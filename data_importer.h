@@ -25,8 +25,14 @@ public:
             V3DLONG * & sz, ImagePixelType & datatype);
     void cleanData();
 public:
-    QString openFileNameLabel = QString("");;
+    QString openFileNameLabel = QString("");
     Image4DSimple* image4d = 0;
+
+    double * p_vmax = NULL, * p_vmin = NULL; //whole volume max/min values. Use pointer to handle multiple channels separately
+    void updateMinMax(V3DLONG nFrame);
+    //double getChannalMinIntensity(V3DLONG channo);
+    //double getChannalMaxIntensity(V3DLONG channo);
+
 };
 
 #endif // DataImporter_H

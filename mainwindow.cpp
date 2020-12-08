@@ -1,7 +1,4 @@
 #include "mainwindow.h"
-#include <QMenuBar>
-#include <QFileDialog>
-#include <QStatusBar>
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_message.h"
 
@@ -9,8 +6,23 @@
 
 MainWindow::MainWindow()
 {
+    //QVBoxLayout *mainLayout = new QVBoxLayout();
+    createControlWidgets();
+    // initialize data4test as null
+    data4test = new DataImporter(); //do we need?
+
+    setMenuBar(menuBar);
+    setCentralWidget(grpBox4display_canvas);
+
+    //setLayout(mainLayout);
+}
+// Create the major layout of the main window
+void MainWindow::createControlWidgets()
+{
     /************ Menu define *****************/
-    fileMenu = menuBar()->addMenu(tr("&File"));
+    menuBar = new QMenuBar;
+    fileMenu = new QMenu(tr("&File"), this);
+    menuBar->addMenu(fileMenu);
     // import image stacks
     importImageSeriesAct = new QAction(tr("&Import time series to an image stack..."), this);
     importImageSeriesAct->setShortcut(tr("Ctrl+I"));
@@ -21,10 +33,49 @@ MainWindow::MainWindow()
     // separator
     fileMenu->addSeparator();
     // exit the program
+    exitAct = new QAction(tr("E&xit"), this);
+    exitAct->setShortcut(tr("Ctrl+Q"));
+    //exitAct->setStatusTip(tr("Exit the application"));
     fileMenu->addAction(exitAct);
 
-    // initialize data4test as null
-    data4test = new DataImporter();
+    /*************** display grid *******************/
+    grpBox4display_canvas = new QGroupBox();//tr("Canvas")
+    // area to show volume
+    glWidgetArea = new QScrollArea;
+    glWidgetArea->setWidgetResizable(true);
+    glWidgetArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    glWidgetArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    glWidgetArea->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding); //QSizePolicy::Ignored, QSizePolicy::Ignored);
+    glWidgetArea->setMinimumSize(700,700);//(MINVIEW_SIZEX, MINVIEW_SIZEY);
+    if (!glWidget){
+        glWidget_simple = new MyGLWidget(this); // test main window with a simple gl
+        glWidgetArea->setWidget(glWidget_simple);
+    }
+    else {
+        glWidgetArea->setWidget(glWidget);
+    }
+    // time slider
+    timeSlider = new QScrollBar(Qt::Horizontal);
+    timeSlider->setRange(0,0);
+    timeSlider->setSingleStep(1);
+    timeSlider->setPageStep(10);
+    // add them to layout
+    QVBoxLayout *viewLayout = new QVBoxLayout;
+    viewLayout->addWidget(glWidgetArea);
+    viewLayout->addWidget(timeSlider);
+    viewLayout->setContentsMargins(0,0,0,0);
+    // Put the layout to the mainwindow
+    grpBox4display_canvas->setLayout(viewLayout);
+}
+
+// connect events
+void MainWindow::connectSignal()
+{
+    if (!glWidget)	return;
+//    if (timeSlider) {
+//        connect(glWidget, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
+//        connect(timeSlider, SIGNAL(valueChanged(int)), glWidget, SLOT(setVolumeTimePoint(int)));
+//    }
 }
 void MainWindow::importImageSeries()
 {
@@ -34,6 +85,8 @@ void MainWindow::importImageSeries()
         try
         {
             data4test->importData(filename);
+            // display in glWidget
+            glWidget = new EmT_GLWidget(data4test, this, filename);
         }
         catch (...)
         {

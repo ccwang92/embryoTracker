@@ -3,6 +3,7 @@
 #include "src_3rd/v3d/import_images_tool_dialog.h"
 
 #include "src_3rd/basic_c_fun/stackutil.h"
+#include "src_3rd/basic_c_fun/volimg_proc_declare.h"
 #include "src_3rd/io/io_bioformats.h"
 #include "src_3rd/basic_c_fun/v3d_message.h"
 //#include "v3d_message.h"
@@ -18,7 +19,10 @@ void DataImporter::importData(QString filename)
         QStringList mylist = importSeriesFileList_addnumbersort(filename, timepacktype);
 
         if (importGeneralImgSeries(mylist, timepacktype))
+        {
+            updateMinMax(0); // use the first frame to update the minmax intensity value
             v3d_msg("File loaded!");
+        }
         else
             v3d_msg("Fail loading!");
     }
@@ -316,4 +320,91 @@ bool DataImporter::readSingleImageFile(char *imgSrcFile, unsigned char * & data1
 }
 void DataImporter::cleanData(){
     if (image4d) {delete image4d; image4d = 0;}
+}
+
+//double DataImporter::getChannalMinIntensity(V3DLONG channo) //if channo <0 or out of range, then return the in of all channels
+//{
+//    if (p_vmin && channo>=0 && channo<image4d->getCDim()) return p_vmin[channo];
+//    else {V3DLONG tmppos; return minInVector(p_vmin, image4d->getCDim(), tmppos);}
+//}
+
+//double DataImporter::getChannalMaxIntensity(V3DLONG channo) //if channo <0 or out of range, then return the max of all channels
+//{
+//    if (p_vmax && channo>=0 && channo<image4d->getCDim()) return p_vmax[channo];
+//    else {V3DLONG tmppos; return maxInVector(p_vmax, image4d->getCDim(), tmppos);}
+//}
+void DataImporter::updateMinMax(V3DLONG nFrame)
+{
+    if (image4d)
+    {
+        //image4d->updateminmaxvalues();
+
+        V3DLONG sx, sy, sz, sc;
+
+        sx = image4d->getXDim();
+        sy = image4d->getYDim();
+        sz = image4d->getZDim();
+        sc = image4d->getCDim();
+
+        if(nFrame<0 || nFrame>=sz) // changed by YuY Feb 8, 2011
+            return;
+
+        V3DLONG offsets = nFrame*sx*sy;
+        V3DLONG pagesz = sx*sy;
+
+        switch (image4d->getDatatype())
+        {
+            case V3D_UINT8:
+                for(V3DLONG i=0;i<sc;i++)
+                {
+                    unsigned char minvv,maxvv;
+                    V3DLONG tmppos_min, tmppos_max;
+                    unsigned char *datahead = (unsigned char *)(image4d->getRawDataAtChannel(i));
+
+                    minMaxInVector(datahead+offsets, pagesz, tmppos_min, minvv, tmppos_max, maxvv);
+
+                    if(p_vmax[i]<maxvv)
+                        p_vmax[i] = maxvv;
+                    if(p_vmin[i]>minvv)
+                        p_vmin[i] = minvv;
+                }
+                break;
+
+            case V3D_UINT16:
+                for(V3DLONG i=0;i<sc;i++)
+                {
+                    unsigned short int minvv,maxvv;
+                    V3DLONG tmppos_min, tmppos_max;
+                    unsigned short int *datahead = (unsigned short int *)(image4d->getRawDataAtChannel(i));
+
+                    minMaxInVector(datahead+offsets, pagesz, tmppos_min, minvv, tmppos_max, maxvv);
+
+                    if(p_vmax[i]<maxvv)
+                        p_vmax[i] = maxvv;
+                    if(p_vmin[i]>minvv)
+                        p_vmin[i] = minvv;
+                }
+                break;
+
+            case V3D_FLOAT32:
+                for(V3DLONG i=0;i<sc;i++)
+                {
+                    float minvv,maxvv;
+                    V3DLONG tmppos_min, tmppos_max;
+                    float *datahead = (float *)(image4d->getRawDataAtChannel(i));
+
+                    minMaxInVector(datahead+offsets, pagesz, tmppos_min, minvv, tmppos_max, maxvv);
+
+                    if(p_vmax[i]<maxvv)
+                        p_vmax[i] = maxvv;
+                    if(p_vmin[i]>minvv)
+                        p_vmin[i] = minvv;
+                }
+                break;
+
+            default:
+                v3d_msg("Invalid data type found in updateMinMax().");
+                return;
+        }
+    }
 }

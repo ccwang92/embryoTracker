@@ -1,4 +1,4 @@
-QT       += core gui
+QT       += core gui opengl
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -14,6 +14,12 @@ SOURCES += emt_glwidget.cpp \
     main.cpp \
     mainwindow.cpp \
     my4dimage.cpp \
+    myglwidget.cpp \
+    renderer_emt.cpp \
+    src_3rd/3drenderer/GLee2glew.c \
+#    src_3rd/3drenderer/renderer.cpp \
+#    src_3rd/3drenderer/renderer_gl2.cpp \
+    src_3rd/3drenderer/glsl_r.cpp \
     src_3rd/basic_c_fun/basic_4dimage.cpp \
     src_3rd/basic_c_fun/basic_4dimage_create.cpp \
     src_3rd/basic_c_fun/imageio_mylib.cpp \
@@ -27,13 +33,23 @@ HEADERS += emt_glwidget.h \
     data_importer.h \
     mainwindow.h \
     my4dimage.h \
+    myglwidget.h \
+    renderer_emt.h \
+    src_3rd/3drenderer/GLee2glew.h \
+#    src_3rd/3drenderer/renderer.h \
+#    src_3rd/3drenderer/renderer_gl1.h \
+#    src_3rd/3drenderer/renderer_gl2.h \
+    src_3rd/3drenderer/glsl_r.h \
     src_3rd/basic_c_fun/basic_4dimage.h \
+    src_3rd/basic_c_fun/color_xyz.h \
     src_3rd/basic_c_fun/imageio_mylib.h \
     src_3rd/basic_c_fun/mg_image_lib.h \
     src_3rd/basic_c_fun/mg_utilities.h \
     src_3rd/basic_c_fun/stackutil.h \
     src_3rd/basic_c_fun/v3d_basicdatatype.h \
     src_3rd/basic_c_fun/v3d_message.h \
+    src_3rd/basic_c_fun/volimg_proc.h \
+    src_3rd/basic_c_fun/volimg_proc_declare.h \
     src_3rd/io/io_bioformats.h \
     src_3rd/v3d/import_images_tool_dialog.h
 
@@ -63,8 +79,10 @@ LIBS += -lm -lv3dtiff # for tiff read
 #LIBS += -lv3dnewmat  # for new image create
 LIBS += -L$$PWD/src_3rd/common_lib/src_packages/mylib_tiff/ -lmylib # for usage of self-deisgned tiff functions
 #LIBS += -L$$PWD/src_3rd/common_lib/lib_unix64  -lteem  -lbz2 -lz  -lGLU #for nrrd support
+#LIBS += -lglut -lGLU # for GL support
 
-#INCLUDEPATH += $$PWD/src_3rd/common_lib/include
+INCLUDEPATH += $$PWD/src_3rd/common_lib/include # for glew folder
+#INCLUDEPATH += $$PWD/src_3rd/common_lib/include/glew/
 #INCLUDEPATH += $$PWD/src_3rd/basic_c_fun
 
 
