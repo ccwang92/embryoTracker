@@ -5,7 +5,8 @@
 #include <cmath>
 #include <QMessageBox>
 #include <QObject>
-
+#include <QOpenGLExtraFunctions>
+//#include <QOpenGLFunctions>
 
 Renderer_EmT::Renderer_EmT(void *widget) : widget(widget)
 {
@@ -19,8 +20,8 @@ Renderer_EmT::Renderer_EmT(void *widget) : widget(widget)
     //this->NAeditingMode = false;
 
     //Renderer_EmT
-    tryTexStream = (supported_PBO()? 1 : 0);
-    tryVolShader = (supported_GLSL()? 1 : 0);
+    //tryTexStream = (supported_PBO()? 1 : 0);
+    //tryVolShader = (supported_GLSL()? 1 : 0);
 
 
     init_members(); //for renderer, gl1 and gl2
@@ -43,9 +44,9 @@ void Renderer_EmT::initialize()
         //if (b_error) return; //080924 try to catch the memory error
         // renderer
         ////////////////////////////////////////////////
-        GLeeInit();
+        //GLeeInit();
 
-        if (GLEE_ARB_multisample)
+        //if (GLEE_ARB_multisample)
         {
             glEnable(GL_MULTISAMPLE_ARB); // default enabled by setSampleBuffers?
             GLint samples=0;
@@ -112,25 +113,25 @@ void Renderer_EmT::loadVol()
     imageZ = bufSize[2];
     imageT = bufSize[4];
 
-    bool ok;
-    if ( !(ok = supported_TexNPT()) )
+    bool ok = 0;
+    //if ( !(ok = supported_TexNPT()) )
         tryTexNPT = 0;
         qDebug()<< QString("	ARB_texture_non_power_of_two          %1 supported ").arg(ok?"":"NOT");
 
-    if ( !(ok = supported_TexCompression()) )
+    //if ( !(ok = supported_TexCompression()) )
         tryTexCompress = 0;
         qDebug()<< QString("	ARB_texture_compression               %1 supported ").arg(ok?"":"NOT");
 
-    if ( !(ok = supported_Tex3D()) )
+    //if ( !(ok = supported_Tex3D()) )
         tryTex3D = 0;
         qDebug()<< QString("	EXT_texture3D (or OpenGL 2.0)         %1 supported ").arg(ok?"":"NOT");
 
-    if ( !(ok = supported_TexStream()) )
+    //if ( !(ok = supported_TexStream()) )
         if (tryTexStream != -1)
             tryTexStream = 0;
         qDebug()<< QString("	texture stream (need PBO and GLSL)    %1 supported ").arg(ok?"":"NOT");
 
-    ok = supported_GL2();
+    //ok = supported_GL2();
         qDebug()<< QString("	GLSL (and OpenGL 2.0)                 %1 supported ").arg(ok?"":"NOT");
 
 
@@ -166,63 +167,63 @@ void Renderer_EmT::loadVol()
     qDebug("   setupStack start --- try %s", try_vol_state());
 
     fillX = _getTexFillSize(imageX);
-    fillY = _getTexFillSize(imageY);
+    fillY = _getTexFillSize(i#include <QOpenGLExtraFunctions>mageY);
     fillZ = _getTexFillSize(imageZ);
     qDebug("   sampleScale = %gx%gx%g""   sampledImage = %dx%dx%d""   fillTexture = %dx%dx%d",
             sampleScaleX, sampleScaleY, sampleScaleZ,  imageX, imageY, imageZ,  fillX, fillY, fillZ);
 
-    if (tryTex3D && supported_Tex3D())
+    //if (tryTex3D && supported_Tex3D())
     {
             qDebug() << "Renderer_gl1::loadVol() - creating 3D texture ID\n";
         glGenTextures(1, &tex3D);		//qDebug("	tex3D = %u", tex3D);
     }
-    if (!tex3D || tryTexStream !=0) //stream = -1/1/2
-    {
-        //tryTex3D = 0; //091015: no need, because tex3D & tex_stream_buffer is not related now.
+//    if (!tex3D || tryTexStream !=0) //stream = -1/1/2
+//    {
+//        //tryTex3D = 0; //091015: no need, because tex3D & tex_stream_buffer is not related now.
 
-            qDebug() << "Renderer_gl1::loadVol() - creating data structures for managing 2D texture slice set\n";
+//            qDebug() << "Renderer_gl1::loadVol() - creating data structures for managing 2D texture slice set\n";
 
-        Ztex_list = new GLuint[imageZ+1]; //+1 for pbo tex
-        Ytex_list = new GLuint[imageY+1];
-        Xtex_list = new GLuint[imageX+1];
-        memset(Ztex_list, 0, sizeof(GLuint)*(imageZ+1));
-        memset(Ytex_list, 0, sizeof(GLuint)*(imageY+1));
-        memset(Xtex_list, 0, sizeof(GLuint)*(imageX+1));
-        glGenTextures(imageZ+1, Ztex_list);
-        glGenTextures(imageY+1, Ytex_list);
-        glGenTextures(imageX+1, Xtex_list);
+//        Ztex_list = new GLuint[imageZ+1]; //+1 for pbo tex
+//        Ytex_list = new GLuint[imageY+1];
+//        Xtex_list = new GLuint[imageX+1];
+//        memset(Ztex_list, 0, sizeof(GLuint)*(imageZ+1));
+//        memset(Ytex_list, 0, sizeof(GLuint)*(imageY+1));
+//        memset(Xtex_list, 0, sizeof(GLuint)*(imageX+1));
+//        glGenTextures(imageZ+1, Ztex_list);
+//        glGenTextures(imageY+1, Ytex_list);
+//        glGenTextures(imageX+1, Xtex_list);
 
-        CHECK_GLErrorString_throw(); // can throw const char* exception, RZC 080925
+//        CHECK_GLErrorString_throw(); // can throw const char* exception, RZC 080925
 
-        int X = _getBufFillSize(imageX);
-        int Y = _getBufFillSize(imageY);
-        int Z = _getBufFillSize(imageZ);
-        Zslice_data = new RGBA8 [Y * X];//[Z][y][x] //base order
-        Yslice_data = new RGBA8 [Z * X];//[Y][z][x]
-        Xslice_data = new RGBA8 [Z * Y];//[X][z][y]
-        memset(Zslice_data, 0, sizeof(RGBA8)* (Y * X));
-        memset(Yslice_data, 0, sizeof(RGBA8)* (Z * X));
-        memset(Xslice_data, 0, sizeof(RGBA8)* (Z * Y));
+//        int X = _getBufFillSize(imageX);
+//        int Y = _getBufFillSize(imageY);
+//        int Z = _getBufFillSize(imageZ);
+//        Zslice_data = new RGBA8 [Y * X];//[Z][y][x] //base order
+//        Yslice_data = new RGBA8 [Z * X];//[Y][z][x]
+//        Xslice_data = new RGBA8 [Z * Y];//[X][z][y]
+//        memset(Zslice_data, 0, sizeof(RGBA8)* (Y * X));
+//        memset(Yslice_data, 0, sizeof(RGBA8)* (Z * X));
+//        memset(Xslice_data, 0, sizeof(RGBA8)* (Z * Y));
 
-        // optimized copy slice data in setupStackTexture, by RZC 2008-10-04
-    }
+//        // optimized copy slice data in setupStackTexture, by RZC 2008-10-04
+//    }
 
     qDebug("   setupStack: id & buffer ....................... cost time = %g sec", qtime.elapsed()*0.001);
 
 
     ///////////////////////////////////////
-    if (texture_format==-1)
-    {
-        texture_format = GL_RGBA;
-        //Call TexImage with a generic compressed internal format. The texture image will be compressed by the GL, if possible.
-        //Call CompressedTexImage to Load pre-compressed image.
-        //S3TC: DXT1(1bit alpha), DXT3(sharp alpha), DXT5(smooth alpha)
-        //glHint(GL_TEXTURE_COMPRESSION_HINT_ARB, GL_NICEST); // seems no use, choice DXT3, but DXT5 is better, 081020
-        if (tryTexCompress && GLEE_ARB_texture_compression)
-            texture_format = GL_COMPRESSED_RGBA_ARB;
-        if (texture_format==GL_COMPRESSED_RGBA_ARB && GLEE_EXT_texture_compression_s3tc)
-            texture_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-    }
+//    if (texture_format==-1)
+//    {
+//        texture_format = GL_RGBA;
+//        //Call TexImage with a generic compressed internal format. The texture image will be compressed by the GL, if possible.
+//        //Call CompressedTexImage to Load pre-compressed image.
+//        //S3TC: DXT1(1bit alpha), DXT3(sharp alpha), DXT5(smooth alpha)
+//        //glHint(GL_TEXTURE_COMPRESSION_HINT_ARB, GL_NICEST); // seems no use, choice DXT3, but DXT5 is better, 081020
+//        if (tryTexCompress && GLEE_ARB_texture_compression)
+//            texture_format = GL_COMPRESSED_RGBA_ARB;
+//        if (texture_format==GL_COMPRESSED_RGBA_ARB && GLEE_EXT_texture_compression_s3tc)
+//            texture_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+//    }
     if (image_format==-1)
     {
         image_format = GL_RGBA;
@@ -251,7 +252,7 @@ void Renderer_EmT::subloadTex(V3DLONG timepoint, bool bfirst)
 
           qDebug() << "Calling setupStackTexture() from Renderer_gl1::subloadTex()";
         //if (tryTexStream<=0) 			// 091014: mix down-sampled & streamed method
-            setupStackTexture(bfirst);  // use a temporary buffer, so first
+        //    setupStackTexture(bfirst);  // use a temporary buffer, so first
 
         if (tryTexStream >0 && bfirst)
         {
@@ -872,7 +873,7 @@ bool Renderer_EmT::supported_TexStream()
 //
 //    glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
 
-#define BIND_UNPACK_PBO(pbo)  glBindBufferARB(GL_PIXEL_UNPACK_BUFFER_ARB, pbo)
+#define BIND_UNPACK_PBO(pbo)  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo)
 
 
 void Renderer_EmT::cleanTexStreamBuffer()
@@ -929,9 +930,9 @@ void  Renderer_EmT::setupTexStreamBuffer()
 
     //091012: 1 common PBO is not faster than switch 3 PBOs
     BIND_UNPACK_PBO(0);
-    glGenBuffersARB(1, &pboZ);
-    glGenBuffersARB(1, &pboY);
-    glGenBuffersARB(1, &pboX);
+    glGenBuffers(1, &pboZ);
+    glGenBuffers(1, &pboY);
+    glGenBuffers(1, &pboX);
     tex_stream_buffer = pboZ>0; //##################
 
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);      //// 4-byte pixel alignment image for good speed
@@ -999,7 +1000,7 @@ void  Renderer_EmT::setupTexStreamBuffer()
 
 void Renderer_EmT::setupStackTexture(bool bfirst) {
     qDebug() << "Renderer_EmT::setupStackTexture() start";
-    Renderer_gl1::setupStackTexture(bfirst);
+    Renderer_EmT::setupStackTexture(bfirst);
 }
 
 
@@ -1051,8 +1052,7 @@ void Renderer_EmT::_streamTex(int stack_i, int slice_i, int step, int slice0, in
 //	if (sh>h) sh = h;
 
     glBindTexture(GL_TEXTURE_2D, tex);
-    BIND_
-UNPACK_PBO(pbo);
+    BIND_UNPACK_PBO(pbo);
     glBufferDataARB(GL_PIXEL_UNPACK_BUFFER_ARB, size, NULL, GL_STREAM_DRAW);
     CHECK_GLError_print();
 
@@ -1108,8 +1108,8 @@ void Renderer_EmT::toggleTexStream()
     tryTexStream = !(tryTexStream >0); // -1--resident, 0--off, 1--mixed, 2--force
     //qDebug( "	tryTexStream = %d", tryTexStream);
     try	{
-        PROGRESS_DIALOG( ((tryTexStream >0)? "Try Texture Stream": "No Texture Stream"), widget);
-        PROGRESS_PERCENT(30);
+        //PROGRESS_DIALOG( ((tryTexStream >0)? "Try Texture Stream": "No Texture Stream"), widget);
+        //PROGRESS_PERCENT(30);
 
         if (tryTexStream<=0)
         {
@@ -1118,7 +1118,7 @@ void Renderer_EmT::toggleTexStream()
         }
         else loadVol();
 
-        PROGRESS_PERCENT(100);
+        //PROGRESS_PERCENT(100);
     } CATCH_handler( "Renderer_EmT::toggleTexStream" );
 }
 
@@ -1598,7 +1598,8 @@ void Renderer_EmT::blendBrighten(float fbright, float fcontrast) // fast, 8-bit 
         {
             if (fbright >=0)
             {
-                glBlendEquationEXT(GL_FUNC_ADD_EXT);
+                //glBlendEquationEXT(GL_FUNC_ADD_EXT);
+                glBlendEquation(GL_FUNC_ADD);
             }
             else //fbright <0
             {

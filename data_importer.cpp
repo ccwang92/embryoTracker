@@ -3,7 +3,7 @@
 #include "src_3rd/v3d/import_images_tool_dialog.h"
 
 #include "src_3rd/basic_c_fun/stackutil.h"
-#include "src_3rd/basic_c_fun/volimg_proc_declare.h"
+//#include "src_3rd/basic_c_fun/volimg_proc_declare.h"
 #include "src_3rd/io/io_bioformats.h"
 #include "src_3rd/basic_c_fun/v3d_message.h"
 //#include "v3d_message.h"
@@ -20,7 +20,7 @@ void DataImporter::importData(QString filename)
 
         if (importGeneralImgSeries(mylist, timepacktype))
         {
-            updateMinMax(0); // use the first frame to update the minmax intensity value
+            //updateMinMax(0); // use the first frame to update the minmax intensity value
             v3d_msg("File loaded!");
         }
         else
@@ -333,6 +333,31 @@ void DataImporter::cleanData(){
 //    if (p_vmax && channo>=0 && channo<image4d->getCDim()) return p_vmax[channo];
 //    else {V3DLONG tmppos; return maxInVector(p_vmax, image4d->getCDim(), tmppos);}
 //}
+
+/***this function should be the one in volimg_proc_declare.h***/
+template <class T> bool minMaxInVector(T * p, V3DLONG len, V3DLONG &pos_min, T &minv, V3DLONG &pos_max, T &maxv)
+{
+    if (!p || len <= 0)
+        return false;
+
+    minv = maxv = p[0];
+    pos_min = pos_max = 0;
+    for (V3DLONG i=1;i<len;i++)
+    {
+        if (p[i]>maxv)
+        {
+            maxv = p[i];
+            pos_max = i;
+        }
+        else if (p[i]<minv)
+        {
+            minv = p[i];
+            pos_min = i;
+        }
+    }
+
+    return true;
+}
 void DataImporter::updateMinMax(V3DLONG nFrame)
 {
     if (image4d)
@@ -407,4 +432,96 @@ void DataImporter::updateMinMax(V3DLONG nFrame)
                 return;
         }
     }
+}
+
+bool DataImporter::updateminmaxvalues() // update the max min intensity of a single frame (frame 0)
+{
+    //always delete the two pointers and recreate because if the image is altered in a plugin, the # of color channels may change
+    if (p_vmax) {delete []p_vmax; p_vmax=0;}
+    if (p_vmin) {delete []p_vmin; p_vmin=0;}
+
+    try
+    {
+        p_vmax = new double [image4d->getCDim()];
+        p_vmin = new double [image4d->getCDim()];
+    }
+    catch (...)
+    {
+        v3d_msg("Error happened in allocating memory in updateminmaxvalues().\n");
+        if (p_vmax) {delete []p_vmax; p_vmax=0;}
+        if (p_vmin) {delete []p_vmin; p_vmin=0;}
+        return false;
+    }
+
+    V3DLONG i;
+    V3DLONG channelPageSize = image4d->getTotalUnitNumberPerChannel();
+
+    switch (image4d->getDatatype())
+    {
+        case V3D_UINT8:
+            for(i=0;i<image4d->getCDim();i++)
+            {
+                unsigned char minvv,maxvv;
+                V3DLONG tmppos_min, tmppos_max;
+                unsigned char *datahead = (unsigned char *)image4d->getRawDataAtChannel(i);
+                minMaxInVector(datahead, channelPageSize, tmppos_min, minvv, tmppos_max, maxvv);
+                p_vmax[i] = maxvv; p_vmin[i] = minvv;
+                v3d_msg(QString("channel %1 min=[%2] max=[%3]").arg(i).arg(p_vmin[i]).arg(p_vmax[i]),0);
+            }
+            break;
+
+        case V3D_UINT16:
+            for(i=0;i<image4d->getCDim();i++)
+            {
+                unsigned short int minvv,maxvv;
+                V3DLONG tmppos_min, tmppos_max;
+                unsigned short int *datahead = (unsigned short int *)image4d->getRawDataAtChannel(i);
+                minMaxInVector(datahead, channelPageSize, tmppos_min, minvv, tmppos_max, maxvv);
+                p_vmax[i] = maxvv; p_vmin[i] = minvv;
+                v3d_msg(QString("channel %1 min=[%2] max=[%3]").arg(i).arg(p_vmin[i]).arg(p_vmax[i]),0);
+            }
+            break;
+
+        case V3D_FLOAT32:
+            for(i=0;i<image4d->getCDim();i++)
+            {
+                float minvv,maxvv;
+
+                V3DLONG tmppos_min, tmppos_max;
+                float *datahead = (float *)image4d->getRawDataAtChannel(i);
+
+                if (0) //for debugging purpose. 2014-08-22
+                {
+                    minvv=datahead[0], maxvv=datahead[0];
+                    for (V3DLONG myii=1; myii<channelPageSize;myii++)
+                    {
+                        if (minvv>datahead[myii]) minvv=datahead[myii];
+                        else if (maxvv<datahead[myii]) maxvv=datahead[myii];
+                    }
+
+                    p_vmax[i] = maxvv; p_vmin[i] = minvv;
+                    v3d_msg(QString("channel %1 min=[%2] max=[%3]").arg(i).arg(p_vmin[i]).arg(p_vmax[i]));
+                }
+                else
+                {
+                    if (minMaxInVector(datahead, channelPageSize, tmppos_min, minvv, tmppos_max, maxvv))
+                    {
+                        p_vmax[i] = maxvv; p_vmin[i] = minvv;
+                        v3d_msg(QString("channel %1 min=[%2] max=[%3]").arg(i).arg(p_vmin[i]).arg(p_vmax[i]), 0);
+                    }
+                    else
+                    {
+                        v3d_msg("fail");
+                    }
+                }
+
+            }
+            break;
+
+        default:
+            v3d_msg("Invalid data type found in updateminmaxvalues(). Should never happen, - check with V3D developers.");
+            return false;
+    }
+
+    return true;
 }

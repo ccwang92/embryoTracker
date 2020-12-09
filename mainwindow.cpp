@@ -47,12 +47,15 @@ void MainWindow::createControlWidgets()
     glWidgetArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     glWidgetArea->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding); //QSizePolicy::Ignored, QSizePolicy::Ignored);
     glWidgetArea->setMinimumSize(700,700);//(MINVIEW_SIZEX, MINVIEW_SIZEY);
-    if (!glWidget){
-        glWidget_simple = new MyGLWidget(this); // test main window with a simple gl
+    if (widget_type == my_simple_test_type){
         glWidgetArea->setWidget(glWidget_simple);
     }
-    else {
-        glWidgetArea->setWidget(glWidget);
+    else if (widget_type == raycast_type){
+        glWidgetArea->setWidget(glWidget_raycast);
+    }
+    else //vaa3d_type
+    {
+        //
     }
     // time slider
     timeSlider = new QScrollBar(Qt::Horizontal);
@@ -71,7 +74,7 @@ void MainWindow::createControlWidgets()
 // connect events
 void MainWindow::connectSignal()
 {
-    if (!glWidget)	return;
+    //if (!glWidget)	return;
 //    if (timeSlider) {
 //        connect(glWidget, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
 //        connect(timeSlider, SIGNAL(valueChanged(int)), glWidget, SLOT(setVolumeTimePoint(int)));
@@ -86,7 +89,18 @@ void MainWindow::importImageSeries()
         {
             data4test->importData(filename);
             // display in glWidget
-            glWidget = new EmT_GLWidget(data4test, this, filename);
+            if (widget_type == my_simple_test_type){
+                glWidget_simple = new MyGLWidget(this); // test main window with a simple gl
+            }
+            else if (widget_type == raycast_type){
+                glWidget_raycast = new RayCastCanvas(this);
+                glWidget_raycast->setVolume(data4test->image4d);
+            }
+            else //vaa3d_type
+            {
+                //glWidget = new EmT_GLWidget(data4test, this, filename);
+            }
+
         }
         catch (...)
         {

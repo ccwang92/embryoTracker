@@ -2,24 +2,28 @@ QT       += core gui opengl
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-CONFIG += c++11
+CONFIG += c++17
 
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
-DEFINES += USE_Qt5 # for vaa3d functions
+#DEFINES += USE_Qt5 # for vaa3d functions
 
-SOURCES += emt_glwidget.cpp \
-    data_importer.cpp \
+SOURCES += data_importer.cpp \
     main.cpp \
     mainwindow.cpp \
     my4dimage.cpp \
     myglwidget.cpp \
-    renderer_emt.cpp \
-    src_3rd/3drenderer/GLee2glew.c \
+#    emt_glwidget.cpp \
+#    renderer_emt.cpp \
+#    src_3rd/3drenderer/GLee2glew.c \
 #    src_3rd/3drenderer/renderer.cpp \
 #    src_3rd/3drenderer/renderer_gl2.cpp \
-    src_3rd/3drenderer/glsl_r.cpp \
+#    src_3rd/3drenderer/glsl_r.cpp \
+    raycasting_renderer/src/mesh.cpp \
+    raycasting_renderer/src/raycastcanvas.cpp \
+    raycasting_renderer/src/raycastvolume.cpp \
+    raycasting_renderer/src/trackball.cpp \
     src_3rd/basic_c_fun/basic_4dimage.cpp \
     src_3rd/basic_c_fun/basic_4dimage_create.cpp \
     src_3rd/basic_c_fun/imageio_mylib.cpp \
@@ -29,17 +33,21 @@ SOURCES += emt_glwidget.cpp \
     src_3rd/basic_c_fun/v3d_message.cpp \
     src_3rd/io/io_bioformats.cpp
 
-HEADERS += emt_glwidget.h \
-    data_importer.h \
+HEADERS += data_importer.h \
     mainwindow.h \
     my4dimage.h \
     myglwidget.h \
-    renderer_emt.h \
-    src_3rd/3drenderer/GLee2glew.h \
+#    emt_glwidget.h \
+#    renderer_emt.h \
+#    src_3rd/3drenderer/GLee2glew.h \
 #    src_3rd/3drenderer/renderer.h \
 #    src_3rd/3drenderer/renderer_gl1.h \
 #    src_3rd/3drenderer/renderer_gl2.h \
-    src_3rd/3drenderer/glsl_r.h \
+#    src_3rd/3drenderer/glsl_r.h \
+    raycasting_renderer/src/mesh.h \
+    raycasting_renderer/src/raycastcanvas.h \
+    raycasting_renderer/src/raycastvolume.h \
+    raycasting_renderer/src/trackball.h \
     src_3rd/basic_c_fun/basic_4dimage.h \
     src_3rd/basic_c_fun/color_xyz.h \
     src_3rd/basic_c_fun/imageio_mylib.h \
@@ -81,7 +89,7 @@ LIBS += -L$$PWD/src_3rd/common_lib/src_packages/mylib_tiff/ -lmylib # for usage 
 #LIBS += -L$$PWD/src_3rd/common_lib/lib_unix64  -lteem  -lbz2 -lz  -lGLU #for nrrd support
 #LIBS += -lglut -lGLU # for GL support
 
-INCLUDEPATH += $$PWD/src_3rd/common_lib/include # for glew folder
+#INCLUDEPATH += $$PWD/src_3rd/common_lib/include # for glew folder
 #INCLUDEPATH += $$PWD/src_3rd/common_lib/include/glew/
 #INCLUDEPATH += $$PWD/src_3rd/basic_c_fun
 

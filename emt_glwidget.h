@@ -1,12 +1,16 @@
 #ifndef EMT_GLWIDGET_H
 #define EMT_GLWIDGET_H
 
-//#include "src_3rd/3drenderer/GLee2glew.h"
+#include "src_3rd/3drenderer/GLee2glew.h"
 #include "data_importer.h"
-//#include "renderer_emt.h"
+#include "renderer_emt.h"
 
+#include <QOpenGLContext>
 #include <QOpenGLWidget>
-#include <QOpenGLFunctions>
+#include <QOpenGLExtraFunctions>
+#include <qtimer.h>
+#include <QMouseEvent>
+#include <QWheelEvent>
 
 
 
@@ -39,7 +43,7 @@
 #define QEvent_HistoryChanged (QEvent::User +6) //20170801 RZC: a notify after Undo Histoty changed
 
 
-class EmT_GLWidget : public QOpenGLWidget
+class EmT_GLWidget : public QOpenGLWidget, , protected QOpenGLExtraFunctions
 {
 public:
     EmT_GLWidget(DataImporter* idep, QWidget* mainWindow=0, QString title="");

@@ -2,12 +2,14 @@
 #define RENDERER_EMT_H
 
 
-#include <GL/glu.h>
-//#include "src_3rd/3drenderer/GLee2glew.h"
-//#include <glew/GL/glew.h>
+
+
 #include "src_3rd/basic_c_fun/color_xyz.h"
 #include "data_importer.h"
-//#include "src_3rd/3drenderer/glsl_r.h"
+#include "src_3rd/3drenderer/GLee2glew.h"
+//#include <glew/GL/glew.h>
+#include "src_3rd/3drenderer/glsl_r.h"
+#include <GL/glu.h>
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // OpenGL related
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////

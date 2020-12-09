@@ -30,6 +30,7 @@ public:
 
     double * p_vmax = NULL, * p_vmin = NULL; //whole volume max/min values. Use pointer to handle multiple channels separately
     void updateMinMax(V3DLONG nFrame);
+    bool updateminmaxvalues();
     //double getChannalMinIntensity(V3DLONG channo);
     //double getChannalMaxIntensity(V3DLONG channo);
 
