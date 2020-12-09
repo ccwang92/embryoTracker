@@ -108,3 +108,6 @@ LIBS += -L$$PWD/src_3rd/common_lib/src_packages/mylib_tiff/ -lmylib # for usage 
 #else:win32:!win32-g++:CONFIG(release, debug|release): PRE_TARGETDEPS += $$PWD/src_3rd/common_lib/src_packages/mylib_tiff/release/mylib.lib
 #else:win32:!win32-g++:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$PWD/src_3rd/common_lib/src_packages/mylib_tiff/debug/mylib.lib
 #else:unix: PRE_TARGETDEPS += $$PWD/src_3rd/common_lib/src_packages/mylib_tiff/libmylib.a
+
+RESOURCES += \
+    raycasting_renderer/resources.qrc

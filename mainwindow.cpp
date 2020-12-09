@@ -48,9 +48,11 @@ void MainWindow::createControlWidgets()
     glWidgetArea->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding); //QSizePolicy::Ignored, QSizePolicy::Ignored);
     glWidgetArea->setMinimumSize(700,700);//(MINVIEW_SIZEX, MINVIEW_SIZEY);
     if (widget_type == my_simple_test_type){
+        glWidget_simple = new MyGLWidget(this);
         glWidgetArea->setWidget(glWidget_simple);
     }
     else if (widget_type == raycast_type){
+        glWidget_raycast = new RayCastCanvas(this);
         glWidgetArea->setWidget(glWidget_raycast);
     }
     else //vaa3d_type
@@ -90,11 +92,9 @@ void MainWindow::importImageSeries()
             data4test->importData(filename);
             // display in glWidget
             if (widget_type == my_simple_test_type){
-                glWidget_simple = new MyGLWidget(this); // test main window with a simple gl
             }
             else if (widget_type == raycast_type){
-                glWidget_raycast = new RayCastCanvas(this);
-                glWidget_raycast->setVolume(data4test->image4d);
+                glWidget_raycast->setVolume(data4test);
             }
             else //vaa3d_type
             {
