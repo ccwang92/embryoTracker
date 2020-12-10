@@ -1,66 +1,66 @@
 #ifndef DIALOG_IMPORT_IM_SEQUENCE_H
 #define DIALOG_IMPORT_IM_SEQUENCE_H
-//#include "ui_.h"
+#include "ui_dialog_import_im_sequence.h"
 
-//#include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
+#include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
 
-//struct ImportImgPara
-//{
-//    V3DLONG startImg;
-//    V3DLONG endImg;
-//    V3DLONG countImg;
-//	QString filt;
-//    V3DLONG inc;
-//	int packType;
-//};
+struct ImportImgPara
+{
+    V3DLONG startImg;
+    V3DLONG endImg;
+    V3DLONG countImg;
+    QString filt;
+    V3DLONG inc;
+    int packType;
+};
 
-//class import_images_tool_Dialog : public QDialog, public Ui_import_images_tool
-//{
-//    Q_OBJECT
+class dialogImportImSequence : public QDialog, public Ui_import_im_seq
+{
+    Q_OBJECT
 
-//public:
-//    import_images_tool_Dialog(QString folderName)
-//	{
-//		setupUi(this);
+public:
+    dialogImportImSequence()
+    {
+        setupUi(this);
 
-//		connect(okButton, SIGNAL(clicked()), this, SLOT(accept()));
-//		connect(cancelButton, SIGNAL(clicked()), this, SLOT(reject()));
+        connect(OK_button, SIGNAL(clicked()), this, SLOT(accept()));
+        connect(Cancel_button, SIGNAL(clicked()), this, SLOT(reject()));
 
-//		//initialization codes for read directory
-//        numimgBox->setMaximum(10000000);
-//        startimgBox->setMaximum(10000000);
-//		startimgBox->setMinimum(1);
-//        incBox->setMaximum(10000000);
-//        incBox->setMinimum(1);
-//        endimgBox->setMaximum(10000000);
-//        endimgBox->setMinimum(1);
+        //initialization codes for read directory
+        num_im_SpBox->setMaximum(10000000);
+        start_id_SpBox->setMaximum(10000000);
+        start_id_SpBox->setMinimum(1);
+        increment_SpBox->setMaximum(10000000);
+        increment_SpBox->setMinimum(1);
+        end_id_SpBox->setMaximum(10000000);
+        end_id_SpBox->setMinimum(1);
 
-//		startimgBox->setValue(1);
-//		incBox->setValue(1);
-//        endimgBox->setValue(1);
-//        filterEdit->setText("");
+        start_id_SpBox->setValue(1);
+        increment_SpBox->setValue(1);
+        end_id_SpBox->setValue(1);
+        LE_name_key_word->setText("");
 
-//        //comboPack->clear();
-//        //comboPack->insertItem(0, "Pack images in 'Z' dimension");
-//        //comboPack->insertItem(1, "Pack images in 'Channel' dimension");
-//        //comboPack->setCurrentIndex(0);
-//	}
+        //comboPack->clear();
+        //comboPack->insertItem(0, "Pack images in 'Z' dimension");
+        //comboPack->insertItem(1, "Pack images in 'Channel' dimension");
+        //comboPack->setCurrentIndex(0);
+    }
 
-//	void fetchData(ImportImgPara *p)
-//	{
-//		if (!p) return;
-//		p->countImg = numimgBox->value();
-//		p->startImg = startimgBox->value();
-//        p->endImg = endimgBox->value();
-//        p->inc = incBox->value();
-//		p->filt = filterEdit->text();
-//        //p->packType = comboPack->currentIndex();
-//        p->packType = 1; //for 3d time series data, we all concatenate them in Channel dim
-//	}
+    void fetchData(ImportImgPara *p)
+    {
+        if (!p) return;
+        p->countImg = num_im_SpBox->value();
+        p->startImg = start_id_SpBox->value();
+        p->endImg = end_id_SpBox->value();
+        p->inc = increment_SpBox->value();
+        p->filt = LE_name_key_word->text();
+        //p->packType = comboPack->currentIndex();
+        p->packType = 1; //for 3d time series data, we all concatenate them in Channel dim
+    }
 
-//private:
-//	QStringList mystringlist;
+private:
+    QStringList mystringlist;
 
-//};
+};
 
 #endif // DIALOG_IMPORT_IM_SEQUENCE_H

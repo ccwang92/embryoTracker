@@ -1,6 +1,6 @@
 #include "data_importer.h"
 #include <stdio.h>
-#include "src_3rd/v3d/import_images_tool_dialog.h"
+#include "dialog_import_im_sequence.h"
 
 #include "src_3rd/basic_c_fun/stackutil.h"
 //#include "src_3rd/basic_c_fun/volimg_proc_declare.h"
@@ -251,25 +251,25 @@ QStringList DataImporter::importSeriesFileList_addnumbersort(const QString & ind
     ImportImgPara p;
     p.countImg = myList.size();
 
-    import_images_tool_Dialog d(curFilePath);
-
+    //import_images_tool_Dialog d(curFilePath);
+    dialogImportImSequence d;
     //need to update the information based on the current myList info. 131017
-    d.numimgBox->setMaximum(p.countImg);
-    d.numimgBox->setValue(p.countImg);
-    d.numimgBox->setMinimum(p.countImg);
+    d.num_im_SpBox->setMaximum(p.countImg);
+    d.num_im_SpBox->setValue(p.countImg);
+    d.num_im_SpBox->setMinimum(p.countImg);
 
-    d.startimgBox->setMaximum(p.countImg);
-    d.startimgBox->setValue(1);
+    d.start_id_SpBox->setMaximum(p.countImg);
+    d.start_id_SpBox->setValue(1);
 
-    d.incBox->setMaximum(p.countImg);
+    d.increment_SpBox->setMaximum(p.countImg);
 
-    d.endimgBox->setMaximum(p.countImg);
-    d.endimgBox->setValue(p.countImg);
+    d.end_id_SpBox->setMaximum(p.countImg);
+    d.end_id_SpBox->setValue(p.countImg);
 
     int res = d.exec();
     if (res==QDialog::Accepted)
     {
-        d.fetchData(&p);
+        d.fetchData(&p);// get the images for loading
 
         //get the QStringList
         myList = myList.filter(p.filt);

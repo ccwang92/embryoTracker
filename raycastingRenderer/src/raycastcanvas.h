@@ -122,7 +122,7 @@ public slots:
     virtual void mouseReleaseEvent(QMouseEvent *event);
     virtual void wheelEvent(QWheelEvent * event);
     virtual void setVolumeTimePoint(int t);
-
+    virtual void setLightPositionZero();
 protected:
     void initializeGL();
     void paintGL();

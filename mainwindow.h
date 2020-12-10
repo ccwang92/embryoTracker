@@ -4,7 +4,7 @@
 //#include "emt_glwidget.h"
 #include "data_importer.h"
 #include "myglwidget.h"
-#include "raycasting_renderer/src/raycastcanvas.h"
+#include "raycastingRenderer/src/raycastcanvas.h"
 #include <QMainWindow>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -30,7 +30,7 @@ signals:
 public slots:
     void importImageSeries();
     void updateControlPanel();
-
+    //void zeroViewPiont();
 
     // parameters
 public:
@@ -41,6 +41,10 @@ public:
     QAction *importImageSeriesAct;
     QAction *exitAct;
     DataImporter *data4test = 0; // functions to import data
+
+    QMenu *editMenu;
+    QAction *resetViewPoint;
+
 
     // major widget
     QScrollArea *glWidgetArea = 0;

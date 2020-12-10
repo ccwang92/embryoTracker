@@ -122,7 +122,10 @@ void RayCastCanvas::paintGL()
     m_modes[m_active_mode]();
 }
 
-
+void RayCastCanvas::setLightPositionZero(){
+    m_lightPosition = QVector3D(0.0, 0.0, 0.0);
+    update();
+}
 /*!
  * \brief Width scaled by the pixel ratio (for HiDPI devices).
  */

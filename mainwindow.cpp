@@ -20,8 +20,8 @@ MainWindow::MainWindow()
 // Create the major layout of the main window
 void MainWindow::createControlWidgets()
 {
-    /************ Menu define *****************/
     menuBar = new QMenuBar;
+    /************ file menu define *****************/
     fileMenu = new QMenu(tr("&File"), this);
     menuBar->addMenu(fileMenu);
     // import image stacks
@@ -29,7 +29,7 @@ void MainWindow::createControlWidgets()
     importImageSeriesAct->setShortcut(tr("Ctrl+I"));
     // status has not been defined
     //importImageFileAct->setStatusTip(tr("Import general image series"));
-    connect(importImageSeriesAct, SIGNAL(triggered()), this, SLOT(importImageSeries()));
+
     fileMenu->addAction(importImageSeriesAct);
     // separator
     fileMenu->addSeparator();
@@ -38,6 +38,15 @@ void MainWindow::createControlWidgets()
     exitAct->setShortcut(tr("Ctrl+Q"));
     //exitAct->setStatusTip(tr("Exit the application"));
     fileMenu->addAction(exitAct);
+    /************ edit menu define *****************/
+    editMenu = new QMenu(tr("&Edit"), this);
+    menuBar->addMenu(editMenu);
+    // reset view point
+    resetViewPoint = new QAction(tr("&Reset ViewPoint"), this);
+    resetViewPoint->setShortcut(tr("Ctrl+R"));
+    // status has not been defined
+    //importImageFileAct->setStatusTip(tr("Import general image series"));
+    editMenu->addAction(resetViewPoint);
 
     /*************** display grid *******************/
     grpBox4display_canvas = new QGroupBox();//tr("Canvas")
@@ -47,7 +56,7 @@ void MainWindow::createControlWidgets()
     glWidgetArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     glWidgetArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     glWidgetArea->setSizePolicy(QSizePolicy::Expanding,QSizePolicy::Expanding); //QSizePolicy::Ignored, QSizePolicy::Ignored);
-    glWidgetArea->setMinimumSize(700,700);//(MINVIEW_SIZEX, MINVIEW_SIZEY);
+    glWidgetArea->setMinimumSize(500,500);//(MINVIEW_SIZEX, MINVIEW_SIZEY);
     if (widget_type == my_simple_test_type){
         glWidget_simple = new MyGLWidget(this);
         glWidgetArea->setWidget(glWidget_simple);
@@ -83,6 +92,13 @@ void MainWindow::updateControlPanel(){
 void MainWindow::connectSignal()
 {
     if (widget_type != raycast_type)	return;
+
+    if(importImageSeriesAct){
+        connect(importImageSeriesAct, SIGNAL(triggered()), this, SLOT(importImageSeries()));
+    }
+    if (resetViewPoint){
+        connect(resetViewPoint, SIGNAL(triggered()), glWidget_raycast, SLOT(setLightPositionZero()));
+    }
     if (timeSlider) {
         connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
         connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
@@ -118,7 +134,23 @@ void MainWindow::importImageSeries()
         }
     }
 }
-
+//void MainWindow::zeroViewPiont(){
+//    if (widget_type == my_simple_test_type){
+////        glWidget_simple->xRotationChanged(0);
+////        glWidget_simple->yRotationChanged(0);
+////        glWidget_simple->zRotationChanged(0);
+//    }
+//    else if (widget_type == raycast_type){
+//        glWidget_raycast->set
+//        //glWidget_raycast->xRotationChanged(0);
+//        //glWidget_raycast->yRotationChanged(0);
+//        //glWidget_raycast->zRotationChanged(0);
+//    }
+//    else //vaa3d_type
+//    {
+//        //
+//    }
+//}
 MainWindow::~MainWindow()
 {
 }
