@@ -34,6 +34,7 @@ SOURCES += data_importer.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
+    dialog_import_im_sequence.h \
     mainwindow.h \
     my4dimage.h \
     myglwidget.h \
@@ -77,6 +78,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 FORMS += \
+    dialog_import_im_sequence.ui \
     src_3rd/v3d/import_images_tool.ui
 
 
@@ -110,4 +112,5 @@ LIBS += -L$$PWD/src_3rd/common_lib/src_packages/mylib_tiff/ -lmylib # for usage 
 #else:unix: PRE_TARGETDEPS += $$PWD/src_3rd/common_lib/src_packages/mylib_tiff/libmylib.a
 
 RESOURCES += \
+    qdarkstyle/style.qrc \
     raycasting_renderer/resources.qrc

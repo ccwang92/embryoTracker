@@ -25,7 +25,7 @@ void MainWindow::createControlWidgets()
     fileMenu = new QMenu(tr("&File"), this);
     menuBar->addMenu(fileMenu);
     // import image stacks
-    importImageSeriesAct = new QAction(tr("&Import time series to an image stack..."), this);
+    importImageSeriesAct = new QAction(tr("&Import image stack..."), this);
     importImageSeriesAct->setShortcut(tr("Ctrl+I"));
     // status has not been defined
     //importImageFileAct->setStatusTip(tr("Import general image series"));
@@ -75,7 +75,9 @@ void MainWindow::createControlWidgets()
 }
 void MainWindow::updateControlPanel(){
     timeSlider->setMinimum(0);
-    timeSlider->setMaximum(data4test->image4d->getTDim());
+    long st = data4test->image4d->getTDim();
+    if (st < 1) st = 1;
+    timeSlider->setMaximum(st - 1);// start from 0
 }
 // connect events
 void MainWindow::connectSignal()

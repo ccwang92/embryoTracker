@@ -14,7 +14,6 @@ bool DataImporter::importData(QString filename)
     if (!filename.isEmpty())
     {
         openFileNameLabel = filename;
-
         TimePackType timepacktype;
         QStringList mylist = importSeriesFileList_addnumbersort(filename, timepacktype);
 
