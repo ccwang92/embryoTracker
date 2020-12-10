@@ -20,10 +20,10 @@ SOURCES += data_importer.cpp \
 #    src_3rd/3drenderer/renderer.cpp \
 #    src_3rd/3drenderer/renderer_gl2.cpp \
 #    src_3rd/3drenderer/glsl_r.cpp \
-    raycasting_renderer/src/mesh.cpp \
-    raycasting_renderer/src/raycastcanvas.cpp \
-    raycasting_renderer/src/raycastvolume.cpp \
-    raycasting_renderer/src/trackball.cpp \
+    raycastingRenderer/src/mesh.cpp \
+    raycastingRenderer/src/raycastcanvas.cpp \
+    raycastingRenderer/src/raycastvolume.cpp \
+    raycastingRenderer/src/trackball.cpp \
     src_3rd/basic_c_fun/basic_4dimage.cpp \
     src_3rd/basic_c_fun/basic_4dimage_create.cpp \
     src_3rd/basic_c_fun/imageio_mylib.cpp \
@@ -45,10 +45,10 @@ HEADERS += data_importer.h \
 #    src_3rd/3drenderer/renderer_gl1.h \
 #    src_3rd/3drenderer/renderer_gl2.h \
 #    src_3rd/3drenderer/glsl_r.h \
-    raycasting_renderer/src/mesh.h \
-    raycasting_renderer/src/raycastcanvas.h \
-    raycasting_renderer/src/raycastvolume.h \
-    raycasting_renderer/src/trackball.h \
+    raycastingRenderer/src/mesh.h \
+    raycastingRenderer/src/raycastcanvas.h \
+    raycastingRenderer/src/raycastvolume.h \
+    raycastingRenderer/src/trackball.h \
     src_3rd/basic_c_fun/basic_4dimage.h \
     src_3rd/basic_c_fun/color_xyz.h \
     src_3rd/basic_c_fun/imageio_mylib.h \
@@ -113,4 +113,4 @@ LIBS += -L$$PWD/src_3rd/common_lib/src_packages/mylib_tiff/ -lmylib # for usage 
 
 RESOURCES += \
     qdarkstyle/style.qrc \
-    raycasting_renderer/resources.qrc
+    raycastingRenderer/resources.qrc
