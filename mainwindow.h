@@ -24,9 +24,12 @@ class MainWindow : public QMainWindow
 public:
     MainWindow();
     ~MainWindow();
+signals:
+    void signalDataLoaded(); //data loaded sucessfully
+
 public slots:
     void importImageSeries();
-//public signals:
+    void updateControlPanel();
 
 
     // parameters
@@ -40,15 +43,15 @@ public:
     DataImporter *data4test = 0; // functions to import data
 
     // major widget
+    QScrollArea *glWidgetArea = 0;
     int widget_type = raycast_type;
     QGroupBox* grpBox4display_canvas;
     //EmT_GLWidget *glWidget = 0;
     MyGLWidget *glWidget_simple = 0;
     RayCastCanvas *glWidget_raycast = 0;
     // time (frame) control
-    QScrollArea *glWidgetArea = 0;
     QScrollBar *timeSlider = 0;
-
+    //QAction *exitAct;
     void createControlWidgets();
     void connectSignal();
     //void

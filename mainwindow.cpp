@@ -15,6 +15,7 @@ MainWindow::MainWindow()
     setCentralWidget(grpBox4display_canvas);
 
     //setLayout(mainLayout);
+    connectSignal();
 }
 // Create the major layout of the main window
 void MainWindow::createControlWidgets()
@@ -72,29 +73,36 @@ void MainWindow::createControlWidgets()
     // Put the layout to the mainwindow
     grpBox4display_canvas->setLayout(viewLayout);
 }
-
+void MainWindow::updateControlPanel(){
+    timeSlider->setMinimum(0);
+    timeSlider->setMaximum(data4test->image4d->getTDim());
+}
 // connect events
 void MainWindow::connectSignal()
 {
-    //if (!glWidget)	return;
-//    if (timeSlider) {
-//        connect(glWidget, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
-//        connect(timeSlider, SIGNAL(valueChanged(int)), glWidget, SLOT(setVolumeTimePoint(int)));
-//    }
+    if (widget_type != raycast_type)	return;
+    if (timeSlider) {
+        connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
+        connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
+    }
+    connect(this, SIGNAL(signalDataLoaded()), this, SLOT(updateControlPanel())); // simply for easy reading
 }
 void MainWindow::importImageSeries()
 {
-    QString filename = QString("/home/ccw/Insync/ccwang@vt.edu/Google Drive/Projects/embyo_analysis/data/crop_embryo_data_500x500x30x40/8bits/embryo_TM481.tif");
-    //QString filename = QFileDialog::getOpenFileName(this);
+    //QString filename = QString("/home/ccw/Insync/ccwang@vt.edu/Google Drive/Projects/embyo_analysis/data/crop_embryo_data_500x500x30x40/8bits/embryo_TM481.tif");
+    QString filename = QFileDialog::getOpenFileName(this);
     if (!filename.isEmpty()) {
         try
         {
-            data4test->importData(filename);
+            if(data4test->importData(filename)) //load data from given paths
+            {
+                emit signalDataLoaded();
+            }
             // display in glWidget
             if (widget_type == my_simple_test_type){
             }
             else if (widget_type == raycast_type){
-                glWidget_raycast->setVolume(data4test);
+                glWidget_raycast->initVolume(data4test);
             }
             else //vaa3d_type
             {
@@ -108,6 +116,7 @@ void MainWindow::importImageSeries()
         }
     }
 }
+
 MainWindow::~MainWindow()
 {
 }

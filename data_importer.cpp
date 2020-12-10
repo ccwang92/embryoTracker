@@ -9,7 +9,7 @@
 //#include "v3d_message.h"
 
 
-void DataImporter::importData(QString filename)
+bool DataImporter::importData(QString filename)
 {
     if (!filename.isEmpty())
     {
@@ -22,12 +22,14 @@ void DataImporter::importData(QString filename)
         {
             //updateMinMax(0); // use the first frame to update the minmax intensity value
             v3d_msg("File loaded!");
+            return true;
         }
         else
             v3d_msg("Fail loading!");
     }
     else
         v3d_msg("Error file name!");
+    return false;
 }
 
 bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackType timepacktype)
