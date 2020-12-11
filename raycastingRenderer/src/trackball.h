@@ -73,6 +73,7 @@ public:
     void start(); // starts clock
     void stop(); // stops clock
     QQuaternion rotation() const;
+    void reset2origin();
 private:
     QQuaternion m_rotation;
     QVector3D m_axis;

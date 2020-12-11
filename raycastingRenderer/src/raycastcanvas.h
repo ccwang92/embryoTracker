@@ -36,6 +36,7 @@
 #include "trackball.h"
 //#include "vtkvolume.h"
 #include "../../data_importer.h"
+
 /*!
  * \brief Class for a raycasting canvas widget.
  */
@@ -76,7 +77,7 @@ public:
         unsigned char *datahead = (unsigned char *)(data_importer->image4d->getRawDataAtChannel(0));
 
         if (!m_raycasting_volume)
-            m_raycasting_volume = new RayCastVolume();
+            m_raycasting_volume = new RayCastVolume(this);
         m_raycasting_volume->transfer_volume(datahead + offsets, p_min, p_max, sx,
                                              sy, sz, sc);
         update();
@@ -114,6 +115,8 @@ public:
         return m_raycasting_volume->range();
     }
 
+    DataImporter* getDataImporter(){return data_importer;}
+
 signals:
     void changeVolumeTimePoint(int);
 public slots:
@@ -129,13 +132,12 @@ protected:
     void resizeGL(int width, int height);
 
 private:
-
     DataImporter *data_importer;
     QMatrix4x4 m_viewMatrix;
     QMatrix4x4 m_modelViewProjectionMatrix;
     QMatrix3x3 m_normalMatrix;
-
-    const GLfloat m_fov = 60.0f;                                          /*!< Vertical field of view. */
+    // m_fov is the maximum vertical angle of cammera, it defines how large the fov will be
+    const GLfloat m_fov = 30.0f;                                          /*!< Vertical field of view. */
     const GLfloat m_focalLength = 1.0 / qTan(M_PI / 180.0 * m_fov / 2.0); /*!< Focal length. */
     GLfloat m_aspectRatio;                                                /*!< width / height */
 
@@ -145,13 +147,15 @@ private:
     QVector3D m_lightPosition {3.0, 0.0, 3.0};    /*!< In camera coordinates. */
     QVector3D m_diffuseMaterial {1.0, 1.0, 1.0};  /*!< Material colour. */
     GLfloat m_stepLength;                         /*!< Step length for ray march. */
-    GLfloat m_threshold;                          /*!< Isosurface intensity threshold. */
+    // no use
+    GLfloat m_threshold = 50;                     /*!< Isosurface intensity threshold. */
+
     QColor m_background;                          /*!< Viewport background colour. */
 
     const GLfloat m_gamma = 2.2f; /*!< Gamma correction parameter. */
 
     RayCastVolume *m_raycasting_volume;
-
+    //QPainter *canvas_painter;
     std::map<QString, QOpenGLShaderProgram*> m_shaders;
     std::map<QString, std::function<void(void)>> m_modes;
     QString m_active_mode;
@@ -169,4 +173,12 @@ private:
     QPointF pixel_pos_to_view_pos(const QPointF& p);
     void create_noise(void);
     void add_shader(const QString& name, const QString& vector, const QString& fragment);
+public:
+    // rendering text
+    void renderText(double x, double y, double z, QString text);
+    inline GLint project(GLdouble objx, GLdouble objy, GLdouble objz,
+                        const GLdouble model[16], const GLdouble proj[16],
+                        const GLint viewport[4],
+                        GLdouble * winx, GLdouble * winy, GLdouble * winz);
+    inline void transformPoint(GLdouble out[4], const GLdouble m[16], const GLdouble in[4]);
 };

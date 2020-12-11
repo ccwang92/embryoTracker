@@ -78,6 +78,8 @@ TrackBall::TrackBall(float angularVelocity, const QVector3D& axis, TrackMode mod
     m_lastTime = QTime::currentTime();
 }
 
+// every time mouse pressing, we must push the location in and call start();
+// after mouse releasing, call stop();
 void TrackBall::push(const QPointF& p, const QQuaternion &)
 {
     m_rotation = rotation();
@@ -86,7 +88,11 @@ void TrackBall::push(const QPointF& p, const QQuaternion &)
     m_lastPos = p;
     m_angularVelocity = 0.0f;
 }
-
+void TrackBall::reset2origin(){
+    m_rotation = QQuaternion();
+    m_lastTime = QTime::currentTime();
+    //m_lastPos = QPointF(0.0,0.0); // no need
+}
 void TrackBall::move(const QPointF& p, const QQuaternion &transformation)
 {
     if (!m_pressed)

@@ -60,7 +60,7 @@ HEADERS += data_importer.h \
     src_3rd/basic_c_fun/volimg_proc.h \
     src_3rd/basic_c_fun/volimg_proc_declare.h \
     src_3rd/io/io_bioformats.h \
-    src_3rd/v3d/import_images_tool_dialog.h
+#    src_3rd/v3d/import_images_tool_dialog.h
 
 #FORMS += v3d/import_images_tool.ui
 
@@ -78,8 +78,8 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 FORMS += \
-    dialog_import_im_sequence.ui \
-    src_3rd/v3d/import_images_tool.ui
+    dialog_import_im_sequence.ui #\
+#    src_3rd/v3d/import_images_tool.ui
 
 
 

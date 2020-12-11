@@ -27,14 +27,15 @@
 #include <QVector3D>
 //#include "../../src_3rd/basic_c_fun/basic_4dimage.h""
 #include "mesh.h"
-
+//#include "raycastcanvas.h"
+#include "../../src_3rd/basic_c_fun/color_xyz.h"
 /*!
  * \brief Class for a raycasting volume.
  */
 class RayCastVolume : protected QOpenGLExtraFunctions
 {
 public:
-    RayCastVolume(void);
+    RayCastVolume(void* _glwidget);
     virtual ~RayCastVolume();
 
     void transfer_volume(void*data, double p_min, double p_max, long sx,
@@ -114,10 +115,27 @@ private:
     GLuint m_volume_texture;
     GLuint m_noise_texture;
     Mesh m_cube_vao;
-    std::pair<double, double> m_range;
-    QVector3D m_origin;
-    QVector3D m_spacing;
-    QVector3D m_size;
+    std::pair<double, double> m_range = std::make_pair(0,255);
+    QVector3D m_origin = QVector3D(0,0,0);
+    QVector3D m_spacing = QVector3D(1,1,1);
+    QVector3D m_size = QVector3D(500,500,30);
 
     float scale_factor(void);
+public:
+    void * glWidget;
+    // add bounding box and x-, y-, z-axes
+    bool bShowAxes = true, bShowBoundingBox = false;
+    BoundingBox* posXTranslateBB=0;
+    BoundingBox* negXTranslateBB=0;
+    BoundingBox* posYTranslateBB=0;
+    BoundingBox* negYTranslateBB=0;
+    BoundingBox boundingBox = 0;
+    int bShowXYTranslateArrows = 0,iPosXTranslateArrowEnabled = 0,
+    iNegXTranslateArrowEnabled = 0,iPosYTranslateArrowEnabled = 0,
+    iNegYTranslateArrowEnabled = 0;
+    RGBA32f color_line = XYZW(.5f,.5f,.7f, 1);
+    void drawString(float x, float y, float z, const char* text, int shadow=0, int fontsize=0);
+    void setBoundingBoxSpace(BoundingBox BB);
+    virtual void getBoundingBox(BoundingBox& bb) {bb = boundingBox;};
+    virtual void drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth=1, float AlineWidth=3);
 };
