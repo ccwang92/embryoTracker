@@ -107,7 +107,7 @@ void TrackBall::move(const QPointF& p, const QQuaternion &transformation)
     case Plane:
         {
             QLineF delta(m_lastPos, p);
-            const float angleDelta = qRadiansToDegrees(float(delta.length()));
+            const float angleDelta = 2 * qRadiansToDegrees(float(delta.length()));
             m_angularVelocity = angleDelta / msecs;
             m_axis = QVector3D(-delta.dy(), delta.dx(), 0.0f).normalized();
             m_axis = transformation.rotatedVector(m_axis);
@@ -131,7 +131,7 @@ void TrackBall::move(const QPointF& p, const QQuaternion &transformation)
                 currentPos3D.normalize();
 
             m_axis = QVector3D::crossProduct(lastPos3D, currentPos3D);
-            float angle = qRadiansToDegrees(std::asin(m_axis.length()));
+            float angle = 2 * qRadiansToDegrees(std::asin(m_axis.length()));
 
             m_angularVelocity = angle / msecs;
             m_axis.normalize();
