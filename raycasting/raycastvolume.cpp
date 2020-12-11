@@ -22,7 +22,6 @@
 
 
 #include "raycastvolume.h"
-//#include "vtkvolume.h"
 #include <QRegularExpression>
 #include "raycastcanvas.h"
 #include <algorithm>

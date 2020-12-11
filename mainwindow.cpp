@@ -2,8 +2,9 @@
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_message.h"
 
-//#include "src_3rd/v3d/xformwidget.h"
-
+/**
+ * brief: create main window
+ * */
 MainWindow::MainWindow()
 {
     //QVBoxLayout *mainLayout = new QVBoxLayout();
@@ -13,11 +14,17 @@ MainWindow::MainWindow()
 
     setMenuBar(menuBar);
     setCentralWidget(grpBox4display_canvas);
-
+    //layout->addWidget(rightSideControlLayout);
     //setLayout(mainLayout);
     connectSignal();
 }
-// Create the major layout of the main window
+void MainWindow::initControlWidgetValues(){
+    //timeSlider no need
+    contrastScrollBar->setValue(0);
+}
+/**
+ * brief: Create the major layout of the main window
+ * */
 void MainWindow::createControlWidgets()
 {
     menuBar = new QMenuBar;
@@ -47,7 +54,9 @@ void MainWindow::createControlWidgets()
     // status has not been defined
     //importImageFileAct->setStatusTip(tr("Import general image series"));
     editMenu->addAction(resetViewPoint);
-
+    /***************** About *************************/
+    QMenu * aboutMenu= new QMenu(tr("&About"), this);
+    menuBar->addMenu(aboutMenu);
     /*************** display grid *******************/
     grpBox4display_canvas = new QGroupBox();//tr("Canvas")
     // area to show volume
@@ -75,12 +84,31 @@ void MainWindow::createControlWidgets()
     timeSlider->setSingleStep(1);
     timeSlider->setPageStep(10);
     // add them to layout
-    QVBoxLayout *viewLayout = new QVBoxLayout;
-    viewLayout->addWidget(glWidgetArea);
-    viewLayout->addWidget(timeSlider);
-    viewLayout->setContentsMargins(0,0,0,0);
+    QHBoxLayout *viewHLayout = new QHBoxLayout;
+    QVBoxLayout *leftSideCanvas = new QVBoxLayout;
+    leftSideCanvas->addWidget(glWidgetArea);
+    leftSideCanvas->addWidget(timeSlider);
+    leftSideCanvas->setContentsMargins(0,0,0,0);
+    viewHLayout->addLayout(leftSideCanvas);
+    /*************** control panel on the right *******************/
+    contrastScrollBar = new QScrollBar(Qt::Orientation::Vertical);
+    contrastScrollBar->setFocusPolicy(Qt::StrongFocus);
+    contrastScrollBar->setRange(-100, 100);
+    contrastScrollBar->setSingleStep(1);
+    contrastScrollBar->setPageStep(10);
+    QLabel *contrastSlider_Label = new QLabel("Contrast");
+//    contrastSlider_Label->setWordWrap(true);
+//    contrastSlider_Label->setAlignment(Qt::AlignTop);
+//    QString s = "Contrast";
+//    contrastSlider_Label->setText(s.split("", QString::SkipEmptyParts).join("\n"));
+    QVBoxLayout *rightSideControlLayout = new QVBoxLayout;
+    //rightSideControlLayout->addWidget(contrastSlider_Label);
+    rightSideControlLayout->addWidget(contrastScrollBar, Qt::AlignCenter);
+
+    //rightSideControlLayout->setContentsMargins(0,0,0,0);
+    viewHLayout->addLayout(rightSideControlLayout);
     // Put the layout to the mainwindow
-    grpBox4display_canvas->setLayout(viewLayout);
+    grpBox4display_canvas->setLayout(viewHLayout);
 }
 void MainWindow::updateControlPanel(){
     timeSlider->setMinimum(0);
@@ -88,7 +116,9 @@ void MainWindow::updateControlPanel(){
     if (st < 1) st = 1;
     timeSlider->setMaximum(st - 1);// start from 0
 }
-// connect events
+/**
+ * brief: connect events
+ * */
 void MainWindow::connectSignal()
 {
     if (widget_type != raycast_type)	return;
@@ -102,6 +132,9 @@ void MainWindow::connectSignal()
     if (timeSlider) {
         connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
         connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
+    }
+    if (contrastScrollBar) {
+        connect(contrastScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setContrast(int)));
     }
     connect(this, SIGNAL(signalDataLoaded()), this, SLOT(updateControlPanel())); // simply for easy reading
 }

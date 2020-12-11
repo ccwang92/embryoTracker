@@ -35,7 +35,7 @@
 #include "raycastvolume.h"
 #include "trackball.h"
 //#include "vtkvolume.h"
-#include "../../data_importer.h"
+#include "../data_importer.h"
 
 /*!
  * \brief Class for a raycasting canvas widget.
@@ -126,6 +126,7 @@ public slots:
     virtual void wheelEvent(QWheelEvent * event);
     virtual void setVolumeTimePoint(int t);
     virtual void setLightPositionZero();
+    virtual void setContrast(int relative_contrast/*[-100:100]*/);
 protected:
     void initializeGL();
     void paintGL();
@@ -152,7 +153,7 @@ private:
 
     QColor m_background;                          /*!< Viewport background colour. */
 
-    const GLfloat m_gamma = 2.2f; /*!< Gamma correction parameter. */
+    GLfloat m_gamma = 1.0f;//2.2 /*!< Gamma correction parameter. */
 
     RayCastVolume *m_raycasting_volume;
     //QPainter *canvas_painter;

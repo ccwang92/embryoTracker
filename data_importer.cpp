@@ -8,7 +8,9 @@
 #include "src_3rd/basic_c_fun/v3d_message.h"
 //#include "v3d_message.h"
 
-
+/**
+** brief: main function of loading tiff image sequence
+*/
 bool DataImporter::importData(QString filename)
 {
     if (!filename.isEmpty())
@@ -20,7 +22,7 @@ bool DataImporter::importData(QString filename)
         if (importGeneralImgSeries(mylist, timepacktype))
         {
             //updateMinMax(0); // use the first frame to update the minmax intensity value
-            v3d_msg("File loaded!");
+            //v3d_msg("File loaded!");
             return true;
         }
         else
@@ -30,7 +32,9 @@ bool DataImporter::importData(QString filename)
         v3d_msg("Error file name!");
     return false;
 }
-
+/**
+** brief: load tiff images in the same folder
+*/
 bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackType timepacktype)
 {
     //foreach (QString qs, myList)  qDebug() << qs;
@@ -173,7 +177,9 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
     return true;
 }
 
-
+/**
+** brief: tranverse images in current folder
+*/
 QStringList DataImporter::importSeriesFileList_addnumbersort(const QString & individualFileName, TimePackType & packtype)
 {
     QStringList myList;
@@ -288,7 +294,9 @@ QStringList DataImporter::importSeriesFileList_addnumbersort(const QString & ind
 
     return myList;
 }
-
+/**
+** brief: load single tiff image
+*/
 bool DataImporter::readSingleImageFile(char *imgSrcFile, unsigned char * & data1d, V3DLONG * & sz, ImagePixelType & datatype)
 {
     datatype = V3D_UNKNOWN;
@@ -319,6 +327,9 @@ bool DataImporter::readSingleImageFile(char *imgSrcFile, unsigned char * & data1
 
     return false;
 }
+/**
+** brief: destructor
+*/
 void DataImporter::cleanData(){
     if (image4d) {delete image4d; image4d = 0;}
 }

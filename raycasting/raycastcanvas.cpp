@@ -46,7 +46,7 @@ QVector3D to_vector3d(const QColor& colour) {
 RayCastCanvas::RayCastCanvas(QWidget *parent)
     : QOpenGLWidget {parent},
     m_stepLength(0.003),
-    m_background(QColor(0, 153, 153)),
+    m_background(QColor(204, 255, 255)),
     m_raycasting_volume {nullptr},
     m_active_mode("MIP")
 {
@@ -80,7 +80,7 @@ void RayCastCanvas::initializeGL()
         setMouseTracking(false);
     //canvas_painter = new QPainter(this);
     m_raycasting_volume = new RayCastVolume(this);
-    m_raycasting_volume->create_noise();
+    //m_raycasting_volume->create_noise();
 
     add_shader("Isosurface", ":/shaders/isosurface.vert", ":/shaders/isosurface.frag");
     add_shader("Alpha blending", ":/shaders/alpha_blending.vert", ":/shaders/alpha_blending.frag");
@@ -100,7 +100,7 @@ void RayCastCanvas::resizeGL(int w, int h)
     m_viewportSize = {(float) scaled_width(), (float) scaled_height()};
     m_aspectRatio = (float) scaled_width() / scaled_height();
     glViewport(0, 0, scaled_width(), scaled_height());
-    m_raycasting_volume->create_noise();
+    //m_raycasting_volume->create_noise();
 }
 
 
@@ -261,7 +261,7 @@ void RayCastCanvas::wheelEvent(QWheelEvent * event)
     update();
 }
 /*!
- * \brief display frame t.
+ * \brief slot: display frame t.
  */
 void RayCastCanvas::setVolumeTimePoint(int t)
 {
@@ -286,7 +286,15 @@ void RayCastCanvas::add_shader(const QString& name, const QString& vertex, const
     m_shaders[name]->addShaderFromSourceFile(QOpenGLShader::Fragment, fragment);
     m_shaders[name]->link();
 }
-
+/*!
+ * \brief slot: change the contrast.
+ */
+void RayCastCanvas::setContrast(int relative_contrast/*[-100:100]*/)
+{
+    m_gamma = (relative_contrast+100.0)/40.0;
+    update();
+    //RayCastCanvas::raycasting(const QString& shader);
+}
 /**rendering text*/
 void RayCastCanvas::renderText(double x, double y, double z, QString text)
 {

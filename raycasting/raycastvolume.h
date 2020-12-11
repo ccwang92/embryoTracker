@@ -25,10 +25,10 @@
 #include <QMatrix4x4>
 #include <QOpenGLExtraFunctions>
 #include <QVector3D>
-//#include "../../src_3rd/basic_c_fun/basic_4dimage.h""
+//#include "../src_3rd/basic_c_fun/basic_4dimage.h""
 #include "mesh.h"
 //#include "raycastcanvas.h"
-#include "../../src_3rd/basic_c_fun/color_xyz.h"
+#include "../src_3rd/basic_c_fun/color_xyz.h"
 /*!
  * \brief Class for a raycasting volume.
  */
@@ -118,7 +118,7 @@ private:
     std::pair<double, double> m_range = std::make_pair(0,255);
     QVector3D m_origin = QVector3D(0,0,0);
     QVector3D m_spacing = QVector3D(1,1,1);
-    QVector3D m_size = QVector3D(500,500,30);
+    QVector3D m_size = QVector3D(500,500,300);
 
     float scale_factor(void);
 public:
