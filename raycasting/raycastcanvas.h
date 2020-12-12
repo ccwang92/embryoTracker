@@ -95,6 +95,9 @@ public:
 
     DataImporter* getDataImporter(){return data_importer;}
 
+    void handleKeyPressEvent(QKeyEvent * event); //for hook to MainWindow
+    void handleKeyReleaseEvent(QKeyEvent * event); //for hook to MainWindow
+
 signals:
     void changeVolumeTimePoint(int);
 public slots:
@@ -105,6 +108,8 @@ public slots:
     virtual void setVolumeTimePoint(int t);
     virtual void setLightPositionZero();
     virtual void setContrast(int relative_contrast/*[-100:100]*/);
+    virtual void keyPressEvent(QKeyEvent *e){handleKeyPressEvent(e);}
+    virtual void keyReleaseEvent(QKeyEvent *e){handleKeyReleaseEvent(e);}
 protected:
     void initializeGL();
     void paintGL();
@@ -142,6 +147,8 @@ private:
     TrackBall m_trackBall {};       /*!< Trackball holding the model rotation. */
     TrackBall m_scene_trackBall {}; /*!< Trackball holding the scene rotation. */
 
+    //center shift
+    QPointF *centerShift = new QPointF(0.0, 0.0);
     GLint m_distExp = -200;
 
     GLuint scaled_width();

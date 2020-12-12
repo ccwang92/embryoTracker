@@ -32,6 +32,9 @@ RayCastCanvas::RayCastCanvas(QWidget *parent)
     m_modes["Isosurface"] = [&]() { RayCastCanvas::raycasting("Isosurface"); };
     m_modes["Alpha blending"] = [&]() { RayCastCanvas::raycasting("Alpha blending"); };
     m_modes["MIP"] = [&]() { RayCastCanvas::raycasting("MIP"); };
+
+    // set focus policy to accept key press events
+    this->setFocusPolicy(Qt::StrongFocus);
 }
 
 
@@ -97,7 +100,8 @@ void RayCastCanvas::paintGL()
 
     // Compute geometry
     m_viewMatrix.setToIdentity();
-    m_viewMatrix.translate(0, 0, -4.0f * std::exp(m_distExp / 600.0f));
+    //m_viewMatrix.translate(centerShift->x()/width(), centerShift->y()/height(), -4.0f * std::exp(m_distExp / 600.0f));
+    m_viewMatrix.translate(centerShift->x(), centerShift->y(), -4.0f * std::exp(m_distExp / 600.0f));
     m_viewMatrix.rotate(m_trackBall.rotation());
 
     m_modelViewProjectionMatrix.setToIdentity();
@@ -181,6 +185,8 @@ QPointF RayCastCanvas::pixel_pos_to_view_pos(const QPointF& p)
 
 void RayCastCanvas::setLightPositionZero(){
     m_trackBall.reset2origin();
+    centerShift->setX(0);
+    centerShift->setY(0);
     //initializeGL();
     update();
 }
@@ -231,7 +237,7 @@ void RayCastCanvas::mouseReleaseEvent(QMouseEvent *event)
  */
 void RayCastCanvas::wheelEvent(QWheelEvent * event)
 {
-    m_distExp += event->delta();
+    m_distExp += event->angleDelta().y(); // for modern mouse, there may be two wheels; common one has only vertical one using angleDelta().y()
     if (m_distExp < -1800)
         m_distExp = -1800;
     if (m_distExp > 600)
@@ -269,9 +275,55 @@ void RayCastCanvas::add_shader(const QString& name, const QString& vertex, const
  */
 void RayCastCanvas::setContrast(int relative_contrast/*[-100:100]*/)
 {
-    m_gamma = (relative_contrast+100.0)/40.0;
+    if (relative_contrast == 0) m_gamma = 1.0;
+    else if (relative_contrast > 0) m_gamma = 1.0 + relative_contrast/25.0;
+    else m_gamma = 1.0 + relative_contrast * 0.008;
+    //m_gamma = (relative_contrast+100.0)/40.0;
     update();
     //RayCastCanvas::raycasting(const QString& shader);
+}
+void RayCastCanvas::handleKeyPressEvent(QKeyEvent * e)  //090428 RZC: make public function to finally overcome the crash problem of hook MainWindow
+{
+    //qDebug("size: %d, %f, %d, %f", scaled_width(), ((float)scaled_width()), scaled_height(), ((float)scaled_height()));
+    float stepSizeX = 20.0/((float)scaled_width());
+    float stepSizeY = 20.0/((float)scaled_height());
+    bool update_flag = true;
+    switch (e->key())
+    {
+        case Qt::Key_Left: //100802: arrows key must use WITH_?_MODIFIER
+            {
+                //centerShift->x()-1;
+                centerShift->setX(centerShift->x()-stepSizeX);
+            }
+            break;
+        case Qt::Key_Right:
+            {
+                centerShift->setX(centerShift->x()+stepSizeX);
+            }
+            break;
+        case Qt::Key_Up:
+            {
+                centerShift->setY(centerShift->y()+stepSizeY);
+            }
+            break;
+        case Qt::Key_Down:
+            {
+                centerShift->setY(centerShift->y()-stepSizeY);
+            }
+            break;
+
+            //////////////////////////////////////////////////////////////////////////////
+        default:
+            update_flag = false;
+            //QOpenGLWidget::keyPressEvent(e);
+            break;
+    }
+    if (update_flag) update();
+}
+void RayCastCanvas::handleKeyReleaseEvent(QKeyEvent * e)  //090428 RZC: make public function to finally overcome the crash problem of hook MainWindow
+{
+    QOpenGLWidget::keyReleaseEvent(e);
+    update(); //091030: must be here for correct MarkerPos's view matrix
 }
 /**rendering text*/
 void RayCastCanvas::renderText(double x, double y, double z, QString text)
@@ -341,3 +393,5 @@ inline void RayCastCanvas::transformPoint(GLdouble out[4], const GLdouble m[16],
         M(3, 0) * in[0] + M(3, 1) * in[1] + M(3, 2) * in[2] + M(3, 3) * in[3];
 #undef M
 }
+
+
