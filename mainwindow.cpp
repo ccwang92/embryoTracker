@@ -140,8 +140,8 @@ void MainWindow::connectSignal()
 }
 void MainWindow::importImageSeries()
 {
-    //QString filename = QString("/home/ccw/Insync/ccwang@vt.edu/Google Drive/Projects/embyo_analysis/data/crop_embryo_data_500x500x30x40/8bits/embryo_TM481.tif");
-    QString filename = QFileDialog::getOpenFileName(this);
+    QString filename = QString("/home/ccw/Desktop/test_ims/embryo_TM481.tif");
+    //QString filename = QFileDialog::getOpenFileName(this);
     if (!filename.isEmpty()) {
         try
         {

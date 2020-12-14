@@ -13,17 +13,18 @@ RayCastVolume::RayCastVolume(void* _glwidget)
     , m_noise_texture {0}
     , m_cube_vao {
           {
-              -1.0f, -1.0f,  1.0f,
-               1.0f, -1.0f,  1.0f,
-               1.0f,  1.0f,  1.0f,
-              -1.0f,  1.0f,  1.0f,
-              -1.0f, -1.0f, -1.0f,
-               1.0f, -1.0f, -1.0f,
-               1.0f,  1.0f, -1.0f,
-              -1.0f,  1.0f, -1.0f,
+              -1.0f, -1.0f,  1.0f, //left-up-back (back is the face not seen to us)
+               1.0f, -1.0f,  1.0f, //right-up-back
+               1.0f,  1.0f,  1.0f, //right-bottom-back
+              -1.0f,  1.0f,  1.0f, //left-bottom-back
+              -1.0f, -1.0f, -1.0f, //..-front
+               1.0f, -1.0f, -1.0f, //..-front
+               1.0f,  1.0f, -1.0f, //..-front
+              -1.0f,  1.0f, -1.0f, //..-front
           },
           {
-              // front
+          // use the eight vertices (the 8*3 matrix above) to define polygon
+              // front ?? intresting???
               0, 1, 2,
               0, 2, 3,
               // right
@@ -95,6 +96,7 @@ void RayCastVolume::transfer_volume(void*data, double p_min, double p_max, long 
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);  // The array on the host has 1 byte alignment
 
+
     glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, m_size.x(), m_size.y(), m_size.z(),
                  0, GL_RED, GL_UNSIGNED_BYTE, data);
     glBindTexture(GL_TEXTURE_3D, 0);
@@ -155,6 +157,19 @@ void RayCastVolume::paint(void)
 //            drawBoundingBoxAndAxes(boundingBox);
 //        }
     }
+
+//    qDebug("The canvas size is : %d, %d, and the volume size is : %f, %f %f\n",
+//           this->scaled_width(), this->scaled_height(), //this->scaled_depth(),
+//           this->m_raycasting_volume->get_size().x(), this->m_raycasting_volume->get_size().y(),
+//           this->m_raycasting_volume->get_size().z());
+
+    glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
+    {
+        glColor3f(0, 1, 0); glVertex3f(-1, -1, 1); glVertex3f(1.3, -1, 1);
+        glColor3f(0, 1, 0); glVertex3f(-1, -1, 1); glVertex3f(-1, 1.3, 1);
+        glColor3f(0, 1, 0); glVertex3f(-1, -1, 1); glVertex3f(-1, -1, -1.3);
+    }
+    glEnd();
 }
 
 
@@ -274,20 +289,21 @@ void RayCastVolume::drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth, flo
 
         glLineWidth(AlineWidth); // work only before glBegin(), by RZC 080827
         //glBegin(GL_QUADS);
-//        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
-//        {
-////            glColor3f(1, 0, 0);		box_quads( BoundingBox(A0, XYZ(A1.x, A0.y+ld, A0.z+ld)) );
-////            glColor3f(0, 1, 0);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A1.y, A0.z+ld)) );
-////            glColor3f(0, 0, 1);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A0.y+ld, A1.z)) );
-//            glColor3f(1, 0, 0); glVertex3f(0, 0, 0); glVertex3f(10, 0, 0);
-//            glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, 10, 0);
-//            glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, 10);
-//        }
-//        glEnd();
+        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
+        {
+//            glColor3f(1, 0, 0);		box_quads( BoundingBox(A0, XYZ(A1.x, A0.y+ld, A0.z+ld)) );
+//            glColor3f(0, 1, 0);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A1.y, A0.z+ld)) );
+//            glColor3f(0, 0, 1);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A0.y+ld, A1.z)) );
+            //glColor3f(1, 0, 0);
+            glVertex3f(0, 0, 0); glVertex3f(10, 0, 0);
+            //glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, 10, 0);
+            //glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, 10);
+        }
+        glEnd();
 
-        glColor3f(1, 0, 0);		drawString(A1.x+td, A0.y, A0.z, "X", 1, 0);
-        glColor3f(0, 1, 0);		drawString(A0.x, A1.y+td, A0.z, "Y", 1, 0);
-        glColor3f(0, 0, 1);		drawString(A0.x, A0.y, A1.z+td, "Z", 1, 0);
+//        glColor3f(1, 0, 0);		drawString(A1.x+td, A0.y, A0.z, "X", 1, 0);
+//        glColor3f(0, 1, 0);		drawString(A0.x, A1.y+td, A0.z, "Y", 1, 0);
+//        glColor3f(0, 0, 1);		drawString(A0.x, A0.y, A1.z+td, "Z", 1, 0);
     }
 
     if (bShowBoundingBox && BlineWidth>0)

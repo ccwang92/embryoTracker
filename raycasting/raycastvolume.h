@@ -35,6 +35,9 @@ public:
     void set_size(QVector3D _m_size){
         this->m_size = _m_size;
     }
+    QVector3D get_size(){
+        return this->m_size;
+    }
     /*!
      * \brief Get the extent of the volume.
      * \return A vector holding the extent of the bounding box.

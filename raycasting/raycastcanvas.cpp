@@ -81,6 +81,7 @@ void RayCastCanvas::resizeGL(int w, int h)
     m_viewportSize = {(float) scaled_width(), (float) scaled_height()};
     m_aspectRatio = (float) scaled_width() / scaled_height();
     glViewport(0, 0, scaled_width(), scaled_height());
+    //glPolygonMode(GL_FRONT_AND_BACK,GL_FILL);
     //m_raycasting_volume->create_noise();
 }
 
@@ -115,6 +116,19 @@ void RayCastCanvas::paintGL()
     // Perform raycasting
     m_modes[m_active_mode]();
 
+//    qDebug("The canvas size is : %d, %d, and the volume size is : %f, %f %f\n",
+//           this->scaled_width(), this->scaled_height(), //this->scaled_depth(),
+//           this->m_raycasting_volume->get_size().x(), this->m_raycasting_volume->get_size().y(),
+//           this->m_raycasting_volume->get_size().z());
+
+    glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
+    {
+        glColor3f(0, 1, 0);glVertex3f(0,0,1); glVertex3f(0.8, 0, 0);
+        //glColor3f(0, 1, 0); glVertex3f(-1, -1, 1); glVertex3f(1.3, -1, 1);
+        //glColor3f(0, 1, 0); glVertex3f(-1, -1, 1); glVertex3f(-1, 1.3, 1);
+        //glColor3f(0, 1, 0); glVertex3f(-1, -1, 1); glVertex3f(-1, -1, -1.3);
+    }
+    glEnd();
 }
 
 

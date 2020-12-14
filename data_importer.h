@@ -4,7 +4,7 @@
 //#include "my4dimage.h"
 #include "src_3rd/basic_c_fun/basic_4dimage.h"
 //#include "src_3rd/basic_c_fun/basic_landmark.h"
-
+#include "src_3rd/basic_c_fun/color_xyz.h"
 
 class DataImporter//:public QObject //for emmit signal,but seems no need
 {
