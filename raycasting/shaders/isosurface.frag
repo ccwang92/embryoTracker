@@ -45,7 +45,7 @@ uniform sampler3D volume;
 uniform sampler2D jitter;
 
 uniform float gamma;
-
+uniform bool consider_transparency;
 // Ray
 struct Ray {
     vec3 origin;

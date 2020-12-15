@@ -307,8 +307,12 @@ bool DataImporter::readSingleImageFile(char *imgSrcFile, unsigned char * & data1
         else if (dt==2) datatype = V3D_UINT16;
         else if (dt==4) datatype = V3D_FLOAT32;
 
-        qDebug("Data type is %d\n", image4d->getDatatype());
-        if(!image4d->getDatatype()) image4d->setDatatype(datatype);
+
+        if(!image4d->getDatatype())
+        {
+            image4d->setDatatype(datatype);
+            qDebug("Data type is %d\n", image4d->getDatatype());
+        }
 
         return true;
     }
@@ -324,8 +328,10 @@ bool DataImporter::readSingleImageFile(char *imgSrcFile, unsigned char * & data1
             else if (dt==2) datatype = V3D_UINT16;
             else if (dt==4) datatype = V3D_FLOAT32;
 
-            qDebug("Data type is %d\n", image4d->getDatatype());
-            if(!image4d->getDatatype()) image4d->setDatatype(datatype);
+            if(!image4d->getDatatype()) {
+                image4d->setDatatype(datatype);
+                qDebug("Data type is %d\n", image4d->getDatatype());
+            }
 
             return true;
         }
@@ -549,165 +555,209 @@ bool DataImporter::updateminmaxvalues() // update the max min intensity of a sin
 /**
  * /brief, update the input data to color image; or the counter-transfer
  **/
-//void rgba3d_r2gray(RGBA8* rgbaBuf, V3DLONG bufSize[5])
-//{
-//    if (rgbaBuf==0 || bufSize==0)
-//        return;
+void DataImporter::rgba3d_r2gray(RGBA8* rgbaBuf, V3DLONG bufSize[5])
+{
+    if (rgbaBuf==0 || bufSize==0)
+        return;
 
-//    // copy R to G,B
-//    V3DLONG imageX, imageY, imageZ, imageC, imageT;
-//    {
-//        imageX = bufSize[0];
-//        imageY = bufSize[1];
-//        imageZ = bufSize[2];
-//        imageC = 4;
-//        imageT = bufSize[4];
-//    }
-//    if (imageX*imageY*imageZ==0)
-//        return;
+    // copy R to G,B
+    V3DLONG imageX, imageY, imageZ, imageC, imageT;
+    {
+        imageX = bufSize[0];
+        imageY = bufSize[1];
+        imageZ = bufSize[2];
+        imageC = 4;
+        imageT = bufSize[4];
+    }
+    if (imageX*imageY*imageZ==0)
+        return;
 
-//    V3DLONG ot;
-//    V3DLONG ox, oy, oz;
-//    for (ot=0; ot<imageT; ot++)
-//    for (oz = 0; oz < imageZ; oz++)
-//    for (oy = 0; oy < imageY; oy++)
-//    for (ox = 0; ox < imageX; ox++)
-//        {
-//            RGBA8 rgba;
-//            V3DLONG p = ot*(imageZ*imageY*imageX) + oz*(imageY*imageX) + oy*(imageX) + ox;
+    V3DLONG ot;
+    V3DLONG ox, oy, oz;
+    for (ot=0; ot<imageT; ot++)
+    for (oz = 0; oz < imageZ; oz++)
+    for (oy = 0; oy < imageY; oy++)
+    for (ox = 0; ox < imageX; ox++)
+        {
+            RGBA8 rgba;
+            V3DLONG p = ot*(imageZ*imageY*imageX) + oz*(imageY*imageX) + oy*(imageX) + ox;
 
-//            rgba = rgbaBuf[p];
-//            rgbaBuf[p].g = rgba.r;
-//            rgbaBuf[p].b = rgba.r;
-//        }
-//}
+            rgba = rgbaBuf[p];
+            rgbaBuf[p].g = rgba.r;
+            rgbaBuf[p].b = rgba.r;
+        }
+}
 
-//void data4dp_to_rgba3d(Image4DProxy<Image4DSimple>& img4dp, V3DLONG dim5,
-//        V3DLONG start1, V3DLONG start2, V3DLONG start3, V3DLONG start4,
-//        V3DLONG size1, V3DLONG size2, V3DLONG size3, V3DLONG size4,
-//        RGBA8* rgbaBuf, V3DLONG bufSize[5])
-//{
-//    if (rgbaBuf==0 || bufSize==0)
-//        return;
+// 090602 RZC: inline cannot be used in *.cpp but in *.h
+// Please see the below comment for 'sampling3dUNIT8_2' in relation to this function.
+float DataImporter::sampling3dUINT8(Image4DProxy<Image4DSimple>& img4dp,
+        V3DLONG c,
+        V3DLONG x, V3DLONG y, V3DLONG z, V3DLONG dx, V3DLONG dy, V3DLONG dz)
+{
+    V3DLONG dim1=img4dp.sx; V3DLONG dim2=img4dp.sy; V3DLONG dim3=img4dp.sz;
+    float avg = 0;
+    float d = (dx*dy*dz);
+    if (d>0 && x>=0 && y>=0 && z>=0 && x+dx<=dim1 && y+dy<=dim2 && z+dz<=dim3)
+    {
+        //float s = 0;
+        V3DLONG xi,yi,zi;
+        for (zi=0; zi<dz; zi++)
+        for (yi=0; yi<dy; yi++)
+        for (xi=0; xi<dx; xi++)
+        {
+            //float w = MAX( (2-ABS(xi-0.5*dx)*2.0/dx), MAX( (2-ABS(yi-0.5*dy)*2.0/dy), (2-ABS(zi-0.5*dz)*2.0/dz) )); //090712
+            //s += w;
+            avg += img4dp.value8bit_at(x,y,z,c);// *w;
+        }
+        //d = s;
+        avg /= d;
+    }
+    return avg;
+}
 
-//    //there may be a memory issue? by PHC 20110122
-//    //	if (img4dp.su!=1)
-////	{
-////		v3d_msg("Your data is not 8bit. Now this data4dp_to_rgba3d(0 function supports only 8bit data.");
-////		return;
-////	}
+// There is a mystery as to why the above function, sampling3dUNIT8, uses a hard-coded 'img4dp.value8bit_at(x,y,z,c)' rather than
+// sampling using the zi,yi,xi indices. Since it does not appear to use the indices, it is equivalent to the below implementation,
+// which speeds-up the parent function quite a bit. Until we can resolve what is going on, we are temporarily using this
+// fast version.
+float DataImporter::sampling3dUINT8_2(Image4DProxy<Image4DSimple>& img4dp,
+                V3DLONG c,
+                V3DLONG x, V3DLONG y, V3DLONG z, V3DLONG dx, V3DLONG dy, V3DLONG dz, V3DLONG dxyz)
+{
+        V3DLONG dim1=img4dp.sx; V3DLONG dim2=img4dp.sy; V3DLONG dim3=img4dp.sz;
+        float avg = 0;
+        if (dxyz>0 && x>=0 && y>=0 && z>=0 && x+dx<=dim1 && y+dy<=dim2 && z+dz<=dim3)
+        {
+                avg = img4dp.value8bit_at(x,y,z,c);
+        }
+        return avg;
+}
 
-//    V3DLONG dim1=img4dp.sx; V3DLONG dim2=img4dp.sy; V3DLONG dim3=img4dp.sz;
-//    V3DLONG dim4=img4dp.sc;
-//    #define SAMPLE(it, ic, ix,iy,iz, dx,dy,dz) \
-//                (unsigned char)sampling3dUINT8( img4dp, (it*dim4/imageT + ic), \
-//                                                ix, iy, iz, dx, dy, dz )
+void DataImporter::data4dp_to_rgba3d(Image4DProxy<Image4DSimple>& img4dp, V3DLONG dim5,
+        V3DLONG start1, V3DLONG start2, V3DLONG start3, V3DLONG start4,
+        V3DLONG size1, V3DLONG size2, V3DLONG size3, V3DLONG size4,
+        RGBA8* rgbaBuf, V3DLONG bufSize[5])
+{
+    if (rgbaBuf==0 || bufSize==0)
+        return;
 
-//        #define SAMPLE2(si, ix,iy,iz, dx,dy,dz, dxyz) \
-//                        (unsigned char)sampling3dUINT8_2( img4dp, si, ix, iy, iz, dx, dy, dz, dxyz)
+    //there may be a memory issue? by PHC 20110122
+    //	if (img4dp.su!=1)
+//	{
+//		v3d_msg("Your data is not 8bit. Now this data4dp_to_rgba3d(0 function supports only 8bit data.");
+//		return;
+//	}
 
-//    // only convert 1<=dim4<=4 ==> RGBA
-//    V3DLONG imageX, imageY, imageZ, imageC, imageT;
-//    {
-//        imageX = bufSize[0];
-//        imageY = bufSize[1];
-//        imageZ = bufSize[2];
-//                imageC = MIN(4, size4); // <=4
-//        imageT = bufSize[4];
-//    }
-//    if (imageX*imageY*imageZ*imageC*imageT==0)
-//        return;
+    V3DLONG dim1=img4dp.sx; V3DLONG dim2=img4dp.sy; V3DLONG dim3=img4dp.sz;
+    V3DLONG dim4=img4dp.sc;
+    #define SAMPLE(it, ic, ix,iy,iz, dx,dy,dz) \
+                (unsigned char)sampling3dUINT8( img4dp, (it*dim4/imageT + ic), \
+                                                ix, iy, iz, dx, dy, dz )
 
-//    float sx, sy, sz;
-//    V3DLONG dx, dy, dz;
-//    sx = float(size1) / imageX;
-//    sy = float(size2) / imageY;
-//    sz = float(size3) / imageZ;
-//    dx = V3DLONG(sx);
-//    dy = V3DLONG(sy);
-//    dz = V3DLONG(sz);
-//        V3DLONG dxyz = dx*dy*dz;
-//    MESSAGE_ASSERT(dx*dy*dz >=1); //down sampling
+    #define SAMPLE2(si, ix,iy,iz, dx,dy,dz, dxyz) \
+        (unsigned char)sampling3dUINT8_2( img4dp, si, ix, iy, iz, dx, dy, dz, dxyz)
 
-//    V3DLONG ot;
-//    V3DLONG ox, oy, oz;
-//    V3DLONG ix, iy, iz;
+    // only convert 1<=dim4<=4 ==> RGBA
+    V3DLONG imageX, imageY, imageZ, imageC, imageT;
+    {
+        imageX = bufSize[0];
+        imageY = bufSize[1];
+        imageZ = bufSize[2];
+                imageC = MIN(4, size4); // <=4
+        imageT = bufSize[4];
+    }
+    if (imageX*imageY*imageZ*imageC*imageT==0)
+        return;
 
-//        V3DLONG otOffset, ozOffset, oyOffset, oxOffset;
+    float sx, sy, sz;
+    V3DLONG dx, dy, dz;
+    sx = float(size1) / imageX;
+    sy = float(size2) / imageY;
+    sz = float(size3) / imageZ;
+    dx = V3DLONG(sx);
+    dy = V3DLONG(sy);
+    dz = V3DLONG(sz);
+        V3DLONG dxyz = dx*dy*dz;
+    MESSAGE_ASSERT(dx*dy*dz >=1); //down sampling
 
-//        V3DLONG SAM0, SAM1, SAM2, SAM3;
+    V3DLONG ot;
+    V3DLONG ox, oy, oz;
+    V3DLONG ix, iy, iz;
+
+        V3DLONG otOffset, ozOffset, oyOffset, oxOffset;
+
+        V3DLONG SAM0, SAM1, SAM2, SAM3;
 
 
-//        for (ot=0; ot<imageT; ot++) {
-//            SAM0 = ot*dim4/imageT + 0;
-//            SAM1 = SAM0+1;
-//            SAM2 = SAM0+2;
-//            SAM3 = SAM0+3;
-//            otOffset=ot*(imageZ*imageY*imageX);
-//            for (oz = 0; oz < imageZ; oz++) {
-//                ozOffset=oz*(imageY*imageX);
-//                iz = start3+ CLAMP(0,dim3-1, IROUND(oz*sz));
-//                for (oy = 0; oy < imageY; oy++) {
-//                    oyOffset=oy*imageX;
-//                    oxOffset=otOffset+ozOffset+oyOffset;
-//                    iy = start2+ CLAMP(0,dim2-1, IROUND(oy*sy));
+        for (ot=0; ot<imageT; ot++) {
+            SAM0 = ot*dim4/imageT + 0;
+            SAM1 = SAM0+1;
+            SAM2 = SAM0+2;
+            SAM3 = SAM0+3;
+            otOffset=ot*(imageZ*imageY*imageX);
+            for (oz = 0; oz < imageZ; oz++) {
+                ozOffset=oz*(imageY*imageX);
+                iz = start3+ CLAMP(0,dim3-1, IROUND(oz*sz));
+                for (oy = 0; oy < imageY; oy++) {
+                    oyOffset=oy*imageX;
+                    oxOffset=otOffset+ozOffset+oyOffset;
+                    iy = start2+ CLAMP(0,dim2-1, IROUND(oy*sy));
 
-//                    if (imageC==1) {
-//                        for (ox=0;ox<imageX;ox++) {
-//                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
-//                            RGBA8 rgba;
-//                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgba.g = 0;
-//                            rgba.b = 0;
-//                            float t = (0.f + rgba.r + rgba.g + rgba.b);
-//                            rgba.a = (unsigned char)t;
-//                            rgbaBuf[oxOffset++] = rgba;
-//                        }
-//                    }
+                    if (imageC==1) {
+                        for (ox=0;ox<imageX;ox++) {
+                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
+                            RGBA8 rgba;
+                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgba.g = 0;
+                            rgba.b = 0;
+                            float t = (0.f + rgba.r + rgba.g + rgba.b);
+                            rgba.a = (unsigned char)t;
+                            rgbaBuf[oxOffset++] = rgba;
+                        }
+                    }
 
-//                    if (imageC==2) {
-//                        for (ox=0;ox<imageX;ox++) {
-//                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
-//                            RGBA8 rgba;
-//                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgba.g = SAMPLE2(SAM1, ix,iy,iz, dx,dy,dz, dxyz);;
-//                            rgba.b = 0;
-//                            float t = (0.f + rgba.r + rgba.g + rgba.b)/2.0;
-//                            rgba.a = (unsigned char)t;
-//                            rgbaBuf[oxOffset++] = rgba;
-//                        }
-//                    }
+                    if (imageC==2) {
+                        for (ox=0;ox<imageX;ox++) {
+                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
+                            RGBA8 rgba;
+                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgba.g = SAMPLE2(SAM1, ix,iy,iz, dx,dy,dz, dxyz);;
+                            rgba.b = 0;
+                            float t = (0.f + rgba.r + rgba.g + rgba.b)/2.0;
+                            rgba.a = (unsigned char)t;
+                            rgbaBuf[oxOffset++] = rgba;
+                        }
+                    }
 
-//                    if (imageC==3) {
-//                        for (ox=0;ox<imageX;ox++) {
-//                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
-//                            RGBA8 rgba;
-//                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgba.g = SAMPLE2(SAM1, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgba.b = SAMPLE2(SAM2, ix,iy,iz, dx,dy,dz, dxyz);
-//                            float t = (0.f + rgba.r + rgba.g + rgba.b)/3.0;
-//                            rgba.a = (unsigned char)t;
-//                            rgbaBuf[oxOffset++] = rgba;
-//                        }
-//                    }
+                    if (imageC==3) {
+                        for (ox=0;ox<imageX;ox++) {
+                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
+                            RGBA8 rgba;
+                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgba.g = SAMPLE2(SAM1, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgba.b = SAMPLE2(SAM2, ix,iy,iz, dx,dy,dz, dxyz);
+                            float t = (0.f + rgba.r + rgba.g + rgba.b)/3.0;
+                            rgba.a = (unsigned char)t;
+                            rgbaBuf[oxOffset++] = rgba;
+                        }
+                    }
 
-//                    if (imageC>=4) {
-//                        for (ox=0;ox<imageX;ox++) {
-//                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
-//                            RGBA8 rgba;
-//                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgba.g = SAMPLE2(SAM1, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgba.b = SAMPLE2(SAM2, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgba.a = SAMPLE2(SAM3, ix,iy,iz, dx,dy,dz, dxyz);
-//                            rgbaBuf[oxOffset++] = rgba;
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//}
+                    if (imageC>=4) {
+                        for (ox=0;ox<imageX;ox++) {
+                            ix = start1+ CLAMP(0,dim1-1, IROUND(ox*sx));
+                            RGBA8 rgba;
+                            rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgba.g = SAMPLE2(SAM1, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgba.b = SAMPLE2(SAM2, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgba.a = SAMPLE2(SAM3, ix,iy,iz, dx,dy,dz, dxyz);
+                            rgbaBuf[oxOffset++] = rgba;
+                        }
+                    }
+                }
+            }
+        }
+}
 
-//void data4dp_to_rgba3d(unsigned char* data4dp, V3DLONG dim1, V3DLONG dim2, V3DLONG dim3, V3DLONG dim4, V3DLONG dim5,
+//void DataImporter::data4dp_to_rgba3d(unsigned char* data4dp, V3DLONG dim1, V3DLONG dim2, V3DLONG dim3, V3DLONG dim4, V3DLONG dim5,
 //        V3DLONG start1, V3DLONG start2, V3DLONG start3, V3DLONG start4,
 //        V3DLONG size1, V3DLONG size2, V3DLONG size3, V3DLONG size4,
 //        RGBA8* rgbaBuf, V3DLONG bufSize[5])

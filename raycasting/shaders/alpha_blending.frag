@@ -45,7 +45,7 @@ uniform sampler3D volume;
 uniform sampler2D jitter;
 
 uniform float gamma;
-
+uniform bool consider_transparency;
 // Ray
 struct Ray {
     vec3 origin;
@@ -133,8 +133,10 @@ void main()
     }
 
     // Blend background
-    colour.rgb = colour.a * colour.rgb + (1 - colour.a) * pow(background_colour, vec3(gamma)).rgb;
-    colour.a = 1.0;
+    if (consider_transparency){
+        colour.rgb = colour.a * colour.rgb + (1 - colour.a) * pow(background_colour, vec3(gamma)).rgb;
+        colour.a = 1.0;
+    }
 
     // Gamma correction
     a_colour.rgb = pow(colour.rgb, vec3(1.0 / gamma));

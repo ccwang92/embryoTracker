@@ -106,18 +106,21 @@ private:
 public:
     void * glWidget;
     // add bounding box and x-, y-, z-axes
-    bool bShowAxes = true, bShowBoundingBox = false;
-    BoundingBox* posXTranslateBB=0;
-    BoundingBox* negXTranslateBB=0;
-    BoundingBox* posYTranslateBB=0;
-    BoundingBox* negYTranslateBB=0;
-    BoundingBox boundingBox = 0;
-    int bShowXYTranslateArrows = 0,iPosXTranslateArrowEnabled = 0,
-    iNegXTranslateArrowEnabled = 0,iPosYTranslateArrowEnabled = 0,
-    iNegYTranslateArrowEnabled = 0;
-    RGBA32f color_line = XYZW(.5f,.5f,.7f, 1);
-    void drawString(float x, float y, float z, const char* text, int shadow=0, int fontsize=0);
-    void setBoundingBoxSpace(BoundingBox BB);
-    virtual void getBoundingBox(BoundingBox& bb) {bb = boundingBox;};
-    virtual void drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth=1, float AlineWidth=3);
+//    bool bShowAxes = true, bShowBoundingBox = false;
+//    BoundingBox* posXTranslateBB=0;
+//    BoundingBox* negXTranslateBB=0;
+//    BoundingBox* posYTranslateBB=0;
+//    BoundingBox* negYTranslateBB=0;
+//    BoundingBox boundingBox = 0;
+//    int bShowXYTranslateArrows = 0,iPosXTranslateArrowEnabled = 0,
+//    iNegXTranslateArrowEnabled = 0,iPosYTranslateArrowEnabled = 0,
+//    iNegYTranslateArrowEnabled = 0;
+//    RGBA32f color_line = XYZW(.5f,.5f,.7f, 1);
+
+
+//    void draw_bbox();
+//    void drawString(float x, float y, float z, const char* text, int shadow=0, int fontsize=0);
+//    void setBoundingBoxSpace(BoundingBox BB);
+//    virtual void getBoundingBox(BoundingBox& bb) {bb = boundingBox;};
+//    virtual void drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth=1, float AlineWidth=3);
 };

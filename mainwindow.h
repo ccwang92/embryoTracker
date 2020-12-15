@@ -45,7 +45,7 @@ public:
     // edit menu
     QMenu *editMenu;
     QAction *resetViewPoint;
-
+    QAction *bndAxesShow;
     // control widgets on the right size
     //QGridLayout *rightSideControlLayout;
     QScrollBar *contrastScrollBar;

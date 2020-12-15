@@ -79,6 +79,7 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 
 FORMS += \
     dialog_import_im_sequence.ui #\
+    mainwindow.ui
 #    src_3rd/v3d/import_images_tool.ui
 
 

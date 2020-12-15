@@ -8,13 +8,42 @@
 #include <QOpenGLWidget>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
-
+#include <QMessageBox>
 #include "mesh.h"
 #include "raycastvolume.h"
 #include "trackball.h"
 //#include "vtkvolume.h"
 #include "../data_importer.h"
 
+// if error then close
+// clean memory before MessageBox, otherwise MessageBox maybe could not be created correctly
+#define ERROR_MessageBox(title, type, what) { \
+    cleanData(); \
+    QMessageBox::critical( 0, title, QObject::tr("%1: OUT OF MEMORY or GL ERROR.\n---%2 exception: %3")\
+            .arg(title).arg(type).arg(what) + "\n\n" + \
+        QObject::tr("Please close some images or views to release memory, then try again.\n\n") ); \
+}
+#define CATCH_handler( func_name ) \
+    catch (std::exception & e) { \
+        \
+        qDebug("   catch: rgbaBuf = @%0p", rgbaBuf); \
+        \
+        ERROR_MessageBox( func_name, "std", e.what() ); \
+        return; \
+        \
+    } catch (const char* s) { \
+        \
+        ERROR_MessageBox( func_name, "GL", s ); \
+        return; \
+        \
+    } catch (...) { \
+        \
+        ERROR_MessageBox( func_name, "UNKOWN", "unknown exception" ); \
+        return; \
+        \
+    }
+
+#define DELETE_AND_ZERO(p)	{ if ((p)!=NULL) delete (p); (p) = NULL; }
 /*!
  * \brief Class for a raycasting canvas widget.
  */
@@ -24,7 +53,7 @@ class RayCastCanvas : public QOpenGLWidget, protected QOpenGLExtraFunctions
 public:
     explicit RayCastCanvas(QWidget *parent = nullptr);
     ~RayCastCanvas();
-
+    virtual void cleanData();
     void setStepLength(const GLfloat step_length) {
         m_stepLength = step_length;
         update();
@@ -33,34 +62,7 @@ public:
         data_importer = _data_importer;
         setVolume();
     }
-    void setVolume(long frame4display = 0) {
-        if (!data_importer)
-        {
-            throw std::runtime_error("data_importer has not been initialized.");
-        }
-        if (!data_importer->p_vmin){// if max min value not defined
-            data_importer->updateminmaxvalues();
-        }
-        double p_min = data_importer->p_vmin[0];
-        double p_max = data_importer->p_vmax[0];
-        long sx = data_importer->image4d->getXDim();
-        long sy = data_importer->image4d->getYDim();
-        long sz = data_importer->image4d->getZDim();
-        long sc = data_importer->image4d->getCDim(); // for gray image stacked in channel, sc is the time indeed
-
-        if (frame4display>=data_importer->image4d->getTDim()){
-            throw std::runtime_error("data to show is not gray.");
-        }
-        long offsets = frame4display*sx*sy*sz;
-        unsigned char *datahead = (unsigned char *)(data_importer->image4d->getRawDataAtChannel(0));
-
-        if (!m_raycasting_volume)
-            m_raycasting_volume = new RayCastVolume(this);
-        m_raycasting_volume->transfer_volume(datahead + offsets, p_min, p_max, sx,
-                                             sy, sz, sc);
-        update();
-    }
-
+    void setVolume(long frame4display = 0);
     void setThreshold(const double threshold) {
         auto range = m_raycasting_volume ? getRange() : std::pair<double, double>{0.0, 1.0};
         m_threshold = threshold / (range.second - range.first);
@@ -110,10 +112,20 @@ public slots:
     virtual void setContrast(int relative_contrast/*[-100:100]*/);
     virtual void keyPressEvent(QKeyEvent *e){handleKeyPressEvent(e);}
     virtual void keyReleaseEvent(QKeyEvent *e){handleKeyReleaseEvent(e);}
+    virtual void setBnfAxesOnOff();
 protected:
     void initializeGL();
     void paintGL();
     void resizeGL(int width, int height);
+
+public:
+    float *depth_buffer;
+    RGBA8 *total_rgbaBuf, *rgbaBuf;  // this will be updated when needs rendering (not quite sure why Vaa3d needs two vectors)
+    //float sampleScale[5];
+    V3DLONG start1, start2, start3, start4, start5;
+    V3DLONG size1, size2, size3, size4, size5;
+    V3DLONG dim1, dim2, dim3, dim4, dim5;
+    V3DLONG bufSize[5]; //(x,y,z,c,t) 090731: add time dim
 
 private:
     DataImporter *data_importer;
@@ -124,7 +136,7 @@ private:
     const GLfloat m_fov = 30.0f;                                          /*!< Vertical field of view. */
     const GLfloat m_focalLength = 1.0 / qTan(M_PI / 180.0 * m_fov / 2.0); /*!< Focal length. */
     GLfloat m_aspectRatio;                                                /*!< width / height */
-
+    GLboolean consider_transparency = false;
     QVector2D m_viewportSize;
     QVector3D m_rayOrigin; /*!< Camera position in model space coordinates. */
 
@@ -167,4 +179,23 @@ public:
                         const GLint viewport[4],
                         GLdouble * winx, GLdouble * winy, GLdouble * winz);
     inline void transformPoint(GLdouble out[4], const GLdouble m[16], const GLdouble in[4]);
+
+    // add bounding box and x-, y-, z-axes
+    bool bShowAxes = true, bShowBoundingBox = false;
+    BoundingBox* posXTranslateBB=0;
+    BoundingBox* negXTranslateBB=0;
+    BoundingBox* posYTranslateBB=0;
+    BoundingBox* negYTranslateBB=0;
+    BoundingBox boundingBox = 0;
+    int bShowXYTranslateArrows = 0,iPosXTranslateArrowEnabled = 0,
+    iNegXTranslateArrowEnabled = 0,iPosYTranslateArrowEnabled = 0,
+    iNegYTranslateArrowEnabled = 0;
+    RGBA32f color_line = XYZW(.5f,.5f,.7f, 1);
+
+
+    void draw_bbox();
+    void drawString(float x, float y, float z, const char* text, int shadow=0, int fontsize=0);
+    void setBoundingBoxSpace(BoundingBox BB);
+    virtual void getBoundingBox(BoundingBox& bb) {bb = boundingBox;};
+    virtual void drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth=1, float AlineWidth=3);
 };

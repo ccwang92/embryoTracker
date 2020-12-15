@@ -51,9 +51,12 @@ void MainWindow::createControlWidgets()
     // reset view point
     resetViewPoint = new QAction(tr("&Reset ViewPoint"), this);
     resetViewPoint->setShortcut(tr("Ctrl+R"));
+    bndAxesShow = new QAction(tr("&BoundingBox"), this);
+    //resetViewPoint->setShortcut(tr("Ctrl+R"));
     // status has not been defined
     //importImageFileAct->setStatusTip(tr("Import general image series"));
     editMenu->addAction(resetViewPoint);
+    editMenu->addAction(bndAxesShow);
     /***************** About *************************/
     QMenu * aboutMenu= new QMenu(tr("&About"), this);
     menuBar->addMenu(aboutMenu);
@@ -129,6 +132,9 @@ void MainWindow::connectSignal()
     if (resetViewPoint){
         connect(resetViewPoint, SIGNAL(triggered()), glWidget_raycast, SLOT(setLightPositionZero()));
     }
+    if (bndAxesShow){
+        connect(bndAxesShow, SIGNAL(triggered()), glWidget_raycast, SLOT(setBnfAxesOnOff()));
+    }
     if (timeSlider) {
         connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
         connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
@@ -140,8 +146,8 @@ void MainWindow::connectSignal()
 }
 void MainWindow::importImageSeries()
 {
-    QString filename = QString("/home/ccw/Desktop/test_ims/embryo_TM481.tif");
-    //QString filename = QFileDialog::getOpenFileName(this);
+    //QString filename = QString("/home/ccw/Desktop/test_ims/embryo_TM481.tif");
+    QString filename = QFileDialog::getOpenFileName(this);
     if (!filename.isEmpty()) {
         try
         {
