@@ -59,8 +59,9 @@ public:
         update();
     }
     void initVolume(DataImporter *_data_importer) {
-        m_raycasting_volume = new RayCastVolume();
-        m_raycasting_volume->create_noise();
+        //m_raycasting_volume = new RayCastVolume();
+        //m_raycasting_volume->initMesh();
+        //m_raycasting_volume->create_noise();
         data_importer = _data_importer;
         setVolume();
     }
@@ -130,7 +131,7 @@ public:
     V3DLONG bufSize[5]; //(x,y,z,c,t) 090731: add time dim
 
 private:
-    DataImporter *data_importer;
+    DataImporter *data_importer {0};
     QMatrix4x4 m_viewMatrix;
     QMatrix4x4 m_modelViewProjectionMatrix;
     QMatrix3x3 m_normalMatrix;

@@ -56,11 +56,11 @@ RayCastCanvas::~RayCastCanvas()
 void RayCastCanvas::initializeGL()
 {
     initializeOpenGLFunctions();
-
     //glEnable(GL_MULTISAMPLE);
     if(hasMouseTracking())
         setMouseTracking(false);
-    //canvas_painter = new QPainter(this);
+
+    m_raycasting_volume = new RayCastVolume();
 
     add_shader("Isosurface", ":/shaders/isosurface.vert", ":/shaders/isosurface.frag");
     add_shader("Alpha blending", ":/shaders/alpha_blending.vert", ":/shaders/alpha_blending.frag");
@@ -81,9 +81,9 @@ void RayCastCanvas::resizeGL(int w, int h)
     m_viewportSize = {(float) scaled_width(), (float) scaled_height()};
     m_aspectRatio = (float) scaled_width() / scaled_height();
     glViewport(0, 0, scaled_width(), scaled_height());
-    if (m_raycasting_volume){
-        m_raycasting_volume->create_noise();
-    }
+//    if (m_raycasting_volume){
+//        m_raycasting_volume->create_noise();
+//    }
 }
 
 void RayCastCanvas::drawInstructions(QPainter *painter)
@@ -111,8 +111,13 @@ void RayCastCanvas::drawInstructions(QPainter *painter)
  */
 void RayCastCanvas::paintGL()
 {
-//    glClear(GL_COLOR_BUFFER_BIT);
+    if (!m_raycasting_volume && data_importer) {
+        //makeCurrent();
+        m_raycasting_volume = new RayCastVolume();
+    }
+
     if (m_raycasting_volume){
+        m_raycasting_volume->create_noise();
         // Compute geometry
         m_viewMatrix.setToIdentity();
         //m_viewMatrix.translate(centerShift->x()/width(), centerShift->y()/height(), -4.0f * std::exp(m_distExp / 600.0f));
@@ -128,9 +133,9 @@ void RayCastCanvas::paintGL()
         m_rayOrigin = m_viewMatrix.inverted() * QVector3D({0.0, 0.0, 0.0});
         //m_rayOrigin = QVector3D({0.0, 0.0, 0.0});
         // Perform raycasting
-        glPushMatrix();
+        //glPushMatrix();
         m_modes[m_active_mode]();
-        glPopMatrix();
+        //glPopMatrix();
     }
     if (bShowBoundingBox)
     {
@@ -164,33 +169,35 @@ GLuint RayCastCanvas::scaled_height()
  */
 void RayCastCanvas::raycasting(const QString& shader)
 {
-    m_shaders[shader]->bind();
-    {
-        m_shaders[shader]->setUniformValue("ViewMatrix", m_viewMatrix);
-        m_shaders[shader]->setUniformValue("ModelViewProjectionMatrix", m_modelViewProjectionMatrix);
-        m_shaders[shader]->setUniformValue("NormalMatrix", m_normalMatrix);
-        m_shaders[shader]->setUniformValue("aspect_ratio", m_aspectRatio);
-        m_shaders[shader]->setUniformValue("focal_length", m_focalLength);
-        m_shaders[shader]->setUniformValue("viewport_size", m_viewportSize);
-        m_shaders[shader]->setUniformValue("ray_origin", m_rayOrigin);
-        m_shaders[shader]->setUniformValue("top", m_raycasting_volume->top());
-        m_shaders[shader]->setUniformValue("bottom", m_raycasting_volume->bottom());
-        m_shaders[shader]->setUniformValue("background_colour", to_vector3d(m_background));
-        m_shaders[shader]->setUniformValue("light_position", m_lightPosition);
-        m_shaders[shader]->setUniformValue("material_colour", m_diffuseMaterial);
-        m_shaders[shader]->setUniformValue("step_length", m_stepLength);
-        m_shaders[shader]->setUniformValue("threshold", m_threshold);
-        m_shaders[shader]->setUniformValue("gamma", m_gamma);
-        m_shaders[shader]->setUniformValue("volume", 0);
-        m_shaders[shader]->setUniformValue("jitter", 1);
-        m_shaders[shader]->setUniformValue("consider_transparency", consider_transparency /*0*/);
+    if (m_raycasting_volume){
+        m_shaders[shader]->bind();
+        {
+            m_shaders[shader]->setUniformValue("ViewMatrix", m_viewMatrix);
+            m_shaders[shader]->setUniformValue("ModelViewProjectionMatrix", m_modelViewProjectionMatrix);
+            m_shaders[shader]->setUniformValue("NormalMatrix", m_normalMatrix);
+            m_shaders[shader]->setUniformValue("aspect_ratio", m_aspectRatio);
+            m_shaders[shader]->setUniformValue("focal_length", m_focalLength);
+            m_shaders[shader]->setUniformValue("viewport_size", m_viewportSize);
+            m_shaders[shader]->setUniformValue("ray_origin", m_rayOrigin);
+            m_shaders[shader]->setUniformValue("top", m_raycasting_volume->top());
+            m_shaders[shader]->setUniformValue("bottom", m_raycasting_volume->bottom());
+            m_shaders[shader]->setUniformValue("background_colour", to_vector3d(m_background));
+            m_shaders[shader]->setUniformValue("light_position", m_lightPosition);
+            m_shaders[shader]->setUniformValue("material_colour", m_diffuseMaterial);
+            m_shaders[shader]->setUniformValue("step_length", m_stepLength);
+            m_shaders[shader]->setUniformValue("threshold", m_threshold);
+            m_shaders[shader]->setUniformValue("gamma", m_gamma);
+            m_shaders[shader]->setUniformValue("volume", 0);
+            m_shaders[shader]->setUniformValue("jitter", 1);
+            m_shaders[shader]->setUniformValue("consider_transparency", consider_transparency /*0*/);
 
-        glClearColor(m_background.redF(), m_background.greenF(), m_background.blueF(), m_background.alphaF());
-        glClear(GL_COLOR_BUFFER_BIT);
+            glClearColor(m_background.redF(), m_background.greenF(), m_background.blueF(), m_background.alphaF());
+            glClear(GL_COLOR_BUFFER_BIT);
 
-        m_raycasting_volume->paint();
+            m_raycasting_volume->paint();
+        }
+        m_shaders[shader]->release();
     }
-    m_shaders[shader]->release();
 }
 /*!
  * \brief import the data and set it as color RGBA data if needed
@@ -600,6 +607,7 @@ inline void draw_tri(const XYZ P1, const XYZ P2, const XYZ P3, const XYZ offst)
 }
 void RayCastCanvas::draw_bbox() {
 
+    makeCurrent();
     if (bShowAxes){
         qDebug("%d, %f \n", this->width(), this->m_raycasting_volume->get_size().x());
         float exceed_extent = 1.2;

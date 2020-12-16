@@ -1,7 +1,9 @@
 #pragma once
 
+//#include <QOpenGLFunctions>
 #include <QOpenGLExtraFunctions>
-
+#include <QOpenGLBuffer>
+#include <QOpenGLVertexArrayObject>
 /*!
  * \brief Class to represent a mesh.
  */
@@ -15,10 +17,10 @@ public:
     void paint(void);
 
 private:
-    GLuint m_vao {0};
-    GLuint m_vertex_VBO {0};
-    GLuint m_normal_VBO {0};
-    GLuint m_index_VBO {0};
+    QOpenGLVertexArrayObject *m_vao {0};
+    QOpenGLBuffer *m_vertex_VBO {0};
+    QOpenGLBuffer *m_normal_VBO {0};
+    QOpenGLBuffer *m_index_VBO {0};
     size_t m_vertices_count {0};
     size_t m_indices_count {0};
 

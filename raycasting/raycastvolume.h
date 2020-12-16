@@ -97,7 +97,7 @@ public:
 private:
     GLuint m_volume_texture = 0;
     GLuint m_noise_texture = 0;
-    Mesh *m_cube_vao;
+    Mesh m_cube_vao;
     std::pair<double, double> m_range = std::make_pair(0,255);
     QVector3D m_origin = QVector3D(0,0,0);
     QVector3D m_spacing = QVector3D(1,1,1);
