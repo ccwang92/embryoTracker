@@ -9,6 +9,7 @@ class Mesh : protected QOpenGLExtraFunctions
 {
 public:
     Mesh(const std::vector<GLfloat>& vertices, const std::vector<GLuint>& indices);
+    Mesh(){};
     virtual ~Mesh();
 
     void paint(void);

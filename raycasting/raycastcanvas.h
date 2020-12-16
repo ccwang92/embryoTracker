@@ -59,6 +59,8 @@ public:
         update();
     }
     void initVolume(DataImporter *_data_importer) {
+        m_raycasting_volume = new RayCastVolume();
+        m_raycasting_volume->create_noise();
         data_importer = _data_importer;
         setVolume();
     }
@@ -117,7 +119,7 @@ protected:
     void initializeGL();
     void paintGL();
     void resizeGL(int width, int height);
-
+    //void paintEvent(QPaintEvent *event);
 public:
     float *depth_buffer;
     RGBA8 *total_rgbaBuf, *rgbaBuf;  // this will be updated when needs rendering (not quite sure why Vaa3d needs two vectors)
@@ -173,6 +175,9 @@ private:
     void add_shader(const QString& name, const QString& vector, const QString& fragment);
 public:
     // rendering text
+    void drawInstructions(QPainter *painter);
+    void paintText(QColor c=QColor(50,50,50), QPoint p = QPoint(int(0),int(0)),
+                   QString text = QString("text"));
     void renderText(double x, double y, double z, QString text);
     inline GLint project(GLdouble objx, GLdouble objy, GLdouble objz,
                         const GLdouble model[16], const GLdouble proj[16],
@@ -181,7 +186,7 @@ public:
     inline void transformPoint(GLdouble out[4], const GLdouble m[16], const GLdouble in[4]);
 
     // add bounding box and x-, y-, z-axes
-    bool bShowAxes = true, bShowBoundingBox = false;
+    bool bShowAxes = false, bShowBoundingBox = true;
     BoundingBox* posXTranslateBB=0;
     BoundingBox* negXTranslateBB=0;
     BoundingBox* posYTranslateBB=0;

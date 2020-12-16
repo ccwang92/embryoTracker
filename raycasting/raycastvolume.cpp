@@ -8,48 +8,81 @@
 /*!
  * \brief Create a two-unit cube mesh as the bounding box for the volume.
  */
-RayCastVolume::RayCastVolume(void* _glwidget)
+RayCastVolume::RayCastVolume()
     : m_volume_texture {0}
     , m_noise_texture {0}
-    , m_cube_vao {
-          {
-              -1.0f, -1.0f,  1.0f, //left-up-back (back is the face not seen to us)
-               1.0f, -1.0f,  1.0f, //right-up-back
-               1.0f,  1.0f,  1.0f, //right-bottom-back
-              -1.0f,  1.0f,  1.0f, //left-bottom-back
-              -1.0f, -1.0f, -1.0f, //..-front
-               1.0f, -1.0f, -1.0f, //..-front
-               1.0f,  1.0f, -1.0f, //..-front
-              -1.0f,  1.0f, -1.0f, //..-front
-          },
-          {
-          // use the eight vertices (the 8*3 matrix above) to define polygon
-              // front ?? intresting???
-              0, 1, 2,
-              0, 2, 3,
-              // right
-              1, 5, 6,
-              1, 6, 2,
-              // back
-              5, 4, 7,
-              5, 7, 6,
-              // left
-              4, 0, 3,
-              4, 3, 7,
-              // top
-              2, 6, 7,
-              2, 7, 3,
-              // bottom
-              4, 5, 1,
-              4, 1, 0,
-          }
-      }
+//    , m_cube_vao {
+//          {
+//              -1.0f, -1.0f,  1.0f, //left-up-back (back is the face not seen to us)
+//               1.0f, -1.0f,  1.0f, //right-up-back
+//               1.0f,  1.0f,  1.0f, //right-bottom-back
+//              -1.0f,  1.0f,  1.0f, //left-bottom-back
+//              -1.0f, -1.0f, -1.0f, //..-front
+//               1.0f, -1.0f, -1.0f, //..-front
+//               1.0f,  1.0f, -1.0f, //..-front
+//              -1.0f,  1.0f, -1.0f, //..-front
+//          },
+//          {
+//          // use the eight vertices (the 8*3 matrix above) to define polygon
+//              // front ?? intresting???
+//              0, 1, 2,
+//              0, 2, 3,
+//              // right
+//              1, 5, 6,
+//              1, 6, 2,
+//              // back
+//              5, 4, 7,
+//              5, 7, 6,
+//              // left
+//              4, 0, 3,
+//              4, 3, 7,
+//              // top
+//              2, 6, 7,
+//              2, 7, 3,
+//              // bottom
+//              4, 5, 1,
+//              4, 1, 0,
+//          }
+//      }
 {
     initializeOpenGLFunctions();
-    glWidget = _glwidget;
+    //glWidget = _glwidget;
 }
 
-
+void RayCastVolume::initMesh(){
+    m_cube_vao = new Mesh(
+              {
+                  -1.0f, -1.0f,  1.0f, //left-up-back (back is the face not seen to us)
+                   1.0f, -1.0f,  1.0f, //right-up-back
+                   1.0f,  1.0f,  1.0f, //right-bottom-back
+                  -1.0f,  1.0f,  1.0f, //left-bottom-back
+                  -1.0f, -1.0f, -1.0f, //..-front
+                   1.0f, -1.0f, -1.0f, //..-front
+                   1.0f,  1.0f, -1.0f, //..-front
+                  -1.0f,  1.0f, -1.0f, //..-front
+              },
+              {
+              // use the eight vertices (the 8*3 matrix above) to define polygon
+                  // front ?? intresting???
+                  0, 1, 2,
+                  0, 2, 3,
+                  // right
+                  1, 5, 6,
+                  1, 6, 2,
+                  // back
+                  5, 4, 7,
+                  5, 7, 6,
+                  // left
+                  4, 0, 3,
+                  4, 3, 7,
+                  // top
+                  2, 6, 7,
+                  2, 7, 3,
+                  // bottom
+                  4, 5, 1,
+                  4, 1, 0,
+              });
+}
 /*!
  * \brief Destructor.
  */
@@ -77,6 +110,7 @@ void RayCastVolume::transfer_volume(void*data, double p_min, double p_max, long 
 //    m_range = volume.range();
 //    data = volume.data();
 
+    this->initMesh();
     //this->set_size(QVector3D(sx, sy, sz));
     //this->set_origin(QVector3D(0,0,0));
     //this->set_spacing(QVector3D(1,1,1)); // default all one per voxel
@@ -156,7 +190,7 @@ void RayCastVolume::paint(void)
     glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_3D, m_volume_texture); //active frame location GL_TEXTURE0 and put texture frame m_volume_texture onto it
     glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, m_noise_texture);
 
-    m_cube_vao.paint();
+    m_cube_vao->paint();
 
     if (!m_size.isNull())//(!(((RayCastCanvas*)glWidget)->getDataImporter()))
     {
