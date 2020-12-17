@@ -60,7 +60,7 @@ void RayCastCanvas::initializeGL()
     if(hasMouseTracking())
         setMouseTracking(false);
 
-    m_raycasting_volume = new RayCastVolume();
+    m_raycasting_volume = new RayCastVolume(this);
 
     add_shader("Isosurface", ":/shaders/isosurface.vert", ":/shaders/isosurface.frag");
     add_shader("Alpha blending", ":/shaders/alpha_blending.vert", ":/shaders/alpha_blending.frag");
@@ -81,15 +81,13 @@ void RayCastCanvas::resizeGL(int w, int h)
     m_viewportSize = {(float) scaled_width(), (float) scaled_height()};
     m_aspectRatio = (float) scaled_width() / scaled_height();
     glViewport(0, 0, scaled_width(), scaled_height());
-//    if (m_raycasting_volume){
-//        m_raycasting_volume->create_noise();
-//    }
+    m_raycasting_volume->create_noise();
 }
 
 void RayCastCanvas::drawInstructions(QPainter *painter)
 {
     QString text = tr("Click and drag with the left mouse button "
-                      "to rotate the Qt logo.");
+                      "to rotate the data.");
     QFontMetrics metrics = QFontMetrics(font());
     int border = qMax(4, metrics.leading());
 
@@ -104,8 +102,39 @@ void RayCastCanvas::drawInstructions(QPainter *painter)
     painter->drawText((width() - rect.width())/2, border,
                       rect.width(), rect.height(),
                       Qt::AlignCenter | Qt::TextWordWrap, text);
-}
 
+}
+/**
+ * @brief RayCastCanvas::drawLine at a specific location related to the rendered volume
+ * @param painter
+ * @param c
+ * @param p0: start location in camera view, which x,y,z in [-1, 1]
+ * @param p1: end location in camera view, which x,y,z in [-1, 1]
+ * @param lineWidth
+ */
+void RayCastCanvas::drawLine(QPainter *painter, QColor c, QPointF p0, QPointF p1 , int lineWidth)
+{
+    painter->setPen(QPen(c, lineWidth));
+    QPointF p_start = view_pos_to_pixel_pos(p0);
+    QPointF p_end = view_pos_to_pixel_pos(p1);
+    painter->drawLine(p_start, p_end);
+
+}
+/**
+ * @brief RayCastCanvas::drawText at a specific location related to the rendered volume
+ * @param painter
+ * @param c
+ * @param p: location in camera view, which x,y,z in [-1, 1]
+ * @param text
+ */
+void RayCastCanvas::drawText(QPainter *painter, QColor c, QPointF p, QString text){
+    //QVector3D newStartPt = m_modelViewProjectionMatrix * QVector3D(1.3, 1, 1);
+    painter->setPen(c);
+    painter->setFont(QFont("Arial", 10)); //font not sure large enough or not
+    QPointF pAtScreen = view_pos_to_pixel_pos(p);
+    painter->drawText(pAtScreen.x(), pAtScreen.y(), text);
+
+}
 /*!
  * \brief Paint a frame on the canvas.
  */
@@ -113,7 +142,7 @@ void RayCastCanvas::paintGL()
 {
     if (!m_raycasting_volume && data_importer) {
         //makeCurrent();
-        m_raycasting_volume = new RayCastVolume();
+        m_raycasting_volume = new RayCastVolume(this);
     }
 
     if (m_raycasting_volume){
@@ -137,10 +166,10 @@ void RayCastCanvas::paintGL()
         m_modes[m_active_mode]();
         //glPopMatrix();
     }
-    if (bShowBoundingBox)
+    if (bShowAxes)
     {
         glPushMatrix();
-        draw_bbox();
+        draw_axes();
         glPopMatrix();
     }
 }
@@ -210,125 +239,71 @@ void RayCastCanvas::setVolume(long frame4display) {
     if (!data_importer->p_vmin){// if max min value not defined
         data_importer->updateminmaxvalues();
     }
-    if (!total_rgbaBuf) // if buffer has not been initialized
+
+    try
+    {
+        if (data_importer->image4d && data_importer->image4d->getCDim()>0)
+        {
+            bufSize[0] = data_importer->image4d->getXDim();
+            bufSize[1] = data_importer->image4d->getYDim();
+            bufSize[2] = data_importer->image4d->getZDim();
+            bufSize[3] = data_importer->image4d->getCDim();
+            bufSize[4] = 1;
+        }
+        if (data_importer->image4d->getTDim()>1 && data_importer->image4d->getTimePackType()==TIME_PACK_C)
+        {
+            MESSAGE_ASSERT(data_importer->image4d->getCDim() >= data_importer->image4d->getTDim());
+
+            bufSize[3] = data_importer->image4d->getCDim()/data_importer->image4d->getTDim();
+            bufSize[4] = data_importer->image4d->getTDim();
+        }
+    } CATCH_handler( "RayCastCanvas:setVolume" );
+    if (!total_rgbaBuf && flag_rgba_display) // if buffer has not been initialized
     {
         QElapsedTimer timer;
-        try
+        // now the correct data size xyzct are saved in bufSize
+        total_rgbaBuf = rgbaBuf = 0; //(RGBA*)-1; //test whether the new sets pointer to 0 when failed
+        if (bufSize[3]>0)
         {
-            if (data_importer->image4d && data_importer->image4d->getCDim()>0)
-            {
-                //              data_unitbytes = data_importer->image4d->getUnitBytes();
-                //              data4dp = data_importer->image4d->getRawData();
-                //              data4d_uint8 = data_importer->image4d->data4d_uint8;
+            // only RGB, first 3 channels of original image
+            total_rgbaBuf = new RGBA8[ bufSize[0] * bufSize[1] * bufSize[2] * 1 * bufSize[4]];
+        }
 
-                size1= dim1 = data_importer->image4d->getXDim();
-                size2= dim2 = data_importer->image4d->getYDim();
-                size3= dim3 = data_importer->image4d->getZDim();
-                size4= dim4 = data_importer->image4d->getCDim();
-                size5= dim5 = 1;
-                if (data_importer->image4d->getTDim()>1 && data_importer->image4d->getTimePackType()==TIME_PACK_C)
-                {
-                    MESSAGE_ASSERT(data_importer->image4d->getCDim() >= data_importer->image4d->getTDim());
-
-                    size4=dim4 = data_importer->image4d->getCDim()/data_importer->image4d->getTDim();
-                    size5=dim5 = data_importer->image4d->getTDim();
-                }
-                start1 = 0;
-                start2 = 0;
-                start3 = 0;
-                start4 = 0;
-                start5 = 0;
-            }
-            else // image4d==0  default coordinate frame for surface
-            {
-                size1=dim1 = 0; //DEFAULT_DIM1;
-                size2=dim2 = 0; //DEFAULT_DIM2;
-                size3=dim3 = 0; //DEFAULT_DIM3;
-                size4=dim4 = 0; // this make no rgbaBuf allocated
-                size5=dim5 = 0; // packed time
-                start1 = 0;
-                start2 = 0;
-                start3 = 0;
-                start4 = 0;
-                start5 = 0;
-                //data4dp = 0; // this make no rgbaBuf allocated
-            }
-
-
-            //         if (b_limitedsize)
-            //         {
-            //              getLimitedSampleScaleBufSize(size1, size2, size3, size4, size5, sampleScale, bufSize);
-            //         }
-            //         else
-            //         {
-            bufSize[0] = size1;
-            bufSize[1] = size2;
-            bufSize[2] = size3;
-            bufSize[3] = size4;
-            bufSize[4] = size5;
-            //              sampleScale[0]=sampleScale[1]=sampleScale[2]=sampleScale[3]=sampleScale[4] = 1;
-            //         }
-
-            total_rgbaBuf = rgbaBuf = 0; //(RGBA*)-1; //test whether the new sets pointer to 0 when failed
-            if (size4>0)
-            {
-                // only RGB, first 3 channels of original image
-                //total_rgbaBuf = rgbaBuf = new RGBA8[ bufSize[0] * bufSize[1] * bufSize[2] * 1 * bufSize[4] ];
-                total_rgbaBuf = new RGBA8[ bufSize[0] * bufSize[1] * bufSize[2] * 1 * bufSize[4] ];
-            }
-
-            //         qDebug("   data4dp = %0p \t(start %dx%dx%d_%d_%d, size %dx%dx%d_%d_%d)", data4dp,
-            //          start1,start2,start3,start4,start5,  size1,size2,size3,size4, size5);
-
-            qDebug("   rgbaBuf = %0p \t(%dx%dx%d_%d_%d)", rgbaBuf, bufSize[0],bufSize[1],bufSize[2],bufSize[3],bufSize[4]);
-
-
-            //dataViewProcBox = dataBox = BoundingBox(start1, start2, start3, start1+(size1-1), start2+(size2-1), start3+(size3-1));
-
-            //qDebug("   data box in original image space @\t(%g %g %g)--(%g %g %g)", dataBox.x0,dataBox.y0,dataBox.z0, dataBox.x1,dataBox.y1,dataBox.z1);
-
-        } CATCH_handler( "RayCastCanvas:setVolume" );
         if (data_importer->image4d)
         {
             Image4DProxy<Image4DSimple> img4dp( data_importer->image4d );
             img4dp.set_minmax(data_importer->p_vmin, data_importer->p_vmax);
 
             timer.start();
-            data_importer->data4dp_to_rgba3d(img4dp,  dim5,
-                                             start1, start2, start3, start4,
-                                             size1, size2, size3, size4,
-                                             total_rgbaBuf, bufSize);
+            data_importer->data4dp_to_rgba3d(img4dp,  bufSize[4],
+                    0, 0, 0, 0, // the starting location to make the transfer
+                    bufSize[0], bufSize[1], bufSize[2], bufSize[3],
+                    total_rgbaBuf, bufSize);
         }
-        if (dim4==1)   data_importer->rgba3d_r2gray(total_rgbaBuf, bufSize); //081103
+        if (data_importer->image4d->getCDim()==1)   data_importer->rgba3d_r2gray(total_rgbaBuf, bufSize); //081103
         qDebug() << "The slow operation took" << ((float)timer.elapsed())/1000.0 << "seconds";
     }
+
     double p_min = data_importer->p_vmin[0];
     double p_max = data_importer->p_vmax[0];
-//    long sx = data_importer->image4d->getXDim();
-//    long sy = data_importer->image4d->getYDim();
-//    long sz = data_importer->image4d->getZDim();
-//    long sc = data_importer->image4d->getCDim(); // for gray image stacked in channel, sc is the time indeed
 
-    if (frame4display>=size5){
+    if (frame4display>=bufSize[4]){
         throw std::runtime_error("data to show is not gray.");
     }
-    long offsets = frame4display*size1*size2*size3;
-    //rgbaBuf = total_rgbaBuf + offsets;
-
-    if (!m_raycasting_volume)
-        m_raycasting_volume = new RayCastVolume();
-    m_raycasting_volume->transfer_volume(total_rgbaBuf + offsets, p_min, p_max, size1, size2, size3, 4/*rgbaBuf contains 4 channels*/);
+    long offsets = frame4display*bufSize[0]*bufSize[1]*bufSize[2];
+    if (total_rgbaBuf){ // display the data using 4 channels
+        m_raycasting_volume->transfer_volume(total_rgbaBuf + offsets,
+                                             p_min, p_max, bufSize[0],
+                                             bufSize[1], bufSize[2], 1/*rgbaBuf contains 4 channels*/);
+    }else{
+        m_raycasting_volume->transfer_volume(data_importer->image4d->getRawData() + offsets,
+                                             p_min, p_max, bufSize[0],
+                                            bufSize[1], bufSize[2], 1);
+    }
     update();
 }
 
-void RayCastCanvas::paintText(QColor c, QPoint p, QString text){
-    QPainter *painter;
-    painter = new QPainter(this);
-    painter->setPen(c);
-    painter->setFont(QFont("Arial", 16));
-    painter->drawText(p, text);
-    painter->end();
-}
+
 /*!
  * \brief Convert a mouse position into normalised canvas coordinates.
  * Normalized coordinates: Center of the canvas is the origin piont.
@@ -341,7 +316,15 @@ QPointF RayCastCanvas::pixel_pos_to_view_pos(const QPointF& p)
     return QPointF(2.0 * float(p.x()) / width() - 1.0,
                    1.0 - 2.0 * float(p.y()) / height());
 }
-
+QPointF RayCastCanvas::view_pos_to_pixel_pos(const QPointF& p)
+{
+    return QPointF(float(p.x() + 1) * width() / 2.0,
+                   height() * float(1.0 - p.y()) / 2.0);
+}
+/**
+ * @brief RayCastCanvas::setLightPositionZero
+ * Reset the camera position and light position
+ */
 void RayCastCanvas::setLightPositionZero(){
     m_trackBall.reset2origin();
     centerShift->setX(0);
@@ -487,10 +470,146 @@ void RayCastCanvas::handleKeyReleaseEvent(QKeyEvent * e)  //090428 RZC: make pub
 void RayCastCanvas::setBnfAxesOnOff()
 {
     if(m_raycasting_volume){
-        bShowBoundingBox = !bShowBoundingBox;
+        bShowAxes = !bShowAxes;
     }
 }
-/**rendering text*/
+
+
+
+void RayCastCanvas::cleanData()
+{
+    qDebug("   Renderer_gl1::cleanData");
+
+    for (int i=0; i<5; i++)
+    {
+        //sampleScale[i]=1;
+        bufSize[i]=0;
+    }
+
+    DELETE_AND_ZERO(total_rgbaBuf);
+    rgbaBuf = 0;
+    //DELETE_AND_ZERO(rgbaBuf_Yzx);
+    //DELETE_AND_ZERO(rgbaBuf_Xzy);
+}
+
+
+/*** The following functions are for bounding box and axes draw ****/
+/**
+ * @brief draw_tri: draw a filled triangle (src from vaa3d), (deprecated)
+ * @param P1
+ * @param P2
+ * @param P3
+ * @param offst
+ */
+inline void draw_tri(const XYZ P1, const XYZ P2, const XYZ P3, const XYZ offst)
+{
+    // front/back
+    glBegin(GL_TRIANGLES);
+    glVertex3f(P1.x, P1.y, P1.z);
+    glVertex3f(P2.x, P2.y, P2.z);
+    glVertex3f(P3.x, P3.y, P3.z);
+    glVertex3f(P1.x+offst.x, P1.y+offst.y, P1.z+offst.z);
+    glVertex3f(P2.x+offst.x, P2.y+offst.y, P2.z+offst.z);
+    glVertex3f(P3.x+offst.x, P3.y+offst.y, P3.z+offst.z);
+    glEnd();
+    // sides
+    glBegin(GL_QUADS);
+    glVertex3f(P1.x, P1.y, P1.z);
+    glVertex3f(P1.x+offst.x, P1.y+offst.y, P1.z+offst.z);
+    glVertex3f(P2.x+offst.x, P2.y+offst.y, P2.z+offst.z);
+    glVertex3f(P2.x, P2.y, P2.z);
+    glVertex3f(P2.x, P2.y, P2.z);
+    glVertex3f(P2.x+offst.x, P2.y+offst.y, P2.z+offst.z);
+    glVertex3f(P3.x+offst.x, P3.y+offst.y, P3.z+offst.z);
+    glVertex3f(P3.x, P3.y, P3.z);
+    glVertex3f(P3.x, P3.y, P3.z);
+    glVertex3f(P3.x+offst.x, P3.y+offst.y, P3.z+offst.z);
+    glVertex3f(P1.x+offst.x, P1.y+offst.y, P1.z+offst.z);
+    glVertex3f(P1.x, P1.y, P1.z);
+    glEnd();
+}
+/**
+ * @brief draw_axes, add axes in the figure with text X, Y, and Z
+ */
+void RayCastCanvas::draw_axes() {
+        float exceed_extent = 1.2;
+        qDebug ("drawInstructions has been called \n"); //this->paintText();
+        QPainter painter(this);
+        QVector3D originPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, 1);
+        // x-axis
+        QVector3D newEndPt = m_modelViewProjectionMatrix * QVector3D(exceed_extent, -1, 1);
+        QColor c = QColor(255,0,0);
+        this->drawLine(&painter, c, QPointF(originPt.x(), originPt.y()),
+                       QPointF(newEndPt.x(), newEndPt.y()), 2);
+        this->drawText(&painter, c, QPointF(newEndPt.x(), newEndPt.y()), "X");
+        // y-axis
+        newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, exceed_extent, 1);
+        c = QColor(0,255,0);
+        this->drawLine(&painter, c, QPointF(originPt.x(), originPt.y()),
+                       QPointF(newEndPt.x(), newEndPt.y()), 2);
+        this->drawText(&painter, c, QPointF(newEndPt.x(), newEndPt.y()), "Y");
+        // z-axis
+        newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, -exceed_extent);
+        c = QColor(0,0,255);
+        this->drawLine(&painter, c, QPointF(originPt.x(), originPt.y()),
+                       QPointF(newEndPt.x(), newEndPt.y()), 2);
+        this->drawText(&painter, c, QPointF(newEndPt.x(), newEndPt.y()), "Z");
+        // draw instructions
+        //this->drawInstructions(&painter);
+        painter.end();
+
+        if (false){// deprecated way to draw lines
+            qDebug("%d, %f \n", this->width(), this->m_raycasting_volume->get_size().x());
+            float exceed_extent = 1.2;
+            //float td = 0.015;
+            QVector3D newStartPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, 1);
+            QVector3D newEndPt = m_modelViewProjectionMatrix * QVector3D(exceed_extent, -1, 1);
+            glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
+            {
+                glColor3f(1, 0, 0);//glLineWidth(3);
+                glVertex3f(newStartPt.x(), newStartPt.y(), newStartPt.z());
+                glVertex3f(newEndPt.x(), newEndPt.y(), newEndPt.z());
+            }
+            glEnd();
+            //    draw_tri(XYZ(newEndPt.x()-td, newEndPt.y()+td, newEndPt.z()),
+            //             XYZ(newEndPt.x()+3.0f*td, newEndPt.y()+td, newEndPt.z()),
+            //             XYZ(newEndPt.x()+td, newEndPt.y()+3.0f*td, newEndPt.z()),
+            //             XYZ(0.0f, 0.0f, td));
+            glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
+            {
+                glColor3f(0, 1, 0);//glLineWidth(3);
+                newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, exceed_extent, 1);
+                glVertex3f(newStartPt.x(), newStartPt.y(), newStartPt.z());
+                glVertex3f(newEndPt.x(), newEndPt.y(), newEndPt.z());
+            }
+            glEnd();
+            //    draw_tri(XYZ(newEndPt.x()-td, newEndPt.y()+td, newEndPt.z()),
+            //             XYZ(newEndPt.x()+3.0f*td, newEndPt.y()+td, newEndPt.z()),
+            //             XYZ(newEndPt.x()+td, newEndPt.y()+3.0f*td, newEndPt.z()),
+            //             XYZ(0.0f, 0.0f, td));
+            glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
+            {
+                glColor3f(0, 0, 1); //glLineWidth(3);
+                newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, -exceed_extent);
+                glVertex3f(newStartPt.x(), newStartPt.y(), newStartPt.z());
+                glVertex3f(newEndPt.x(), newEndPt.y(), newEndPt.z());
+            }
+            glEnd();
+            //    draw_tri(XYZ(newEndPt.x()-td, newEndPt.y()+td, newEndPt.z()),
+            //             XYZ(newEndPt.x()+3.0f*td, newEndPt.y()+td, newEndPt.z()),
+            //             XYZ(newEndPt.x()+td, newEndPt.y()+3.0f*td, newEndPt.z()),
+            //             XYZ(0.0f, 0.0f, td));
+        }
+}
+
+/**
+ * @brief RayCastCanvas::renderText-> the following 3 functions
+ *  are a way to render text using QPainter. keep it as a back up method.
+ * @param x
+ * @param y
+ * @param z
+ * @param text
+ */
 void RayCastCanvas::renderText(double x, double y, double z, QString text)
 {
     int width = this->width();
@@ -559,322 +678,148 @@ inline void RayCastCanvas::transformPoint(GLdouble out[4], const GLdouble m[16],
 #undef M
 }
 
+/** this is the Vaa3d's idea of adding axes. It fails on our framework. Use Qpainter instead.*/
+//void RayCastCanvas::setBoundingBoxSpace(BoundingBox BB)
+//{
+//    float DX = BB.Dx();
+//    float DY = BB.Dy();
+//    float DZ = BB.Dz();
+//    float maxD = BB.Dmax();
 
-void RayCastCanvas::cleanData()
-{
-    qDebug("   Renderer_gl1::cleanData");
+//    double s[3];
+//    s[0] = 1/maxD *2;
+//    s[1] = 1/maxD *2;
+//    s[2] = 1/maxD *2;
+//    double t[3];
+//    t[0] = -BB.x0 -DX /2;
+//    t[1] = -BB.y0 -DY /2;
+//    t[2] = -BB.z0 -DZ /2;
 
-    for (int i=0; i<5; i++)
-    {
-        //sampleScale[i]=1;
-        bufSize[i]=0;
-    }
+//    // from boundingBox space ==> fit in [-1, +1]^3
+//    glScaled(s[0], s[1], s[2]);
+//    glTranslated(t[0], t[1], t[2]);
+//}
 
-    DELETE_AND_ZERO(total_rgbaBuf);
-    rgbaBuf = 0;
-    //DELETE_AND_ZERO(rgbaBuf_Yzx);
-    //DELETE_AND_ZERO(rgbaBuf_Xzy);
-}
+//inline void box_quads(const BoundingBox & BB)
+//{
+//#define BB_VERTEX(xi,yi,zi)  glVertex3d(BB.x##xi, BB.y##yi, BB.z##zi)
 
+//    BB_VERTEX(0, 0, 0);	BB_VERTEX(0, 1, 0);	BB_VERTEX(1, 1, 0); BB_VERTEX(1, 0, 0); //z=0
+//    BB_VERTEX(0, 0, 1);	BB_VERTEX(0, 1, 1);	BB_VERTEX(1, 1, 1); BB_VERTEX(1, 0, 1); //z=1
 
-/*** The following functions are for bounding box and axes draw ****/
-inline void draw_tri(const XYZ P1, const XYZ P2, const XYZ P3, const XYZ offst)
-{
-    // front/back
-    glBegin(GL_TRIANGLES);
-    glVertex3f(P1.x, P1.y, P1.z);
-    glVertex3f(P2.x, P2.y, P2.z);
-    glVertex3f(P3.x, P3.y, P3.z);
-    glVertex3f(P1.x+offst.x, P1.y+offst.y, P1.z+offst.z);
-    glVertex3f(P2.x+offst.x, P2.y+offst.y, P2.z+offst.z);
-    glVertex3f(P3.x+offst.x, P3.y+offst.y, P3.z+offst.z);
-    glEnd();
-    // sides
-    glBegin(GL_QUADS);
-    glVertex3f(P1.x, P1.y, P1.z);
-    glVertex3f(P1.x+offst.x, P1.y+offst.y, P1.z+offst.z);
-    glVertex3f(P2.x+offst.x, P2.y+offst.y, P2.z+offst.z);
-    glVertex3f(P2.x, P2.y, P2.z);
-    glVertex3f(P2.x, P2.y, P2.z);
-    glVertex3f(P2.x+offst.x, P2.y+offst.y, P2.z+offst.z);
-    glVertex3f(P3.x+offst.x, P3.y+offst.y, P3.z+offst.z);
-    glVertex3f(P3.x, P3.y, P3.z);
-    glVertex3f(P3.x, P3.y, P3.z);
-    glVertex3f(P3.x+offst.x, P3.y+offst.y, P3.z+offst.z);
-    glVertex3f(P1.x+offst.x, P1.y+offst.y, P1.z+offst.z);
-    glVertex3f(P1.x, P1.y, P1.z);
-    glEnd();
-}
-void RayCastCanvas::draw_bbox() {
+//    BB_VERTEX(0, 0, 0);	BB_VERTEX(1, 0, 0);	BB_VERTEX(1, 0, 1); BB_VERTEX(0, 0, 1); //y=0
+//    BB_VERTEX(0, 1, 0);	BB_VERTEX(1, 1, 0);	BB_VERTEX(1, 1, 1); BB_VERTEX(0, 1, 1); //y=1
 
-    makeCurrent();
-    if (bShowAxes){
-        qDebug("%d, %f \n", this->width(), this->m_raycasting_volume->get_size().x());
-        float exceed_extent = 1.2;
-        //float td = 0.015;
-        QVector3D newStartPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, 1);
-        QVector3D newEndPt = m_modelViewProjectionMatrix * QVector3D(exceed_extent, -1, 1);
-        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
-        {
-            glColor3f(1, 0, 0);glLineWidth(3);
-            glVertex3f(newStartPt.x(), newStartPt.y(), newStartPt.z());
-            glVertex3f(newEndPt.x(), newEndPt.y(), newEndPt.z());
-        }
-        glEnd();
-        //    draw_tri(XYZ(newEndPt.x()-td, newEndPt.y()+td, newEndPt.z()),
-        //             XYZ(newEndPt.x()+3.0f*td, newEndPt.y()+td, newEndPt.z()),
-        //             XYZ(newEndPt.x()+td, newEndPt.y()+3.0f*td, newEndPt.z()),
-        //             XYZ(0.0f, 0.0f, td));
-        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
-        {
-            glColor3f(0, 1, 0);glLineWidth(3);
-            newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, exceed_extent, 1);
-            glVertex3f(newStartPt.x(), newStartPt.y(), newStartPt.z());
-            glVertex3f(newEndPt.x(), newEndPt.y(), newEndPt.z());
-        }
-        glEnd();
-        //    draw_tri(XYZ(newEndPt.x()-td, newEndPt.y()+td, newEndPt.z()),
-        //             XYZ(newEndPt.x()+3.0f*td, newEndPt.y()+td, newEndPt.z()),
-        //             XYZ(newEndPt.x()+td, newEndPt.y()+3.0f*td, newEndPt.z()),
-        //             XYZ(0.0f, 0.0f, td));
-        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
-        {
-            glColor3f(0, 0, 1); glLineWidth(3);
-            newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, -exceed_extent);
-            glVertex3f(newStartPt.x(), newStartPt.y(), newStartPt.z());
-            glVertex3f(newEndPt.x(), newEndPt.y(), newEndPt.z());
-        }
-        glEnd();
-        //    draw_tri(XYZ(newEndPt.x()-td, newEndPt.y()+td, newEndPt.z()),
-        //             XYZ(newEndPt.x()+3.0f*td, newEndPt.y()+td, newEndPt.z()),
-        //             XYZ(newEndPt.x()+td, newEndPt.y()+3.0f*td, newEndPt.z()),
-        //             XYZ(0.0f, 0.0f, td));
-    }
+//    BB_VERTEX(0, 0, 0);	BB_VERTEX(0, 0, 1);	BB_VERTEX(0, 1, 1); BB_VERTEX(0, 1, 0); //x=0
+//    BB_VERTEX(1, 0, 0);	BB_VERTEX(1, 0, 1);	BB_VERTEX(1, 1, 1); BB_VERTEX(1, 1, 0); //x=1
 
-    if (true){
-        qDebug ("drawInstructions has been called \n"); //this->paintText();
-        QPainter newPainter(this);
-        this->drawInstructions(&newPainter);
-        newPainter.end();
-    }
-//    // Cube 1x1x1, centered on origin
-//    GLfloat vertices[] = {
-//        -1.5, -0.5, -0.5, 1.0,
-//        1.5, -0.5, -0.5, 1.0,
-//        1.5,  0.5, -0.5, 1.0,
-//        -1.5,  0.5, -0.5, 1.0,
-//        -1.5, -0.5,  0.5, 1.0,
-//        1.5, -0.5,  0.5, 1.0,
-//        1.5,  0.5,  0.5, 1.0,
-//        -1.5,  0.5,  0.5, 1.0,
-//    };
-//    GLuint vbo_vertices;
-//    glGenBuffers(1, &vbo_vertices);
-//    glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices);
-//    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-//    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-//    GLushort elements[] = {
-//        0, 1, 2, 3,
-//        4, 5, 6, 7,
-//        0, 4, 1, 5, 2, 6, 3, 7
-//    };
-//    GLuint ibo_elements;
-//    glGenBuffers(1, &ibo_elements);
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_elements);
-//    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW);
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-
-//    //  GLfloat
-//    //    min_x, max_x,
-//    //    min_y, max_y,
-//    //    min_z, max_z;
-//    //  min_x = max_x = mesh->vertices[0].x;
-//    //  min_y = max_y = mesh->vertices[0].y;
-//    //  min_z = max_z = mesh->vertices[0].z;
-//    //  for (int i = 0; i < mesh->vertices.size(); i++) {
-//    //    if (mesh->vertices[i].x < min_x) min_x = mesh->vertices[i].x;
-//    //    if (mesh->vertices[i].x > max_x) max_x = mesh->vertices[i].x;
-//    //    if (mesh->vertices[i].y < min_y) min_y = mesh->vertices[i].y;
-//    //    if (mesh->vertices[i].y > max_y) max_y = mesh->vertices[i].y;
-//    //    if (mesh->vertices[i].z < min_z) min_z = mesh->vertices[i].z;
-//    //    if (mesh->vertices[i].z > max_z) max_z = mesh->vertices[i].z;
-//    //  }
-//    //  glm::vec3 size = glm::vec3(max_x-min_x, max_y-min_y, max_z-min_z);
-//    //  glm::vec3 center = glm::vec3((min_x+max_x)/2, (min_y+max_y)/2, (min_z+max_z)/2);
-//    //  glm::mat4 transform = glm::translate(glm::mat4(1), center) * glm::scale(glm::mat4(1), size);
-
-//    //  /* Apply object's transformation matrix */
-//    //  glm::mat4 m = mesh->object2world * transform;
-//    //glUniformMatrix4fv(uniform_m, 1, GL_FALSE, m_modelViewProjectionMatrix);
-//    GLint attribute_v_coord = -1;
-//    glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices);
-//    glEnableVertexAttribArray(attribute_v_coord);
-//    glVertexAttribPointer(
-//                attribute_v_coord,  // attribute
-//                4,                  // number of elements per vertex, here (x,y,z,w)
-//                GL_FLOAT,           // the type of each element
-//                GL_FALSE,           // take our values as-is
-//                0,                  // no extra data between each position
-//                0                   // offset of first element
-//                );
-
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_elements);
-//    glLineWidth(3); glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_SHORT, 0);
-//    glLineWidth(3); glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_SHORT, (GLvoid*)(4*sizeof(GLushort)));
-//    glLineWidth(3); glDrawElements(GL_LINES, 8, GL_UNSIGNED_SHORT, (GLvoid*)(8*sizeof(GLushort)));
-//    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
-//    glDisableVertexAttribArray(attribute_v_coord);
-//    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-//    glDeleteBuffers(1, &vbo_vertices);
-//    glDeleteBuffers(1, &ibo_elements);
-}
-
-
-void RayCastCanvas::setBoundingBoxSpace(BoundingBox BB)
-{
-    float DX = BB.Dx();
-    float DY = BB.Dy();
-    float DZ = BB.Dz();
-    float maxD = BB.Dmax();
-
-    double s[3];
-    s[0] = 1/maxD *2;
-    s[1] = 1/maxD *2;
-    s[2] = 1/maxD *2;
-    double t[3];
-    t[0] = -BB.x0 -DX /2;
-    t[1] = -BB.y0 -DY /2;
-    t[2] = -BB.z0 -DZ /2;
-
-    // from boundingBox space ==> fit in [-1, +1]^3
-    glScaled(s[0], s[1], s[2]);
-    glTranslated(t[0], t[1], t[2]);
-}
-
-inline void box_quads(const BoundingBox & BB)
-{
-#define BB_VERTEX(xi,yi,zi)  glVertex3d(BB.x##xi, BB.y##yi, BB.z##zi)
-
-    BB_VERTEX(0, 0, 0);	BB_VERTEX(0, 1, 0);	BB_VERTEX(1, 1, 0); BB_VERTEX(1, 0, 0); //z=0
-    BB_VERTEX(0, 0, 1);	BB_VERTEX(0, 1, 1);	BB_VERTEX(1, 1, 1); BB_VERTEX(1, 0, 1); //z=1
-
-    BB_VERTEX(0, 0, 0);	BB_VERTEX(1, 0, 0);	BB_VERTEX(1, 0, 1); BB_VERTEX(0, 0, 1); //y=0
-    BB_VERTEX(0, 1, 0);	BB_VERTEX(1, 1, 0);	BB_VERTEX(1, 1, 1); BB_VERTEX(0, 1, 1); //y=1
-
-    BB_VERTEX(0, 0, 0);	BB_VERTEX(0, 0, 1);	BB_VERTEX(0, 1, 1); BB_VERTEX(0, 1, 0); //x=0
-    BB_VERTEX(1, 0, 0);	BB_VERTEX(1, 0, 1);	BB_VERTEX(1, 1, 1); BB_VERTEX(1, 1, 0); //x=1
-
-}
+//}
 
 
 
-void RayCastCanvas::drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth, float AlineWidth)
-{
-    glPushAttrib(GL_LINE_BIT | GL_POLYGON_BIT);
-            //| GL_DEPTH_BUFFER_BIT);
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glEnable(GL_POLYGON_OFFSET_LINE);
+//void RayCastCanvas::drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth, float AlineWidth)
+//{
+//    glPushAttrib(GL_LINE_BIT | GL_POLYGON_BIT);
+//            //| GL_DEPTH_BUFFER_BIT);
+//    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//    glEnable(GL_POLYGON_OFFSET_LINE);
 
-//	glPolygonOffset(0, -1); // deal z-fighting, 081120
-//	glDepthFunc(GL_LEQUAL);
-    if (posXTranslateBB != 0) delete posXTranslateBB;
-    if (negXTranslateBB != 0) delete negXTranslateBB;
-    if (posYTranslateBB != 0) delete posYTranslateBB;
-    if (negYTranslateBB != 0) delete negYTranslateBB;
-    posXTranslateBB=0, negXTranslateBB=0,
-            posYTranslateBB=0, negYTranslateBB=0;
-    // an indicator of coordinate direction
-    if (bShowAxes && AlineWidth>0)
-    {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+////	glPolygonOffset(0, -1); // deal z-fighting, 081120
+////	glDepthFunc(GL_LEQUAL);
+//    if (posXTranslateBB != 0) delete posXTranslateBB;
+//    if (negXTranslateBB != 0) delete negXTranslateBB;
+//    if (posYTranslateBB != 0) delete posYTranslateBB;
+//    if (negYTranslateBB != 0) delete negYTranslateBB;
+//    posXTranslateBB=0, negXTranslateBB=0,
+//            posYTranslateBB=0, negYTranslateBB=0;
+//    // an indicator of coordinate direction
+//    if (bShowAxes && AlineWidth>0)
+//    {
+//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-        float D = (BB.Dmax());
-        float ld = D*0.0001; //1e-4 is best
-        float td = D*0.015;
-        XYZ A0 = BB.Vabsmin();
-        XYZ A1 = BB.V1() + D*0.05;
+//        float D = (BB.Dmax());
+//        float ld = D*0.0001; //1e-4 is best
+//        float td = D*0.015;
+//        XYZ A0 = BB.Vabsmin();
+//        XYZ A1 = BB.V1() + D*0.05;
 
-        glPolygonOffset(-0.002, -2); //(-0.002, -2) for good z-fighting with bounding box, 081120,100823
+//        glPolygonOffset(-0.002, -2); //(-0.002, -2) for good z-fighting with bounding box, 081120,100823
 
-        glLineWidth(AlineWidth); // work only before glBegin(), by RZC 080827
-        //glBegin(GL_QUADS);
-        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
-        {
-//            glColor3f(1, 0, 0);		box_quads( BoundingBox(A0, XYZ(A1.x, A0.y+ld, A0.z+ld)) );
-//            glColor3f(0, 1, 0);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A1.y, A0.z+ld)) );
-//            glColor3f(0, 0, 1);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A0.y+ld, A1.z)) );
-            //glColor3f(1, 0, 0);
-            glVertex3f(0, 0, 0); glVertex3f(10, 0, 0);
-            //glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, 10, 0);
-            //glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, 10);
-        }
-        glEnd();
+//        glLineWidth(AlineWidth); // work only before glBegin(), by RZC 080827
+//        //glBegin(GL_QUADS);
+//        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
+//        {
+////            glColor3f(1, 0, 0);		box_quads( BoundingBox(A0, XYZ(A1.x, A0.y+ld, A0.z+ld)) );
+////            glColor3f(0, 1, 0);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A1.y, A0.z+ld)) );
+////            glColor3f(0, 0, 1);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A0.y+ld, A1.z)) );
+//            //glColor3f(1, 0, 0);
+//            glVertex3f(0, 0, 0); glVertex3f(10, 0, 0);
+//            //glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, 10, 0);
+//            //glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, 10);
+//        }
+//        glEnd();
 
-//        glColor3f(1, 0, 0);		drawString(A1.x+td, A0.y, A0.z, "X", 1, 0);
-//        glColor3f(0, 1, 0);		drawString(A0.x, A1.y+td, A0.z, "Y", 1, 0);
-//        glColor3f(0, 0, 1);		drawString(A0.x, A0.y, A1.z+td, "Z", 1, 0);
-    }
+////        glColor3f(1, 0, 0);		drawString(A1.x+td, A0.y, A0.z, "X", 1, 0);
+////        glColor3f(0, 1, 0);		drawString(A0.x, A1.y+td, A0.z, "Y", 1, 0);
+////        glColor3f(0, 0, 1);		drawString(A0.x, A0.y, A1.z+td, "Z", 1, 0);
+//    }
 
-    if (bShowBoundingBox && BlineWidth>0)
-    {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//    if (bShowBoundingBox && BlineWidth>0)
+//    {
+//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-        glPolygonOffset(0, -1); // deal z-fighting with volume, 081120
+//        glPolygonOffset(0, -1); // deal z-fighting with volume, 081120
 
-        glLineWidth(BlineWidth); // work only before glBegin(), by RZC 080827
-        glBegin(GL_QUADS);
-        //glBegin(GL_LINES);
-        {
-            glColor3fv(color_line.c);	box_quads(BB);
-        }
-        glEnd();
-    }
+//        glLineWidth(BlineWidth); // work only before glBegin(), by RZC 080827
+//        glBegin(GL_QUADS);
+//        //glBegin(GL_LINES);
+//        {
+//            glColor3fv(color_line.c);	box_quads(BB);
+//        }
+//        glEnd();
+//    }
 
-    glPopAttrib();
-}
-void RayCastCanvas::drawString(float x, float y, float z, const char* text, int shadow, int fontsize)
-{
-    //if (! this)  return;
+//    glPopAttrib();
+//}
+//void RayCastCanvas::drawString(float x, float y, float z, const char* text, int shadow, int fontsize)
+//{
+//    //if (! this)  return;
 
-    if (shadow)
-    {
-        glPushAttrib(GL_DEPTH_BUFFER_BIT);
-        glPushAttrib(GL_CURRENT_BIT);
-            //glColor3ub(50,50,50);
-            //glColor3ub(200,200,200);
+//    if (shadow)
+//    {
+//        glPushAttrib(GL_DEPTH_BUFFER_BIT);
+//        glPushAttrib(GL_CURRENT_BIT);
+//            //glColor3ub(50,50,50);
+//            //glColor3ub(200,200,200);
 
-            // CMB MSVC debugger with Qt 4.7 triggers assert if font weight > 99
-            // QFont f;  f.setPointSize(f.pointSize()+1); f.setWeight(f.weight()+200);
-            QFont f;  f.setPointSize(f.pointSize()+1); f.setWeight(99);
-//#if defined(USE_Qt5)
-//#else
-//            ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text), f);
-//#endif
-            QPainter painter(this);
-            painter.setPen(QColor(50,50,50));
-            painter.setFont(QFont("Arial", 16));
-            painter.drawText(QPoint(int(200),int(200)), QString(text));
-            painter.end();
-        glPopAttrib();
-        glDepthFunc(GL_LEQUAL);
-    }
+//            // CMB MSVC debugger with Qt 4.7 triggers assert if font weight > 99
+//            // QFont f;  f.setPointSize(f.pointSize()+1); f.setWeight(f.weight()+200);
+//            QFont f;  f.setPointSize(f.pointSize()+1); f.setWeight(99);
+////#if defined(USE_Qt5)
+////#else
+////            ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text), f);
+////#endif
+//            QPainter painter(this);
+//            painter.setPen(QColor(50,50,50));
+//            painter.setFont(QFont("Arial", 16));
+//            painter.drawText(QPoint(int(200),int(200)), QString(text));
+//            painter.end();
+//        glPopAttrib();
+//        glDepthFunc(GL_LEQUAL);
+//    }
 
-    QFont f1;  f1.setPointSize((fontsize>0)?fontsize:30); f1.setWeight(99);
-//    if (fontsize>0)
-//#if defined(USE_Qt5)
-//#else
-//        ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text), f1);
-//    else
-//        ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text));
-//#endif
+//    QFont f1;  f1.setPointSize((fontsize>0)?fontsize:30); f1.setWeight(99);
+////    if (fontsize>0)
+////#if defined(USE_Qt5)
+////#else
+////        ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text), f1);
+////    else
+////        ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text));
+////#endif
 
 
-    if (shadow)
-    {
-        glPopAttrib();
-    }
-}
+//    if (shadow)
+//    {
+//        glPopAttrib();
+//    }
+//}

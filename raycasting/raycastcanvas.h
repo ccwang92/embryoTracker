@@ -26,8 +26,6 @@
 #define CATCH_handler( func_name ) \
     catch (std::exception & e) { \
         \
-        qDebug("   catch: rgbaBuf = @%0p", rgbaBuf); \
-        \
         ERROR_MessageBox( func_name, "std", e.what() ); \
         return; \
         \
@@ -123,11 +121,12 @@ protected:
     //void paintEvent(QPaintEvent *event);
 public:
     float *depth_buffer;
-    RGBA8 *total_rgbaBuf, *rgbaBuf;  // this will be updated when needs rendering (not quite sure why Vaa3d needs two vectors)
+    bool flag_rgba_display = false;
+    RGBA8 *total_rgbaBuf {0}, *rgbaBuf{0};  // this will be updated when needs rendering (not quite sure why Vaa3d needs two vectors)
     //float sampleScale[5];
-    V3DLONG start1, start2, start3, start4, start5;
-    V3DLONG size1, size2, size3, size4, size5;
-    V3DLONG dim1, dim2, dim3, dim4, dim5;
+    //V3DLONG start1, start2, start3, start4, start5;
+    //V3DLONG size1, size2, size3, size4, size5;
+    //V3DLONG dim1, dim2, dim3, dim4, dim5;
     V3DLONG bufSize[5]; //(x,y,z,c,t) 090731: add time dim
 
 private:
@@ -172,13 +171,20 @@ private:
     void raycasting(const QString& shader);
 
     QPointF pixel_pos_to_view_pos(const QPointF& p);
+    QPointF view_pos_to_pixel_pos(const QPointF& p);
     void create_noise(void);
     void add_shader(const QString& name, const QString& vector, const QString& fragment);
 public:
-    // rendering text
+    // Rendering axes in the figure
+    bool bShowAxes = false;
     void drawInstructions(QPainter *painter);
-    void paintText(QColor c=QColor(50,50,50), QPoint p = QPoint(int(0),int(0)),
+    void drawLine(QPainter *painter, QColor c=QColor(50,50,50), QPointF p0 = QPointF(0, 0),
+                   QPointF p1 = QPointF(1, 1), int lineWidth = 1);
+    void drawText(QPainter *painter, QColor c=QColor(50,50,50), QPointF p = QPointF(0, 0),
                    QString text = QString("text"));
+    void draw_axes();
+
+    /** another way to draw text on volume */
     void renderText(double x, double y, double z, QString text);
     inline GLint project(GLdouble objx, GLdouble objy, GLdouble objz,
                         const GLdouble model[16], const GLdouble proj[16],
@@ -186,22 +192,19 @@ public:
                         GLdouble * winx, GLdouble * winy, GLdouble * winz);
     inline void transformPoint(GLdouble out[4], const GLdouble m[16], const GLdouble in[4]);
 
-    // add bounding box and x-, y-, z-axes
-    bool bShowAxes = false, bShowBoundingBox = true;
-    BoundingBox* posXTranslateBB=0;
-    BoundingBox* negXTranslateBB=0;
-    BoundingBox* posYTranslateBB=0;
-    BoundingBox* negYTranslateBB=0;
-    BoundingBox boundingBox = 0;
-    int bShowXYTranslateArrows = 0,iPosXTranslateArrowEnabled = 0,
-    iNegXTranslateArrowEnabled = 0,iPosYTranslateArrowEnabled = 0,
-    iNegYTranslateArrowEnabled = 0;
-    RGBA32f color_line = XYZW(.5f,.5f,.7f, 1);
-
-
-    void draw_bbox();
-    void drawString(float x, float y, float z, const char* text, int shadow=0, int fontsize=0);
-    void setBoundingBoxSpace(BoundingBox BB);
-    virtual void getBoundingBox(BoundingBox& bb) {bb = boundingBox;};
-    virtual void drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth=1, float AlineWidth=3);
+    /** Vaa3d's method to add bounding box and x-, y-, z-axes */
+    //    bool bShowBoundingBox = false;
+    //    BoundingBox* posXTranslateBB=0;
+    //    BoundingBox* negXTranslateBB=0;
+    //    BoundingBox* posYTranslateBB=0;
+    //    BoundingBox* negYTranslateBB=0;
+    //    BoundingBox boundingBox = 0;
+    //    int bShowXYTranslateArrows = 0,iPosXTranslateArrowEnabled = 0,
+    //    iNegXTranslateArrowEnabled = 0,iPosYTranslateArrowEnabled = 0,
+    //    iNegYTranslateArrowEnabled = 0;
+    //    RGBA32f color_line = XYZW(.5f,.5f,.7f, 1);
+    //    void drawString(float x, float y, float z, const char* text, int shadow=0, int fontsize=0);
+    //    void setBoundingBoxSpace(BoundingBox BB);
+    //    virtual void getBoundingBox(BoundingBox& bb) {bb = boundingBox;};
+    //    virtual void drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth=1, float AlineWidth=3);
 };

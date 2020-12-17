@@ -4,6 +4,7 @@
 #include <QMatrix4x4>
 #include <QOpenGLExtraFunctions>
 #include <QVector3D>
+#include <QOpenGLTexture>
 //#include "../src_3rd/basic_c_fun/basic_4dimage.h""
 #include "mesh.h"
 //#include "raycastcanvas.h"
@@ -14,11 +15,10 @@
 class RayCastVolume : protected QOpenGLExtraFunctions
 {
 public:
-    RayCastVolume();
+    RayCastVolume(void* _glWidget);
     virtual ~RayCastVolume();
 
-    void initMesh();
-    void transfer_volume(void*data, double p_min, double p_max, long sx,
+    void transfer_volume(void* data, double p_min, double p_max, long sx,
                          long sy, long sz, long sc);
     void create_noise(void);
     void paint(void);
@@ -95,8 +95,8 @@ public:
     }
 
 private:
-    GLuint m_volume_texture = 0;
-    GLuint m_noise_texture = 0;
+    GLuint/*QOpenGLTexture*/ m_volume_texture = 0;
+    GLuint/*QOpenGLTexture*/ m_noise_texture = 0;
     Mesh m_cube_vao;
     std::pair<double, double> m_range = std::make_pair(0,255);
     QVector3D m_origin = QVector3D(0,0,0);
