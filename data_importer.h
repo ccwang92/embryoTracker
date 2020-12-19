@@ -16,7 +16,7 @@
 class DataImporter//:public QObject //for emmit signal,but seems no need
 {
 public:
-    DataImporter(){};
+    DataImporter(bool _debugMode = false){debugMode = _debugMode;};
     ~DataImporter(){};
 
     bool importData(QString filename);
@@ -35,6 +35,7 @@ signals:
     //Nope
 
 public:
+    bool debugMode = false;
     QString openFileNameLabel = QString("");
     Image4DSimple* image4d = 0;
 

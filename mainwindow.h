@@ -1,10 +1,6 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-//#include "emt_glwidget.h"
-#include "data_importer.h"
-#include "myglwidget.h"
-#include "raycasting/raycastcanvas.h"
 #include <QMainWindow>
 #include <QScrollArea>
 #include <QScrollBar>
@@ -13,6 +9,12 @@
 #include <QMenuBar>
 #include <QFileDialog>
 #include <QStatusBar>
+//#include "emt_glwidget.h"
+#include "data_importer.h"
+#include "myglwidget.h"
+#include "raycasting/raycastcanvas.h"
+#include "cellsegmentation/cellsegment_main.h"
+
 
 enum widget_type_choice {my_simple_test_type = 0, raycast_type = 1, vaa3d_type = 2};
 
@@ -31,13 +33,13 @@ public slots:
     void importImageSeries();
     void initControlWidgetValues();
     void updateControlPanel();
-    //void zeroViewPiont();
-
+    void sendData4Segment();
+    void sendData4Track();
     // parameters
 public:
     QString win_title;
-    // read the image stack in
     QMenuBar *menuBar;
+    // file menuread the image stack in
     QMenu *fileMenu;
     QAction *importImageSeriesAct;
     QAction *exitAct;
@@ -46,6 +48,10 @@ public:
     QMenu *editMenu;
     QAction *resetViewPoint;
     QAction *bndAxesShow;
+    // process menu
+    QMenu *processMenu;
+    QAction *segmentCell3d;
+    QAction *trackCell3d;
     // control widgets on the right size
     //QGridLayout *rightSideControlLayout;
     QScrollBar *contrastScrollBar;
@@ -61,7 +67,14 @@ public:
     //QAction *exitAct;
     void createControlWidgets();
     void connectSignal();
-    //void
+public:
+    bool algorithmDebug = true;
+    QString debugDataPath = QString("/home/ccw/Desktop/test_ims/8bit/embryo_TM481.tif");
+    QAction * debugButton;
+    cellSegmentMain *cellSegmenter;
+public slots:
+    void debugAlgorithm();
+
 
 };
 #endif // MAINWINDOW_H

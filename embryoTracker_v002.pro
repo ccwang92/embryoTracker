@@ -10,6 +10,7 @@ CONFIG += c++17
 #DEFINES += USE_Qt5 # for vaa3d functions
 
 SOURCES += data_importer.cpp \
+    cellsegmentation/cellsegment_main.cpp \
     main.cpp \
     mainwindow.cpp \
     my4dimage.cpp \
@@ -34,6 +35,7 @@ SOURCES += data_importer.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
+    cellsegmentation/cellsegment_main.h \
     dialog_import_im_sequence.h \
     mainwindow.h \
     my4dimage.h \
@@ -63,6 +65,12 @@ HEADERS += data_importer.h \
 #    src_3rd/v3d/import_images_tool_dialog.h
 
 #FORMS += v3d/import_images_tool.ui
+
+
+## adding include paths and libs related to opencv
+#include(opencv.qrc)
+INCLUDEPATH += /usr/local/include/opencv4
+LIBS += -L/usr/local/lib -lopencv_imgproc -lopencv_core -lopencv_highgui
 
 #LIBS += src_3d/common_lib/src_packages/mylib_tiff -lmylib
 

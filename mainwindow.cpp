@@ -10,7 +10,7 @@ MainWindow::MainWindow()
     //QVBoxLayout *mainLayout = new QVBoxLayout();
     createControlWidgets();
     // initialize data4test as null
-    data4test = new DataImporter(); //do we need?
+    data4test = new DataImporter(algorithmDebug); //do we need?
 
     setMenuBar(menuBar);
     setCentralWidget(grpBox4display_canvas);
@@ -28,7 +28,7 @@ void MainWindow::initControlWidgetValues(){
 void MainWindow::createControlWidgets()
 {
     menuBar = new QMenuBar;
-    /************ file menu define *****************/
+    /** ********** file menu define *****************/
     fileMenu = new QMenu(tr("&File"), this);
     menuBar->addMenu(fileMenu);
     // import image stacks
@@ -45,7 +45,7 @@ void MainWindow::createControlWidgets()
     exitAct->setShortcut(tr("Ctrl+Q"));
     //exitAct->setStatusTip(tr("Exit the application"));
     fileMenu->addAction(exitAct);
-    /************ edit menu define *****************/
+    /** ********** edit menu define *****************/
     editMenu = new QMenu(tr("&Edit"), this);
     menuBar->addMenu(editMenu);
     // reset view point
@@ -57,8 +57,20 @@ void MainWindow::createControlWidgets()
     //importImageFileAct->setStatusTip(tr("Import general image series"));
     editMenu->addAction(resetViewPoint);
     editMenu->addAction(bndAxesShow);
-    /***************** About *************************/
-    QMenu * aboutMenu= new QMenu(tr("&About"), this);
+    /** ************* process menu ********************/
+    processMenu = new QMenu(tr("&Process"), this);
+    menuBar->addMenu(processMenu);
+    segmentCell3d = new QAction(tr("&Cell Segmentation"), this);
+    trackCell3d = new QAction(tr("&Cell Tracking"), this);
+    processMenu->addAction(segmentCell3d);
+    processMenu->addAction(trackCell3d);
+    /** *************** Debug algorithms *****************/
+    if (algorithmDebug){
+        debugButton = new QAction(tr("Debug"), this);
+        menuBar->addAction(debugButton);
+    }
+    /** *************** About *************************/
+    QMenu * aboutMenu = new QMenu(tr("About"), this);
     menuBar->addMenu(aboutMenu);
     /*************** display grid *******************/
     grpBox4display_canvas = new QGroupBox();//tr("Canvas")
@@ -143,11 +155,26 @@ void MainWindow::connectSignal()
         connect(contrastScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setContrast(int)));
     }
     connect(this, SIGNAL(signalDataLoaded()), this, SLOT(updateControlPanel())); // simply for easy reading
+
+    /** cell segmentation and tracking algorithm call ***/
+    if (segmentCell3d){
+        connect(segmentCell3d, SIGNAL(triggered()), this, SLOT(sendData4Segment()));
+    }
+    if (trackCell3d){
+        connect(segmentCell3d, SIGNAL(triggered()), this, SLOT(sendData4Track()));
+    }
+    if (debugButton){
+        connect(debugButton, SIGNAL(triggered()), this, SLOT(debugAlgorithm()));
+    }
 }
 void MainWindow::importImageSeries()
 {
-    //QString filename = QString("/home/ccw/Desktop/test_ims/embryo_TM481.tif");
-    QString filename = QFileDialog::getOpenFileName(this);
+    QString filename;
+    if (algorithmDebug){
+        filename = debugDataPath;
+    }else{
+        filename = QFileDialog::getOpenFileName(this);
+    }
     if (!filename.isEmpty()) {
         try
         {
@@ -193,4 +220,25 @@ void MainWindow::importImageSeries()
 MainWindow::~MainWindow()
 {
 }
+void MainWindow::debugAlgorithm()
+{
+    if (algorithmDebug){
+        this->importImageSeries();
+        this->sendData4Segment();
+    }
+}
+void MainWindow::sendData4Segment()
+{
+    if(!data4test || !glWidget_raycast){
+        QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
+        return;
+    }
+    cellSegmenter = new cellSegmentMain(data4test->image4d->getRawData(),
+                                        data4test->image4d->getDatatype(),
+                                        glWidget_raycast->bufSize);
+}
 
+void MainWindow::sendData4Track()
+{
+
+}

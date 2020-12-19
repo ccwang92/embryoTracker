@@ -22,7 +22,6 @@ public:
     dialogImportImSequence()
     {
         setupUi(this);
-
         connect(OK_button, SIGNAL(clicked()), this, SLOT(accept()));
         connect(Cancel_button, SIGNAL(clicked()), this, SLOT(reject()));
 
@@ -54,8 +53,8 @@ public:
         p->endImg = end_id_SpBox->value();
         p->inc = increment_SpBox->value();
         p->filt = LE_name_key_word->text();
-        //p->packType = comboPack->currentIndex();
-        p->packType = 1; //for 3d time series data, we all concatenate them in Channel dim
+        //this equals to setting p->packType is set to one, if using combo list.
+        p->packType = TIME_PACK_C; //for 3d time series data, we all concatenate them in Channel dim
     }
 
 private:

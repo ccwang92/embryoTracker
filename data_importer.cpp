@@ -252,6 +252,11 @@ QStringList DataImporter::importSeriesFileList_addnumbersort(const QString & ind
         return myList;
     }
 
+    if (debugMode){
+        qDebug("Currently we are debuging the segment/track algorithm, no pop-up dialog\n");
+        packtype = TIME_PACK_C;
+        return myList;
+    }
     //Get the tiff image sequence by usr interaction
 
     ImportImgPara p;

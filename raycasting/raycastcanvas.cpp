@@ -296,6 +296,7 @@ void RayCastCanvas::setVolume(long frame4display) {
                                              p_min, p_max, bufSize[0],
                                              bufSize[1], bufSize[2], 1/*rgbaBuf contains 4 channels*/);
     }else{
+        offsets *= data_importer->image4d->getUnitBytes(); // if 16 bit, one pixel occupies two chars.
         m_raycasting_volume->transfer_volume(data_importer->image4d->getRawData() + offsets,
                                              p_min, p_max, bufSize[0],
                                             bufSize[1], bufSize[2], 1);
