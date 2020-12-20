@@ -34,26 +34,37 @@ cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, l
 }
 void cellSegmentMain::cellSegmentSingleFrame(unsigned char *data_grayim3d)
 {
+    // The data is mirrored by the y-direction, this is because OpenGL
+    // texture are loaded left to right, bottom to top. Most image loaders
+    // however will store the image in memory left to right, top to bottom.
     Mat *input_3dmat;
     if (data_type == V3D_UINT8){
-        //input_3dmat = new Mat(3, data_size, CV_8UC1, data_grayim3d);
-        for (int s = 0; s < data_rows_cols_slices[2]; s ++)
-        {
-            long offset = data_rows_cols_slices[0]*data_rows_cols_slices[1]*s;
-            input_3dmat = new Mat(data_rows_cols_slices[0], data_rows_cols_slices[1], CV_8UC1, (void *)(data_grayim3d+offset));
-            imshow(std::to_string(s), *input_3dmat);
-            waitKey(0);
-            destroyWindow(std::to_string(s));
-        }
+        input_3dmat = new Mat(3, data_rows_cols_slices, CV_8UC1, data_grayim3d);
+//        for (int s = 0; s < data_rows_cols_slices[2]; s ++)
+//        {
+//            long offset = data_rows_cols_slices[0]*data_rows_cols_slices[1]*s;
+//            input_3dmat = new Mat(data_rows_cols_slices[0], data_rows_cols_slices[1], CV_8UC1, (void *)(data_grayim3d+offset));
+//            imshow(std::to_string(s), *input_3dmat);
+//            waitKey(0);
+//            destroyWindow(std::to_string(s));
+//        }
     }else if(data_type == V3D_UINT16){
-        input_3dmat = new Mat(3, data_rows_cols_slices, CV_16UC1, (void*)data_grayim3d);
+        input_3dmat = new Mat(3, data_rows_cols_slices, CV_16UC1, data_grayim3d);
+//        for (int s = 0; s < data_rows_cols_slices[2]; s ++)
+//        {
+//            long offset = data_rows_cols_slices[0]*data_rows_cols_slices[1]*s * 2; // 16 bit = 2 * char
+//            input_3dmat = new Mat(data_rows_cols_slices[0], data_rows_cols_slices[1], CV_16UC1, (void *)(data_grayim3d+offset));
+//            *input_3dmat *= 10;
+//            imshow(std::to_string(s), *input_3dmat);
+//            waitKey(0);
+//            destroyWindow(std::to_string(s));
+//        }
     }else{
         //qDebug("unsupported data type!\n");
         MESSAGE_ASSERT("unsupported data type!\n");
         return;
     }
-    if (input_3dmat){
-        imshow("test image", *input_3dmat);
-    }
+    Mat inputVolFloat;
+    input_3dmat->convertTo(inputVolFloat, CV_32F); // data we will work on in the future
 
 }

@@ -36,6 +36,8 @@ SOURCES += data_importer.cpp \
 
 HEADERS += data_importer.h \
     cellsegmentation/cellsegment_main.h \
+    cellsegmentation/img_basic_proc.h \
+    cellsegmentation/img_basic_proc_declare.h \
     dialog_import_im_sequence.h \
     mainwindow.h \
     my4dimage.h \
