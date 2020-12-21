@@ -11,7 +11,7 @@ enum filterDirection{DIRECTION_X = 0, DIRECTION_Y, DIRECTION_Z};
  * @param src3d: float mat
  * @param dst3d: float mat
  */
-void principalCv2d(Mat* src3d, Mat &dst3d, float *sigma, int minIntensity = 0){
+void principalCv2d(const Mat* src3d, Mat &dst3d, float *sigma, int minIntensity = 0){
     src3d->copyTo(dst3d);
     gaussianSmooth3Ddata(dst3d, sigma);
 
@@ -63,7 +63,7 @@ void principalCv2d(Mat* src3d, Mat &dst3d, float *sigma, int minIntensity = 0){
  * @param sigma
  * @param minIntensity
  */
-void principalCv3d(Mat* src3d, Mat &dst3d, float *sigma, int minIntensity = 0){
+void principalCv3d(const Mat* src3d, Mat &dst3d, float *sigma, int minIntensity = 0){
     src3d->copyTo(dst3d);
     gaussianSmooth3Ddata(dst3d, sigma);
 
@@ -185,14 +185,14 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float *sigma)
 //                    for (unsigned k = 0; k < kernSize; k++)
 //                    {
 //                        *z_ptr += lineBuffer[z+k]*kernGauss[k];
-//                    }data4smooth
+//                    }
 //                }
 //            }
 //        }
 //        delete [] lineBuffer;
     }
 }
-void filterVolume(Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction){
+void filterVolume(const Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction){
     if (dst3d.empty()){
         dst3d.create(src3d->dims, src3d->size, CV_32F);
         src3d->copyTo(dst3d);
@@ -230,7 +230,7 @@ void filterVolume(Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction){
  * @param dst3d : float
  * @param kernel_z : float (border is replicated)
  */
-void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernel_z){
+void filterZdirection(const Mat* src3d, Mat &dst3d, Mat kernel_z){
     assert(src3d->dims == 3);
     int x_size  = src3d->size[0];
     int y_size  = src3d->size[1];
@@ -308,13 +308,14 @@ float varByTruncate(vector<float> vals4var, int numSigma, int numIter){
     for(int i = 0 ; i< numIter; i++){
         float ub = mu+numSigma*sigma;
         float lb = mu-numSigma*sigma;
-        vector<float> tmpVals = vec_atrange(vals4var, ub, lb);
+        vector<float> tmpVals = vec_atrange(vals4var, ub, lb, true);
         float sigmaTr = vec_stddev(tmpVals);
         //sigmaTr = sqrt(mean(vals(vals<ub & vals>lb).^2));
         float varCorrectionTerm = truncatedGauss(mu, sigma, lb, ub, t_mu, t_sigma); // only lb and ub is usefull if we only want the third output
         sigma = sigmaTr/sqrt(varCorrectionTerm);
         mu = vec_mean(tmpVals);
     }
+    return sigma;
 }
 
 /**
@@ -323,7 +324,7 @@ float varByTruncate(vector<float> vals4var, int numSigma, int numIter){
  * @param validRatio: consider the validRatio pixels in the data (remove pixels with saturated intensity)
  * @param gap
  */
-float calVarianceStablization(Mat* src3d, Mat & varMap, float &varTrend, float validRatio = 0.95, int gap=2){
+float calVarianceStablization(const Mat* src3d, Mat & varMap, float &varTrend, float validRatio = 0.95, int gap=2){
     Mat meanVal(src3d->dims, src3d->size, CV_32F, Scalar(0));
     Mat kernelx, kernely, kernelz;
     float denominator = 0;
@@ -501,12 +502,12 @@ template <typename T> T vec_mean(vector<T> const & func)
     return accumulate(func.begin(), func.end(), 0.0) / func.size();
 }
 /**
- * @brief ConnectedComponents3d
- * @param src3d
+ * @brief connectedComponents3d
+ * @param src3d: boolean but represented by CV_8U
  * @param dst3d
  * @param connect: 4, 8 for 2d and 6,10,26 for 3d
  */
-int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
+int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect){
     //assert(src3d->type()==bool);
     assert(src3d->dims == 3);
     assert(connect == 4 || connect == 8 || connect == 6 || connect == 10 || connect == 26);
@@ -530,7 +531,7 @@ int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
             for (int i = 0; i < x_size; i++){
                 for (int j = 0; j< y_size; j++){
                     for (int k = 0; k < z_size; k++){
-                        if (src3d->at<bool>(i,j,k) == 0){
+                        if (src3d->at<unsigned short>(i,j,k) == 0){
                             continue;
                         }
                         if (dst3d.at<int>(i,j,k) == 0){
@@ -538,14 +539,14 @@ int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
                             dst3d.at<int>(i,j,k) = numCC;
                         }
                         current_id = dst3d.at<int>(i,j,k);
-                        if ((i + 1) < x_size && src3d->at<bool>(i+1,j,k)>0){
-                            dst3d.at<bool>(i+1,j,k) = current_id;
+                        if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k)>0){
+                            dst3d.at<unsigned short>(i+1,j,k) = current_id;
                         }
-                        if ((j + 1) < y_size && src3d->at<bool>(i,j+1,k)>0){
-                            dst3d.at<bool>(i,j+1,k) = current_id;
+                        if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k)>0){
+                            dst3d.at<unsigned short>(i,j+1,k) = current_id;
                         }
-                        if ((k + 1) < z_size && src3d->at<bool>(i,j,k+1)>0){
-                            dst3d.at<bool>(i,j,k+1) = current_id;
+                        if ((k + 1) < z_size && src3d->at<unsigned short>(i,j,k+1)>0){
+                            dst3d.at<unsigned short>(i,j,k+1) = current_id;
                         }
                     }
                 }
@@ -556,7 +557,7 @@ int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
             for (int i = 0; i < x_size; i++){
                 for (int j = 0; j< y_size; j++){
                     for (int k = 0; k < z_size; k++){
-                        if (src3d->at<bool>(i,j,k) == 0){
+                        if (src3d->at<unsigned short>(i,j,k) == 0){
                             continue;
                         }
                         if (dst3d.at<int>(i,j,k) == 0){
@@ -564,18 +565,18 @@ int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
                             dst3d.at<int>(i,j,k) = numCC;
                         }
                         current_id = dst3d.at<int>(i,j,k);
-                        if ((i + 1) < x_size && src3d->at<bool>(i+1,j,k)>0){
-                            dst3d.at<bool>(i+1,j,k) = current_id;
+                        if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k)>0){
+                            dst3d.at<unsigned short>(i+1,j,k) = current_id;
                         }
-                        if ((j + 1) < y_size && src3d->at<bool>(i,j+1,k)>0){
-                            dst3d.at<bool>(i,j+1,k) = current_id;
+                        if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k)>0){
+                            dst3d.at<unsigned short>(i,j+1,k) = current_id;
                         }
-                        if ((k + 1) < z_size && src3d->at<bool>(i,j,k+1)>0){
-                            dst3d.at<bool>(i,j,k+1) = current_id;
+                        if ((k + 1) < z_size && src3d->at<unsigned short>(i,j,k+1)>0){
+                            dst3d.at<unsigned short>(i,j,k+1) = current_id;
                         }
 
-                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<bool>(i+1,j+1,k)>0){
-                            dst3d.at<bool>(i+1,j+1,k) = current_id;
+                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned short>(i+1,j+1,k)>0){
+                            dst3d.at<unsigned short>(i+1,j+1,k) = current_id;
                         }
                     }
                 }
@@ -586,7 +587,7 @@ int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
             for (int i = 0; i < x_size; i++){
                 for (int j = 0; j< y_size; j++){
                     for (int k = 0; k < z_size; k++){
-                        if (src3d->at<bool>(i,j,k) == 0){
+                        if (src3d->at<unsigned short>(i,j,k) == 0){
                             continue;
                         }
                         if (dst3d.at<int>(i,j,k) == 0){
@@ -594,28 +595,28 @@ int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
                             dst3d.at<int>(i,j,k) = numCC;
                         }
                         current_id = dst3d.at<int>(i,j,k);
-                        if ((i + 1) < x_size && src3d->at<bool>(i+1,j,k)>0){
-                            dst3d.at<bool>(i+1,j,k) = current_id;
+                        if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k)>0){
+                            dst3d.at<unsigned short>(i+1,j,k) = current_id;
                         }
-                        if ((j + 1) < y_size && src3d->at<bool>(i,j+1,k)>0){
-                            dst3d.at<bool>(i,j+1,k) = current_id;
+                        if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k)>0){
+                            dst3d.at<unsigned short>(i,j+1,k) = current_id;
                         }
-                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<bool>(i+1,j+1,k)>0){
-                            dst3d.at<bool>(i+1,j+1,k) = current_id;
+                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned short>(i+1,j+1,k)>0){
+                            dst3d.at<unsigned short>(i+1,j+1,k) = current_id;
                         }
 
                         if ((k + 1) < z_size){
-                            if (src3d->at<bool>(i,j,k+1)>0){
-                                dst3d.at<bool>(i,j,k+1) = current_id;
+                            if (src3d->at<unsigned short>(i,j,k+1)>0){
+                                dst3d.at<unsigned short>(i,j,k+1) = current_id;
                             }
-                            if ((j + 1) < y_size && src3d->at<bool>(i,j+1,k+1)>0){
-                                dst3d.at<bool>(i,j+1,k+1) = current_id;
+                            if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k+1)>0){
+                                dst3d.at<unsigned short>(i,j+1,k+1) = current_id;
                             }
-                            if ((i + 1) < x_size && src3d->at<bool>(i+1,j,k+1)>0){
-                                dst3d.at<bool>(i+1,j,k+1) = current_id;
+                            if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k+1)>0){
+                                dst3d.at<unsigned short>(i+1,j,k+1) = current_id;
                             }
-                            if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<bool>(i+1,j+1,k+1)>0){
-                                dst3d.at<bool>(i+1,j+1,k+1) = current_id;
+                            if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned short>(i+1,j+1,k+1)>0){
+                                dst3d.at<unsigned short>(i+1,j+1,k+1) = current_id;
                             }
                         }
                     }
@@ -625,6 +626,158 @@ int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
     }
 
     return numCC;
+}
+
+/**
+ * @brief extractVoxList
+ * @param label3d
+ * @param voxList
+ * @param numCC
+ */
+void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC){
+    voxList.resize(numCC);
+    for (size_t i = 0; i < label3d->total(); i++){
+        if(label3d->at<int>(i) > 0){
+            voxList[label3d->at<int>(i)].push_back(i);
+        }
+    }
+}
+
+/**
+ * @brief extractVoxList
+ * @param label3d
+ * @param voxList
+ * @param numCC
+ */
+void removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = true){
+    vector<size_t> cc_size(numCC);
+    fill(cc_size.begin(), cc_size.end(), 0);
+    for (size_t i = 0; i < label3d.total(); i++){
+        if(label3d.at<int>(i) > 0){
+            cc_size[label3d.at<int>(i) - 1]++;
+        }
+    }
+    if(relabel){
+        vector<size_t> newlabel(numCC);
+        fill(newlabel.begin(), newlabel.end(), 0);
+        int rm_cc_cnt = 0;
+        for (int i = 0; i < numCC; i ++){
+            if (cc_size[i] >= min_size){
+                newlabel[i] = rm_cc_cnt;
+                rm_cc_cnt ++ ;
+            }
+        }
+        numCC = rm_cc_cnt;
+        for (size_t i = 0; i < label3d.total(); i++){
+            if(label3d.at<int>(i) > 0){
+                label3d.at<int>(i) = newlabel[label3d.at<int>(i) - 1];
+            }
+        }
+    }else{
+        // no change to numCC, only set invalid CC to 0
+        for (size_t i = 0; i < label3d.total(); i++){
+            if(label3d.at<int>(i) > 0 && cc_size[label3d.at<int>(i) - 1] < min_size){
+                label3d.at<int>(i) = 0;
+            }
+        }
+    }
+}
+/**
+ * @brief volumeDilate: x,y direction is formal, while z direction is simplified
+ * @param src3d: boolean (but represented by CV_8U)
+ * @param dst3d
+ * @param kernel
+ */
+void volumeDilate(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
+//    int dilation_type = 0;
+//    if( dilation_elem == 0 ){ dilation_type = MORPH_RECT; }
+//    else if( dilation_elem == 1 ){ dilation_type = MORPH_CROSS; }
+//    else if( dilation_elem == 2) { dilation_type = MORPH_ELLIPSE; }
+    assert(src3d->dims == 3);
+    int x_size  = src3d->size[0];
+    int y_size  = src3d->size[1];
+    int z_size  = src3d->size[2];
+    size_t xy_size = x_size*y_size;
+
+    src3d->copyTo(dst3d);
+    Mat element = getStructuringElement( dilation_type,
+                           Size( 2*radiusValues[0] + 1, 2*radiusValues[1]+1 ),
+                           Point( radiusValues[0], radiusValues[1] ) );
+    for (int z = 0; z < z_size; z++)
+    {
+        float *ind = (float*)dst3d.data + z * xy_size; // sub-matrix pointer
+        Mat subMatrix(2, dst3d.size, CV_8U, ind);
+        dilate(subMatrix, subMatrix, element);
+    }
+    unsigned short max_val;
+    if (radiusValues[2] > 0){
+        for (int i = 0; i < x_size; i++){
+            for (int j = 0; j< y_size; j++){
+                for (int k = 0; k < z_size; k++){
+                    max_val = src3d->at<unsigned short>(i,j,k);
+                    for (int kk = 1; kk < radiusValues[2]; kk++){
+                        if (k+kk < z_size){
+                            max_val = max(src3d->at<unsigned short>(i,j,k+kk), max_val);
+                        }
+                        if (k-kk >= 0){
+                            max_val = max(src3d->at<unsigned short>(i,j,k-kk), max_val);
+                        }
+                    }
+                    dst3d.at<unsigned short>(i,j,k) = max_val;
+                }
+            }
+        }
+    }
+}
+
+/**
+ * @brief volumeErode: x,y direction is formal, while z direction is fixed to morph_corss
+ * @param src3d: boolean (but represented by CV_8U)
+ * @param dst3d
+ * @param kernel
+ */
+void volumeErode(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
+    // there is a question here: if dst3d and src3d point to the same memory address?? what will happen
+//    int dilation_type = 0;
+//    if( dilation_elem == 0 ){ dilation_type = MORPH_RECT; }
+//    else if( dilation_elem == 1 ){ dilation_type = MORPH_CROSS; }
+//    else if( dilation_elem == 2) { dilation_type = MORPH_ELLIPSE; }
+    //assert(src3d != dst3d);
+    assert(src3d->dims == 3);
+    int x_size  = src3d->size[0];
+    int y_size  = src3d->size[1];
+    int z_size  = src3d->size[2];
+    size_t xy_size = x_size*y_size;
+    //Mat org_src3d;
+    src3d->copyTo(dst3d);
+    Mat element = getStructuringElement( dilation_type,
+                           Size( 2*radiusValues[0] + 1, 2*radiusValues[1]+1 ),
+                           Point( radiusValues[0], radiusValues[1] ) );
+    for (int z = 0; z < z_size; z++)
+    {
+        float *ind = (float*)dst3d.data + z * xy_size; // sub-matrix pointer
+        Mat subMatrix(2, dst3d.size, CV_8U, ind);
+        erode(subMatrix, subMatrix, element);
+    }
+    unsigned short min_val;
+    if (radiusValues[2] > 0){
+        for (int i = 0; i < x_size; i++){
+            for (int j = 0; j< y_size; j++){
+                for (int k = 0; k < z_size; k++){
+                    min_val = src3d->at<unsigned short>(i,j,k);
+                    for (int kk = 1; kk < radiusValues[2]; kk++){
+                        if (k+kk < z_size){
+                            min_val = min(src3d->at<unsigned short>(i,j,k+kk), min_val);
+                        }
+                        if (k-kk >= 0){
+                            min_val = min(src3d->at<unsigned short>(i,j,k-kk), min_val);
+                        }
+                    }
+                    dst3d.at<unsigned short>(i,j,k) = min_val;
+                }
+            }
+        }
+    }
 }
 #endif // IMG_BASIC_PROC_H
 
