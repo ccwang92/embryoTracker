@@ -18,9 +18,9 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float *sigma);
 void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernal_z);
 int ConnectedComponents3d(Mat* src3d, Mat &dst3d, int connect);
 
-template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, bool strict);
-template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bool strict);
-template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool strict);
+template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, bool strict = true);
+template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bool strict = true);
+template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool strict = true);
 template <typename T> T normalCDF(T x, T m = 0, T s = 1);
 template <typename T> T normalPDF(T x, T m = 0, T s = 1);
 template <typename T> T vec_stddev(vector<T> const & func);

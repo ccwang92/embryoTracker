@@ -74,6 +74,17 @@ HEADERS += data_importer.h \
 INCLUDEPATH += /usr/local/include/opencv4
 LIBS += -L/usr/local/lib -lopencv_imgproc -lopencv_core -lopencv_highgui
 
+#include(VTK.qrc)
+#INCLUDEPATH += /usr/local/include/ITK-5.1
+#DEPENDPATH += /usr/local/include/ITK-5.1
+#LIBS += -L/usr/local/lib -lITKBiasCorrection-5.1 -lITKBioCell-5.1 -lITKCommon-5.1 -lITKDICOMParser-5.1 -litkdouble-conversion-5.1 -lITKEXPAT-5.1 -lITKFEM-5.1 -litkgdcmCommon-5.1 -litkgdcmDICT-5.1 -litkgdcmDSED-5.1\
+#        -litkgdcmIOD-5.1 -litkgdcmjpeg8-5.1 -litkgdcmjpeg12-5.1 -litkgdcmjpeg16-5.1 -litkgdcmMSFF-5.1 -lITKgiftiio-5.1 -litkhdf5_cpp-5.1 -litkhdf5-5.1 -lITKIOBioRad-5.1 -lITKIOBMP-5.1\
+#        -lITKIOCSV-5.1 -lITKIOGDCM-5.1 -lITKIOGE-5.1 -lITKIOGIPL-5.1 -lITKIOHDF5-5.1 -lITKIOImageBase-5.1 -lITKIOIPL-5.1 -lITKIOJPEG-5.1 -lITKIOLSM-5.1 -lITKIOMesh-5.1 -lITKIOMeta-5.1 -lITKIOMRC-5.1\
+#        -lITKIONIFTI-5.1 -lITKIONRRD-5.1 -lITKIOPNG-5.1 -lITKIOSiemens-5.1 -lITKIOSpatialObjects-5.1 -lITKIOStimulate-5.1 -lITKIOTIFF-5.1 -lITKIOTransformBase-5.1 -lITKIOTransformHDF5-5.1 -lITKIOTransformInsightLegacy-5.1\
+#        -lITKIOTransformMatlab-5.1 -lITKIOVTK-5.1 -lITKIOXML-5.1 -litkjpeg-5.1 -lITKKLMRegionGrowing-5.1 -lITKLabelMap-5.1 -lITKMesh-5.1 -lITKMetaIO-5.1 -litkNetlibSlatec-5.1 -lITKniftiio-5.1\
+#        -lITKNrrdIO-5.1 -litkopenjpeg-5.1 -lITKOptimizers-5.1 -lITKPath-5.1 -litkpng-5.1 -lITKPolynomials-5.1 -lITKQuadEdgeMesh-5.1 -lITKSpatialObjects-5.1 -lITKStatistics-5.1\
+#        -litktiff-5.1 -litkv3p_lsqr-5.1 -litkv3p_netlib-5.1 -litkvcl-5.1 -lITKVideoCore-5.1 -lITKVideoIO-5.1 -litkvnl_algo-5.1 -litkvnl-5.1 -lITKVNLInstantiation-5.1 -lITKVTK-5.1\
+#        -lITKVtkGlue-5.1 -lITKWatersheds-5.1 -litkzlib-5.1 -lITKznz-5.1
 #LIBS += src_3d/common_lib/src_packages/mylib_tiff -lmylib
 
 #INCLUDEPATH += src_3rd/common_lib/include/glew
