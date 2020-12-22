@@ -324,7 +324,7 @@ float varByTruncate(vector<float> vals4var, int numSigma, int numIter){
  * @param validRatio: consider the validRatio pixels in the data (remove pixels with saturated intensity)
  * @param gap
  */
-float calVarianceStablization(const Mat* src3d, Mat & varMap, float &varTrend, float validRatio = 0.95, int gap=2){
+float calVarianceStablization(const Mat* src3d, Mat & varMap, vector<float> &varTrend, float validRatio = 0.95, int gap=2){
     Mat meanVal(src3d->dims, src3d->size, CV_32F, Scalar(0));
     Mat kernelx, kernely, kernelz;
     float denominator = 0;
@@ -352,8 +352,9 @@ float calVarianceStablization(const Mat* src3d, Mat & varMap, float &varTrend, f
     minMaxLoc(meanVal, &min_intensity, &max_intensity);
 
     double unit_intensity = (max_intensity - min_intensity) / (levels-1);
-    float *xx = new float[levels];
-    for (int i = 0; i < levels; i++) xx[0] = 0;
+    varTrend.resize(levels);
+    //for (int i = 0; i < levels; i++) xx[0] = 0;
+    fill(varTrend.begin(), varTrend.end(), 0);
     int x_size  = src3d->size[0];
     int y_size  = src3d->size[1];
     int z_size  = src3d->size[2];
@@ -397,7 +398,7 @@ float calVarianceStablization(const Mat* src3d, Mat & varMap, float &varTrend, f
             vals4var[j] = diff.at<float>(numElements[cur_level][j]);
         }
         float varCur = varByTruncate(vals4var, 2, 3);
-        xx[cur_level] = (denominator/(denominator+1))*varCur;
+        varTrend[cur_level] = (denominator/(denominator+1))*varCur;
         testedElements += numElements[cur_level].size();
         if (cur_level < target_level &&
                 (testedElements/validElements > validRatio)){
@@ -406,20 +407,20 @@ float calVarianceStablization(const Mat* src3d, Mat & varMap, float &varTrend, f
         }
     }
     if (max_intensity>20){
-        for (int i=0;i<3;i++) xx[i] = 0;
+        for (int i=0;i<3;i++) varTrend[i] = 0;
     }
     else{
-        for (int i=0;i<15;i++) xx[i] = 0;
+        for (int i=0;i<15;i++) varTrend[i] = 0;
     }
     for(size_t i = 0; i < xy_size*z_size; i++){
         cur_level = (int) ((meanVal.at<float>(i) - min_intensity)/unit_intensity);
         if (cur_level >= levels) cur_level = levels - 1;
         if (cur_level < 0) cur_level = 0;
-        varMap.at<float>(i) = xx[cur_level];
+        varMap.at<float>(i) = varTrend[cur_level];
     }
 
-    varTrend = *xx;
-    return xx[target_level];
+    //varTrend = *xx;
+    return varTrend[target_level];
 }
 
 //double normalCDF(double value) //standard

@@ -10,10 +10,10 @@ struct segParameter {
     union
     {
         float min_intensity;
-        long min_cell_sz;
-        long max_cell_sz;
+        size_t min_cell_sz;
+        size_t max_cell_sz;
         float min_fill;
-        long max_WHRatio;
+        size_t max_WHRatio;
         float noise_estimate_ratio;
         float fdr;
         float min_zscore;
@@ -24,6 +24,7 @@ struct odStatsParameter {
     union
     {
         int gap4fgbgCompare; // default is 0
+        float varAtRatio;
     };
 };
 
@@ -31,7 +32,7 @@ class cellSegmentMain
 {
 public:
     cellSegmentMain(unsigned char *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/);
-    void cellSegmentSingleFrame(unsigned char *data_grayim3d, size_t curr_frame);
+    void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
 
 protected:
     string debug_folder;
@@ -46,6 +47,8 @@ protected:
     vector<Mat> principalCurv2d;
     vector<Mat> principalCurv3d;
     vector<Mat> varMaps;
+    vector<vector<float>> varTrends;
+    vector<float> variances;
     vector<size_t> number_cells;
     vector<vector<size_t>> voxIdxList; // cell voxIdx list
 
@@ -59,7 +62,8 @@ protected:
         p4segVol.min_fill = 0.0001;
         p4segVol.max_WHRatio = 100;
 
-        p4odStats.gap4fgbgCompare = 0;
+        p4odStats.gap4fgbgCompare = 2;
+        p4odStats.varAtRatio = 0.95;
     }
 };
 

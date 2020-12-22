@@ -28,7 +28,7 @@ void filterVolume(const Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction);
 void filterZdirection(const Mat* src3d, Mat &dst3d, Mat kernal_z);
 float truncatedGauss(float mu, float sigma, float lower, float upper, float &t_mu, float &t_sigma);
 float varByTruncate(vector<float> vals4var, int numSigma, int numIter);
-float calVarianceStablization(const Mat* src3d, Mat & varMap, float &varTrend, float validRatio, int gap);
+float calVarianceStablization(const Mat* src3d, Mat & varMap, vector<float> &varTrend, float validRatio, int gap);
 
 template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, bool strict = true);
 template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bool strict = true);
