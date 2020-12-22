@@ -11,7 +11,7 @@ enum filterDirection{DIRECTION_X = 0, DIRECTION_Y, DIRECTION_Z};
  * @param src3d: float mat
  * @param dst3d: float mat
  */
-void principalCv2d(const Mat* src3d, Mat &dst3d, float *sigma, int minIntensity = 0){
+void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
     src3d->copyTo(dst3d);
     gaussianSmooth3Ddata(dst3d, sigma);
 
@@ -63,7 +63,7 @@ void principalCv2d(const Mat* src3d, Mat &dst3d, float *sigma, int minIntensity 
  * @param sigma
  * @param minIntensity
  */
-void principalCv3d(const Mat* src3d, Mat &dst3d, float *sigma, int minIntensity = 0){
+void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
     src3d->copyTo(dst3d);
     gaussianSmooth3Ddata(dst3d, sigma);
 
@@ -131,7 +131,7 @@ void principalCv3d(const Mat* src3d, Mat &dst3d, float *sigma, int minIntensity 
  * @param data4smooth
  * @param sigma
  */
-void gaussianSmooth3Ddata(Mat &data4smooth, const float *sigma)
+void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[])
 {
     assert(data4smooth.dims == 3);
     int x_size  = data4smooth.size[0];
@@ -475,7 +475,7 @@ template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool s
 template <typename T> T normalCDF(T x, T m, T s)
 {
     T a = (x - m) / s;
-    return 0.5 * erfc(-a * M_SQRT1_2); //erfc(x) = 1-erf(x)
+    return 0.5 * erfc(-a * M_SQRT1_2); //erfc(x) = 1-erf(x), erf(-x) = -erf(x)
 }
 template <typename T> T normalPDF(T x, T m, T s)
 {
@@ -484,7 +484,10 @@ template <typename T> T normalPDF(T x, T m, T s)
 
     return inv_sqrt_2pi / s * exp(-T(0.5) * a * a);
 }
-
+template <typename T> T zscore2Pvalue(T z){
+    return 1-normalCDF(z);
+}
+//template <typename T> T pvalue2Zscore(T p){}
 template <typename T> T vec_stddev(vector<T> const & func)
 {
     return sqrt(vec_variance(func));
@@ -501,6 +504,7 @@ template <typename T> T vec_mean(vector<T> const & func)
 {
     return accumulate(func.begin(), func.end(), 0.0) / func.size();
 }
+
 /**
  * @brief connectedComponents3d
  * @param src3d: boolean but represented by CV_8U
@@ -644,10 +648,11 @@ void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int 
 }
 
 /**
- * @brief extractVoxList
+ * @brief removeSmallCC
  * @param label3d
- * @param voxList
  * @param numCC
+ * @param min_size
+ * @param relabel
  */
 void removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = true){
     vector<size_t> cc_size(numCC);
@@ -682,6 +687,7 @@ void removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = tru
         }
     }
 }
+
 /**
  * @brief volumeDilate: x,y direction is formal, while z direction is simplified
  * @param src3d: boolean (but represented by CV_8U)
@@ -778,6 +784,12 @@ void volumeErode(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_t
             }
         }
     }
+}
+
+void volumeWrite(Mat *src3d, string filename){
+    vector<Mat> imgs;
+    split(*src3d, imgs);
+    imwrite(filename, imgs);
 }
 #endif // IMG_BASIC_PROC_H
 

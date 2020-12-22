@@ -64,6 +64,7 @@ public:
         setVolume();
     }
     void setVolume(long frame4display = 0);
+    void setVolumeWithMask(long frame4display, unsigned char* mask);
     void setThreshold(const double threshold) {
         auto range = m_raycasting_volume ? getRange() : std::pair<double, double>{0.0, 1.0};
         m_threshold = threshold / (range.second - range.first);

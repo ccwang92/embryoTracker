@@ -1,13 +1,12 @@
 #include "cellsegment_main.h"
-#include <opencv2/core.hpp> //basic building blocks of opencv
-#include <opencv2/imgcodecs.hpp> // image io
-#include <opencv2/highgui.hpp> //image display
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
 #include <string>
-using namespace cv;
+#include "img_basic_proc_declare.h"
+
 cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/)
 {
+    init_parameter();
     data_rows_cols_slices = new int[3];
 
     if (bufSize[0] > INT_MAX || bufSize[1] > INT_MAX || bufSize[2] > INT_MAX){
@@ -22,17 +21,27 @@ cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, l
     }
     time_points = bufSize[4];
     data_type = _data_type;
-
+    cell_label_maps.resize(time_points);
+    principalCurv2d.resize(time_points);
+    principalCurv3d.resize(time_points);
+    varMaps.resize(time_points);
+    number_cells.resize(time_points);
     long sz_single_frame_char = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
 
     if (data_type == V3D_UINT16) sz_single_frame_char *= 2;
     else if(data_type != V3D_UINT8) qFatal("Unsupported data type\n");
 
     for (int i = 0; i < time_points; i++){
-        cellSegmentSingleFrame(data_grayim4d + sz_single_frame_char*i);
+        cellSegmentSingleFrame(data_grayim4d + sz_single_frame_char*i, i);
     }
 }
-void cellSegmentMain::cellSegmentSingleFrame(unsigned char *data_grayim3d)
+/**
+ * @brief cellSegmentMain::cellSegmentSingleFrame
+ * @param data_grayim3d: The data is mirrored by the y-direction, this is because
+ * OpenGL texture are loaded left to right, bottom to top. Most image loaders
+ * however will store the image in memory left to right, top to bottom.
+ */
+void cellSegmentMain::cellSegmentSingleFrame(unsigned char *data_grayim3d, size_t curr_frame)
 {
     // The data is mirrored by the y-direction, this is because OpenGL
     // texture are loaded left to right, bottom to top. Most image loaders
@@ -51,11 +60,16 @@ void cellSegmentMain::cellSegmentSingleFrame(unsigned char *data_grayim3d)
 //        }
     }else{ // (data_type == V3D_UINT16)
         input_3dmat = new Mat(3, data_rows_cols_slices, CV_16UC1, data_grayim3d);
+
     }
 
     Mat inputVolFloat;
     input_3dmat->convertTo(inputVolFloat, CV_32F); // data we will work on in the future
 
-
+    /******** start to do cell segmentation *******/
+    float sigma2d[3] = {3.0, 3.0, 0.0};
+    principalCv2d(&inputVolFloat, principalCurv2d[curr_frame], sigma2d, p4segVol.min_intensity);
+    float sigma3d[3] = {5.0, 5.0, 1.0};
+    principalCv2d(&inputVolFloat, principalCurv3d[curr_frame], sigma3d, p4segVol.min_intensity);
 
 }

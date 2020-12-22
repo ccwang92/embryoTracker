@@ -294,7 +294,7 @@ void RayCastCanvas::setVolume(long frame4display) {
     if (total_rgbaBuf){ // display the data using 4 channels
         m_raycasting_volume->transfer_volume(total_rgbaBuf + offsets,
                                              p_min, p_max, bufSize[0],
-                                             bufSize[1], bufSize[2], 1/*rgbaBuf contains 4 channels*/);
+                                             bufSize[1], bufSize[2], 4/*rgbaBuf contains 4 channels*/);
     }else{
         offsets *= data_importer->image4d->getUnitBytes(); // if 16 bit, one pixel occupies two chars.
         m_raycasting_volume->transfer_volume(data_importer->image4d->getRawData() + offsets,
@@ -305,6 +305,54 @@ void RayCastCanvas::setVolume(long frame4display) {
 }
 
 
+/**
+ * @brief RayCastCanvas::setVolumeWithMask
+ * @param frame4display
+ * @param mask
+ * @param datatype
+ */
+void RayCastCanvas::setVolumeWithMask(long frame4display, unsigned char* mask) {
+    //datatype == 1: unsigned char
+    //datatype == 2: int 32
+    if (!data_importer)
+    {
+        throw std::runtime_error("data_importer has not been initialized.");
+    }
+    if (!data_importer->p_vmin){// if max min value not defined
+        data_importer->updateminmaxvalues();
+    }
+    size_t numVox = bufSize[0] * bufSize[1] * bufSize[2];
+    RGBA8 *imWithMask = new RGBA8[ numVox ];
+    double p_min = data_importer->p_vmin[frame4display];
+    double p_max = data_importer->p_vmax[frame4display];
+
+    // scale the image to 0, 1
+    long offsets = frame4display*bufSize[0]*bufSize[1]*bufSize[2];
+    offsets *= data_importer->image4d->getUnitBytes();
+    void *start = data_importer->image4d->getRawData() + offsets;
+    float vox_val = 0;
+    for (size_t i = 0; i < numVox; i++){
+        if (mask[i] > 0){
+            imWithMask[i].r = 150;
+        }else{
+            if (data_importer->image4d->getUnitBytes() == 1){
+                vox_val = (float)*((v3d_uint8 *)start + i);
+            }else{
+                vox_val = (float)*((v3d_uint16 *)start + i);
+            }
+        }
+        vox_val = 2*255.0*(vox_val-p_min)/(p_max-p_min); // times 2 to make it clearer
+        imWithMask[i].g = (v3d_uint8)vox_val;
+        imWithMask[i].b = 0;
+        imWithMask[i].a = (v3d_uint8)(0.0f + imWithMask[i].r + imWithMask[i].g + + imWithMask[i].b);
+    }
+
+    // display the data using 4 channels
+    m_raycasting_volume->transfer_volume(imWithMask,
+                                         p_min, p_max, bufSize[0],
+            bufSize[1], bufSize[2], 4/*rgba contains 4 channels*/);
+    update();
+}
 /*!
  * \brief Convert a mouse position into normalised canvas coordinates.
  * Normalized coordinates: Center of the canvas is the origin piont.

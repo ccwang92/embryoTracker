@@ -473,7 +473,7 @@ bool DataImporter::updateminmaxvalues() // update the max min intensity of a sin
 
     try
     {
-        p_vmax = new double [image4d->getCDim()];
+        p_vmax = new double [image4d->getCDim()]; // at first the data was ordered by channel
         p_vmin = new double [image4d->getCDim()];
     }
     catch (...)
