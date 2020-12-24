@@ -2,7 +2,7 @@
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
 #include <string>
-#include "img_basic_proc_declare.h"
+#include "img_basic_proc.h"
 
 cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/)
 {

@@ -12,6 +12,7 @@ CONFIG += c++17
 SOURCES += data_importer.cpp \
     cellsegmentation/cellsegment_main.cpp \
     cellsegmentation/synquant_simple.cpp \
+    cellsegmentation/img_basic_proc.cpp \
     main.cpp \
     mainwindow.cpp \
     my4dimage.cpp \
@@ -38,7 +39,6 @@ SOURCES += data_importer.cpp \
 HEADERS += data_importer.h \
     cellsegmentation/cellsegment_main.h \
     cellsegmentation/img_basic_proc.h \
-    cellsegmentation/img_basic_proc_declare.h \
     cellsegmentation/synquant_simple.h \
     dialog_import_im_sequence.h \
     mainwindow.h \

@@ -1,4 +1,5 @@
 #include "synquant_simple.h"
+#include "img_basic_proc.h"
 //public:
 //    Mat zMap, idMap;
 //    vector<float> zscore_list;
@@ -19,8 +20,15 @@
  * @param p4segVol
  * @param p4odStats
  */
-synQuantSimple::synQuantSimple(Mat *_srcVolume, segParameter p4segVol, odStatsParameter p4odStats){
+synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter p4segVol, odStatsParameter p4odStats){
     srcVolumeUint8 = _srcVolume;
+    imArray = (unsigned char*)srcVolumeUint8->data;
+    src_var = _src_var;
+
+    componentTree3d(p4segVol, p4odStats);
+    float * zscore_pointer = & (*zscore_list.begin()); // a pointer to the address of zscore_list.begin()
+    zMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32F, zscore_pointer); //*zscore_list.begin()
+    floatMap2idMap(zMap, *idMap, 26);
 }
 
 void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4odStats){
@@ -30,14 +38,14 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
     size_t nVoxels=width*height*zSlice; // voxels in a 3D image
     size_t nPixels = width*height; //pixels in a single slice
     //imArray = new short[nVoxels];
-    int tmpCnt = 0;
+    //int tmpCnt = 0;
 
     //    for(int i = 0; i < imArrayIn.length; i++) {
     //        for(int j = 0; j < imArrayIn[0].length; j++)
     //            imArray[tmpCnt++] = imArrayIn[i][j]; // java.util.Arrays
     //    }
     //Create nodes
-    size_t x,y,z, rmder, x0,x2,y0,y2,z0, z2;
+    long x,y,z, rmder, x0,x2,y0,y2,z0, z2;
     size_t i,j,k;
     //outputArray = new byte[nVoxels];
     diffN.resize(nVoxels);
@@ -53,7 +61,7 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
 
     voxSum.resize(nVoxels);
     BxCor.resize(nVoxels);//ymin,xmin,zmin,  ymax,xmax,zmax.
-    unsigned char* imArray = (unsigned char*)srcVolumeUint8->data;
+
     for (i=0; i<nVoxels; i++)
     {
         rmder = i % nPixels;
@@ -278,12 +286,12 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
                     if(j==13979) {
                         System.out.print("neighbor: "+voxSumN[j]+" "+areasN[j]+" self: "+voxSum[j]+" "+areas[j]+" "+"\n");
                     }***/
-            y0=max(y-1,0);
-            y2=min(y+1, height-1);
-            x0=max(x-1,0);
-            x2=min(x+1,width-1);
-            z0=max(z-1,0);
-            z2=min(z+1,zSlice-1);
+            y0= MAX(y-1,0);
+            y2= MIN(y+1, height-1);
+            x0= MAX(x-1,0);
+            x2= MIN(x+1,width-1);
+            z0= MAX(z-1,0);
+            z2= MIN(z+1,zSlice-1);
             // for neighboring pixels' value we consider 26 neighbors
             for (ii=z2;ii>=z0;ii--) {
                 for (jj=y2;jj>=y0;jj--) {
@@ -310,8 +318,8 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
         }
 
     }
-    outputArray.resize(nVoxels);
-    objLabel(p4segVol.min_cell_sz, p4segVol.max_cell_sz);
+    outputArray.resize(nVoxels); // label the output
+    fill(outputArray.begin(), outputArray.end(), UNDEFINED);
     zscore_list.resize(nVoxels);
     for (i=0; i<nVoxels; i++)
     {
@@ -323,35 +331,21 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
         double LW = (double)BxCor[i][3]-BxCor[i][0]+1;
         double LZ = (double)BxCor[i][5]-BxCor[i][2]+1;
         double ratio = LH>LW? LH/LW: LW/LH;
-        /* for debug
-                if(i==13775) {
-                    System.out.println(""+outputArray[i]+" "+areas[i]+" "+voxSum[i]+" "+areasN[i]+" "+voxSumN[i]+" ");
-                }*/
-        if(areas[i]<p4segVol.min_cell_sz || ratio>p4segVol.max_WHRatio || (areas[i]/(double)(LH*LW*LZ))<p4segVol.min_fill){
-            zscore_list[i] = 0;
-            continue;
-        }
 
-        if(outputArray[i] == OBJECT)
-        {
-            zscore_list[i] = zscoreCal(diffN[i],areas[i],areasN[i],p,q.var);
+        if(areas[i]>=p4segVol.max_cell_sz){
+            zscore_list[i] = -1;
+            outputArray[i] = NOT_OBJECT; // no need to update the object label
+        }
+        if(areas[i]<p4segVol.min_cell_sz || ratio>p4segVol.max_WHRatio || (areas[i]/(double)(LH*LW*LZ))<p4segVol.min_fill){
+            zscore_list[i] = -1;
+        }else{
+            zscore_list[i] = zscoreCal(diffN[i], areas[i], areasN[i]);
+            valid_zscore.push_back(zscore_list[i]);
+            valid_zscore_idx.push_back(i);
         }
     }
-
-
-    /******Debug for the correctness of component tree building****
-            for(i=2; i<6;i++) {
-                for(j = 21;j<30;j++){
-                    for(kk = 21; kk<30;kk++) {
-                        tmpIdx = kk+j*width+i*nPixels;
-                        adjNode=findNode(tmpIdx);
-                        System.out.print(adjNode+" "+areas[adjNode]+"; ");
-                        //System.out.print(imArray[tmpIdx]+"; ");
-                    }
-                }
-                System.out.print("\n\n");
-            }
-            System.out.print("Debug in Component Tree Done!\n");***/
+    // label the object
+    objLabel_descending();
 }
 
 /*Label object or not: here we simply  test the size  to decide object or not*/
@@ -362,7 +356,7 @@ void synQuantSimple::objLabel(size_t minSize ,size_t maxSize)
     for (i = nVoxels-1; i >= 0; i--)
     {
         j=sortedIndex[i];
-        if (areas[j]<=maxSize)// && areas[j]>=minSize)
+        if (areas[j]<=maxSize && areas[j]>=minSize)
             outputArray[j] = OBJECT;
         else
             outputArray[j] = NOT_OBJECT;
@@ -389,8 +383,8 @@ size_t synQuantSimple::mergeNodes(size_t e1,size_t e2)/*e1 adjacent node, e2 cur
 
     if(imArray[e1]==imArray[e2])
     {
-        res=Math.max(e1,e2);
-        m=Math.min(e1,e2);
+        res=max(e1,e2);
+        m=min(e1,e2);
     }
     else
     {
@@ -410,11 +404,11 @@ size_t synQuantSimple::mergeNodes(size_t e1,size_t e2)/*e1 adjacent node, e2 cur
     size_t y=rmder/width;
     size_t x=rmder-y*width;
 
-    size_t y0=max(y-1,0);
+    size_t y0=max(y-1,(size_t)0);
     size_t y2=min(y+1, height-1);
-    size_t x0=max(x-1,0);
+    size_t x0=max(x-1,(size_t)0);
     size_t x2=min(x+1,width-1);
-    size_t z0=max(z-1,0);
+    size_t z0=max(z-1,(size_t)0);
     size_t z2=min(z+1,zSlice-1);
     // for neighboring pixels' value we consider 26 neighbors
     //System.out.print("Before Merging"+voxSumN[res]+" "+areasN[res]+" "+"\n");
@@ -422,8 +416,9 @@ size_t synQuantSimple::mergeNodes(size_t e1,size_t e2)/*e1 adjacent node, e2 cur
     for (ii=z2;ii>=z0;ii--) {
         for (jj=y2;jj>=y0;jj--) {
             for(kk=x2;kk>=x0;kk--) {
-                if( ii==z & jj==y & kk==x)
+                if( ii==z && jj==y && kk==x){
                     continue;
+                }
                 tmpIdx = kk+width*jj+ii*(width*height);
                 if (usedN[tmpIdx] == NOT_USED_AS_N)
                 {
@@ -478,141 +473,191 @@ size_t synQuantSimple::mergeNodes(size_t e1,size_t e2)/*e1 adjacent node, e2 cur
     return res;
 }
 /*Calculate the z-score of each pixel*/
-double zscoreCal(double t0, int M/*in*/, int N/*nei*/, paraP3D p, double qVar){
-    double[][] pMu = p.mu;
-    double[][] pSigma = p.sigma;
-
-    if(M < p.min_size)
-        M = p.min_size;
-    if(N<=p.min_size || N < (M/10))
-        return 0;
-    if(N<p.min_size)
-        N = p.min_size;
-    if(M>p.max_size)
-        M = p.max_size;
-    if(N>p.max_size)
-        N = p.max_size;
-    double mu = pMu[M-1][N-1];
-    double sigma = pSigma[M-1][N-1];
-    mu = mu*Math.sqrt(qVar);
-    sigma = sigma*Math.sqrt(qVar);
-    double zScore = (t0-mu)/sigma;
-    t0 = t0/Math.sqrt(qVar);
-    return zScore;
+float synQuantSimple::zscoreCal(float t0, size_t M/*in*/, size_t N/*nei*/){
+    float mu, sigma;
+    nonOV_truncatedGauss(M, N, mu, sigma);
+    mu = mu*sqrt(src_var);
+    sigma = sigma*sqrt(src_var);
+    t0 = t0/sqrt(src_var);
+    return (t0-mu)/sigma;
 }
-/* This function is to connect the component tree to the following functions like scanAll3Updt in scanAll3 class.
-     * It transfer the component tree into Nthr zscore maps (zMapx) and index maps (kMapx).
-     * Each map corresponding to a threshold, the connected region in one map share same zscore and index.
-     *
-     * Also this function build two arraylists for the following FDR control: one is Zscore_Vec, which saves all zscores.
-     * The other is levels, which saves the map level(just the threshold level) of each zscore.*/
-void cpt2map(paraP3D p){
-    Nthr = (p.thr1-p.thr0)/p.thrg +1;
-    kMapx = new int[Nthr][zSlice][height][width];
-    boolean[][][][] bMapx = new boolean[Nthr][zSlice][height][width];
-    zMapx = new double[Nthr][zSlice][height][width];
-    int nVoxels = width*height*zSlice;
-    ImageHandling IH = new ImageHandling();
 
-    Zscore_Vec = new ArrayList<Double>();
-    levels = new ArrayList<Integer>();
-    for (int i = nVoxels-1; i >=0; i--)
+/**
+ * @brief objLabel_zscore: label the objects by z-score threshold set by users
+ * @param zscore_thres
+ */
+void synQuantSimple::objLabel_zscore(float zscore_thres) {
+//    int i,j;
+//    for (i=nVoxels-1; i>=0; i--)
+//    {
+//        j=sortedIndex[i];
+//        if (outputArray[j] == UNDEFINED)
+//        {
+//            int e = j;
+//            while(zscore[e] < zscore_thres && outputArray[e] == UNDEFINED) {
+//                e = parNode[e];
+//            }
+//            if (zscore[e] >= zscore_thres) { // this region is good
+//                double cur_zscore = zscore[e];
+//                double cur_label = outputArray[e];
+//                while(imArray[e] == imArray[parNode[e]] & outputArray[e] == UNDEFINED)
+//                    e = parNode[e];
+//                if (cur_label == UNDEFINED) { // this region haven't been labeled
+//                    int e1 = j;
+//                    while(e1 != e)
+//                    {
+//                        outputArray[e1] = OBJECT;
+//                        zscore[e1] = cur_zscore;
+//                        e1 = parNode[e1];
+//                    }
+//                    if (outputArray[e1] == UNDEFINED) {
+//                        outputArray[e1] = OBJECT;
+//                        zscore[e1] = cur_zscore;
+//                    }
+//                    e1 = parNode[e];
+//                    while(e1 != parNode[e1] & outputArray[e1] == UNDEFINED)
+//                    {
+//                        outputArray[e1] = NOT_OBJECT;
+//                        zscore[e1] = -1;
+//                        e1 = parNode[e1];
+//                    }
+//                    if (outputArray[e1] == UNDEFINED) {
+//                        outputArray[e1] = NOT_OBJECT;
+//                        zscore[e1] = -1;
+//                    }
+//                    if (outputArray[e1] == OBJECT) { // we did wrong thing if the root is OBJECT
+//                        // under such condition, we need to correct previous from j to e1
+//                        int e2 = j;
+//                        while(e2 != e1)
+//                        {
+//                            outputArray[e2] = OBJECT;
+//                            zscore[e2] = zscore[e1];
+//                            e2 = parNode[e2];
+//                        }
+//                    }
+//                }
+//                else{ // this region has been labeled (should only have NOT_OBJECT label)
+//                    int e1 = j;
+//                    while(e1 != e) // label j to e as the same
+//                    {
+//                        outputArray[e1] = cur_label;
+//                        zscore[e1] = cur_zscore;
+//                        e1 = parNode[e1];
+//                    }
+//                }
+//            }else { // this region is bad
+//                int e1 = j;
+//                while(e1 != e) // label j to e as the same
+//                {
+//                    outputArray[e1] = outputArray[e];
+//                    zscore[e1] = zscore[e];
+//                    e1 = parNode[e1];
+//                }
+//            }
+//        }
+//    }
+}
+
+/**
+ * @brief synQuantSimple::objLabel_fdr: label the objects by finding the
+ * best level based on z-score
+ */
+void synQuantSimple::processVoxLabel(size_t j){
+    if (outputArray[j] == UNDEFINED)
     {
-        int j=sortedIndex[i];
-        if(outputArray[j] != OBJECT)
-            continue;
-
-        //Compute new neighbours
-        int z = j / (width*height);
-        int rmder = j % (width*height);
-        int y=rmder/width;
-        int x=rmder-y*width;
-
-        int e = j;
-        int intensity = imArray[e];
-        if(intensity<p.thr0)
-            continue;
-        int Inl = (intensity-p.thr0)/p.thrg;
-        int Inlevel = Inl;
-        zMapx[Inlevel][z][y][x] = zscore[e];
-        bMapx[Inlevel][z][y][x] = true;
-
-        while (parNode[e] != e){
-            intensity = imArray[parNode[e]];
-            if(intensity<p.thr0 | outputArray[parNode[e]] != OBJECT){
-                break;
-            }
-            int InlevelPar = (intensity-p.thr0)/p.thrg;
-            zMapx[InlevelPar][z][y][x] = zscore[parNode[e]];
-            bMapx[InlevelPar][z][y][x] = true;
+        size_t e = j;
+        //System.out.println("Idx "+j+" Image Value"+imArray[j]+" "+zscore[j]);
+        while(imArray[e] == imArray[parNode[e]] && outputArray[e] == UNDEFINED)
             e = parNode[e];
+        if (outputArray[e] == UNDEFINED)
+        {
+            size_t e1 = parNode[e];
+            //					if (e1!=e && zscore[e]>0) {
+            //						outputArray[e] = OBJECT;
+            //						continue;
+            //					}
+            // find if parents contains a valid OBEJCT or NOT_OBJECT label
+            byte ObjOrNot = NOT_OBJECT;
+            double tmpZscore = -1;
+            while(e1 != parNode[e1])
+            {
+                if (outputArray[e1]!=UNDEFINED) {
+                    ObjOrNot = outputArray[e1];
+                    tmpZscore = zscore_list[e1];
+                    break;
+                }
+                e1 = parNode[e1];
+            }
+
+
+            if (ObjOrNot==OBJECT) { //if there is a OBEJCT label, assign j to e1 to object
+                e1 = j;
+                while(e1 != parNode[e1] && outputArray[e1] == UNDEFINED){
+                    outputArray[e1] = OBJECT;
+                    //diffN[e1] = diffN[e];
+                    zscore_list[e1] = tmpZscore;
+                    e1 = parNode[e1];
+                }
+                if (outputArray[e1] == UNDEFINED) { // should not use; in case loop till the last pixel
+                    outputArray[e1] = OBJECT;
+                    zscore_list[e1] = tmpZscore;
+                }
+                //						if (outputArray[e] == UNDEFINED) {
+                //							outputArray[e] = OBJECT;
+                //							zscore[e] = tmpZscore;
+                //						}
+            }
+            else { // label parNode[e] to e1 NOT_OBJECT, label j to e object
+                e1 = parNode[e];
+                while(e1 != parNode[e1] && outputArray[e1] == UNDEFINED){//may lost one pixel; do-while may better
+                    outputArray[e1] = NOT_OBJECT;
+                    //diffN[e1] = diffN[e];
+                    zscore_list[e1] = -1;
+                    e1 = parNode[e1];
+                }
+                if (outputArray[e1] == UNDEFINED) {
+                    outputArray[e1] = NOT_OBJECT;
+                    zscore_list[e1] = -1;
+                }
+                // only e and j is enough
+                outputArray[e] = OBJECT;
+                zscore_list[e] = zscore_list[j];
+                outputArray[j] = OBJECT;
+                zscore_list[j] = zscore_list[j];
+            }
+
+            //findBestLevel(j, -1);
         }
-    }
-    int lvCnt = 0;
-    BasicMath bm = new BasicMath();
-    for(int i=0;i<Nthr;i++){
-        System.out.println("Thresholded region's zscore: "+bm.matrix3DMax(zMapx[i]));
-        kMapx[i] = IH.bwlabel3D(zMapx[i], 26,Zscore_Vec);
-        for(int j=lvCnt;j<Zscore_Vec.size();j++){
-            levels.add(i);
+        else
+        {
+            size_t e1 = j;
+            while(e1 != e)
+            {
+                outputArray[e1] = outputArray[e];
+                //diffN[e1] = diffN[e];
+                zscore_list[e1] = zscore_list[e];
+                e1 = parNode[e1];
+            }
         }
-        lvCnt = Zscore_Vec.size();
     }
 }
-/* The same function as BestSyn.extractBestSyn_fdr. Extract the region with highest zscore.
-     * Now we just need to scan the ArrayList Zscore_Vec and levels. No need to go through all maps.*/
-void extractBestSyn(paraP3D p){
-    Nthr = (p.thr1-p.thr0)/p.thrg +1;
-    int nVoxels = width*height*zSlice;
-    boolean[] checkedMark = new boolean[nVoxels];
-    System.out.println("size of candidate particle set: "+Zscore_Vec.size());
-    if(Zscore_Vec==null){//if the vector haven't been build, this will not be used
-        Zscore_Vec = new ArrayList<Double>();
-        levels = new ArrayList<Integer>();
-        for (int i = 0; i <=nVoxels; i++)
-        {
-            int j=sortedIndex[i];
-            if(outputArray[j] != OBJECT)
-                continue;
-            if (checkedMark[j])
-                continue;
-            int e = j;
-            int intensity = imArray[e];
-            if(intensity<p.thr0)
-                continue;
-            int Inlevel = (intensity-p.thr0)/p.thrg;
-            checkedMark[e] = true;
-            while (parNode[e] != e){
-                intensity = imArray[parNode[e]];
-                if(intensity<p.thr0)
-                    break;
-                int newInlevel = (int) Math.floor((intensity-p.thr0)/(double)p.thrg);
-                checkedMark[e] = true;
-                if(newInlevel!=Inlevel){
-                    Zscore_Vec.add(zscore[e]);
-                    levels.add(Inlevel);
-                    Inlevel = newInlevel;
-                }
-                e = parNode[e];
-
-            }
-            Zscore_Vec.add(zscore[e]);
-            levels.add(Inlevel);
-        }
-    }
-    C = 0;
-    I = 0;
-    int CI_cnt = 0;
-
-    for(int i=0;i<Zscore_Vec.size();i++)
+void synQuantSimple::objLabel_descending() {
+    size_t j;
+    // sort all pixels with their zscore values with descending order
+    vector<size_t> zScoreSortedIdx = sort_indexes(valid_zscore, false, 0); //false:descend, 0:start from 0
+    // process the voxel with valid zscore first
+    FOREACH_i(zScoreSortedIdx)
     {
-        if(Zscore_Vec.get(i)>C){
-            C = Zscore_Vec.get(i);
-            I = levels.get(i);
-            CI_cnt = i;
-        }
+        j=valid_zscore_idx[zScoreSortedIdx[i]];
+        processVoxLabel(j);
     }
-    Zscore_Vec.remove(CI_cnt);
-    levels.remove(CI_cnt);
+    // process other voxels, no need to avoid voxels processed in valid_zscore_idx.
+    FOREACH_i(zscore_list)
+    {
+        processVoxLabel(i);
+    }
+}
+
+float synQuantSimple::debiasedFgBgCompare(unsigned debiasMethod){
 
 }
