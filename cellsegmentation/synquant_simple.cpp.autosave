@@ -20,7 +20,7 @@
  * @param p4segVol
  * @param p4odStats
  */
-synQuantSimple::synQuantSimple(const Mat *_srcVolume, float _src_var, segParameter const &p4segVol, odStatsParameter const &p4odStats){
+synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter const &p4segVol, odStatsParameter const &p4odStats){
     srcVolumeUint8 = _srcVolume;
     imArray = (unsigned char*)srcVolumeUint8->data;
     src_var = _src_var;

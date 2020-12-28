@@ -3,6 +3,7 @@
 #include <opencv2/core.hpp> //basic building blocks of opencv
 #include <opencv2/imgcodecs.hpp> // image io
 #include <opencv2/highgui.hpp> //image display
+
 //#define VOLUME_WH_MAX 100000
 using namespace cv;
 using namespace std;
@@ -27,13 +28,26 @@ struct odStatsParameter {
         float varAtRatio;
     };
 };
+struct singleCellSeed{
+    int id;
+    vector<size_t> idx_yxz;
+    vector<int> y, x, z;
+    Range crop_range_yxz[3];
+    Mat eigMap2d, eigMap3d;
+    Mat varMap;
+    Mat volFloat;
+};
 
 class cellSegmentMain
 {
 public:
     cellSegmentMain(unsigned char *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/);
+    ~cellSegmentMain(){delete data_rows_cols_slices;};
     void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
-
+    void regionWiseAnalysis4d(Mat *dataVolFloat, Mat *idMap, int seed_num, Mat *eigMap2d,
+                              Mat *eigMap3d, Mat *varMap, vector<int> test_ids);
+    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *dataVolFloat, Mat *idMap, Mat *eigMap2d,
+                          Mat *eigMap3d, Mat *varMap, singleCellSeed &seed);
 protected:
     string debug_folder;
     string default_name;

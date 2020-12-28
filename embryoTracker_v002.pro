@@ -11,8 +11,8 @@ CONFIG += c++17
 
 SOURCES += data_importer.cpp \
     cellsegmentation/cellsegment_main.cpp \
-    cellsegmentation/synquant_simple.cpp \
     cellsegmentation/img_basic_proc.cpp \
+    cellsegmentation/synquant_simple.cpp \
     main.cpp \
     mainwindow.cpp \
     my4dimage.cpp \
@@ -34,11 +34,13 @@ SOURCES += data_importer.cpp \
     src_3rd/basic_c_fun/mg_utilities.cpp \
     src_3rd/basic_c_fun/stackutil.cpp \
     src_3rd/basic_c_fun/v3d_message.cpp \
+    src_3rd/cellseg/FL_morphology.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
     cellsegmentation/cellsegment_main.h \
     cellsegmentation/img_basic_proc.h \
+    cellsegmentation/img_basic_proc_declare.h \
     cellsegmentation/synquant_simple.h \
     dialog_import_im_sequence.h \
     mainwindow.h \
@@ -101,7 +103,7 @@ HEADERS += data_importer.h \
 ## adding include paths and libs related to opencv
 #include(opencv.qrc)
 INCLUDEPATH += /usr/local/include/opencv4
-LIBS += -L/usr/local/lib -lopencv_imgproc -lopencv_core -lopencv_highgui
+LIBS += -L/usr/local/lib -lopencv_imgproc -lopencv_core -lopencv_highgui -lopencv_imgcodecs
 
 #include(VTK.qrc)
 #INCLUDEPATH += /usr/local/include/ITK-5.1

@@ -15,10 +15,12 @@ enum debiasMethods{TTEST2 = 0, TTEST2_VAR_KNOWN, NON_OV_TRUNCATED_NORMAL, OV_TRU
 
 using namespace cv;
 using namespace std;
-class synQuantSimple{
+class synQuantSimple
+{
 public:
-    synQuantSimple(Mat *_srcVolume, float _src_var, segParameter p4segVol, odStatsParameter p4odStats);
-
+    synQuantSimple(Mat *_srcVolume, float _src_var, segParameter const &p4segVol, odStatsParameter const &p4odStats);
+    //~synQuantSimple(){} //TODO: delete the pointers
+public:
     void processVoxLabel(size_t j);
     void componentTree3d(segParameter p4segVol, odStatsParameter p4odStats);
     float zscoreCal(float t0, size_t M/*in*/, size_t N/*nei*/);
@@ -38,6 +40,7 @@ public:
 //                                                unsigned debiasMethod);
 public:
     Mat *zMap, *idMap;
+    int cell_num;
     vector<float> zscore_list;
     vector<float> valid_zscore;
     vector<size_t> valid_zscore_idx;
