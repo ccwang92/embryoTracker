@@ -1,8 +1,8 @@
-﻿#include "cellsegment_main.h"
+#include "cellsegment_main.h"
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
 #include <string>
-#include "img_basic_proc_declare.h"
+
 #include "synquant_simple.h"
 cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/)
 {
@@ -44,6 +44,7 @@ cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, l
     for (int i = 0; i < time_points; i++){
         unsigned char *ind = (unsigned char*)data4d->data + sz_single_frame*i; // sub-matrix pointer
         Mat *single_frame = new Mat(3, data4d->size, CV_8U, ind);
+        cell_label_maps[i].create(3, data4d->size, CV_32S); // int label
         cellSegmentSingleFrame(single_frame , i);
     }
 }
@@ -65,7 +66,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     principalCv2d(dataVolFloat, principalCurv3d[curr_frame], sigma3d, p4segVol.min_intensity);
 
     variances[curr_frame] = calVarianceStablization(data_grayim3d, varMaps[curr_frame], varTrends[curr_frame],
-                                                   p4odStats.varAtRatio, p4odStats.gap4fgbgCompare);
+                                                   p4odStats.varAtRatio, p4odStats.gap4varTrendEst);
 
     // first use synQuant to get 1-tier seed regions
     synQuantSimple seed_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
@@ -85,7 +86,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
  * @param varMap
  * @param test_ids
  */
-void cellSegmentMain::regionWiseAnalysis4d(Mat *dataVolFloat, Mat *idMap, int seed_num, Mat *eigMap2d,
+void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat, Mat *idMap /*int*/, int seed_num, Mat *eigMap2d,
                                            Mat *eigMap3d, Mat *varMap, vector<int> test_ids){
     //1. sort the seeds based on intensity levels
     vector<float> seed_intensity(seed_num);
@@ -98,13 +99,15 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *dataVolFloat, Mat *idMap, int se
     FOREACH_i(seed_intensity_order){
         int seed_id = seed_intensity_order[i];
         singleCellSeed seed;
-        cropSeed(seed_id, voxIdxList[seed_id-1], dataVolFloat, idMap, eigMap2d,
-                        eigMap3d, varMap, seed);
+        cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, idMap, eigMap2d,
+                        eigMap3d, varMap, seed, p4segVol);
+        refineSeed2Region(seed, p4odStats, p4segVol);
+
     }
 }
 
-void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *dataVolFloat, Mat *idMap, Mat *eigMap2d,
-                               Mat *eigMap3d, Mat *varMap, singleCellSeed &seed){
+void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d, Mat *idMap, Mat *eigMap2d,
+                               Mat *eigMap3d, Mat *varMap, singleCellSeed &seed, segParameter p4segVol){
     seed.id = seed_id;
     seed.idx_yxz = idx_yxz; // shallow copy
     seed.y.resize(idx_yxz.size());
@@ -112,13 +115,33 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *dataVol
     seed.z.resize(idx_yxz.size());
     vec_ind2sub(idx_yxz, seed.y, seed.x, seed.z, idMap->size);// MatSize itself is a vector
 
-    seed.crop_range_yxz[0] = Range(*min_element(seed.y.begin(), seed.y.end()), *max_element(seed.y.begin(), seed.y.end()));
-    seed.crop_range_yxz[1] = Range(*min_element(seed.x.begin(), seed.x.end()), *max_element(seed.x.begin(), seed.x.end()));
-    seed.crop_range_yxz[2] = Range(*min_element(seed.z.begin(), seed.z.end()), *max_element(seed.z.begin(), seed.z.end()));
+    getRange(seed.y, p4segVol.shift_yxz[0], idMap->size[0], seed.crop_range_yxz[0]);
+    getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], seed.crop_range_yxz[1]);
+    getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], seed.crop_range_yxz[2]);
 
     seed.eigMap2d = (*eigMap2d)(seed.crop_range_yxz); // all shallow copy
     seed.eigMap3d = (*eigMap3d)(seed.crop_range_yxz); // all shallow copy
     seed.varMap = (*varMap)(seed.crop_range_yxz); // all shallow copy
 
-    seed.volFloat = (*dataVolFloat)(seed.crop_range_yxz); // all shallow copy
+    seed.volUint8 = (*data_grayim3d)(seed.crop_range_yxz); // all shallow copy
+    seed.idMap = (*idMap)(seed.crop_range_yxz); // all shallow copy
+
+    vec_sub2ind(seed.idx_yxz_cropped, vec_Minus(seed.y, seed.crop_range_yxz[0].start),
+            vec_Minus(seed.x, seed.crop_range_yxz[1].start),
+            vec_Minus(seed.z, seed.crop_range_yxz[2].start), seed.idMap.size);// MatSize itself is a vector
+
+    //seed.idMap.copyTo(seed.otherIdMap);
+    seed.otherIdMap = seed.idMap > 0;
+    FOREACH_i(seed.idx_yxz_cropped){
+        seed.otherIdMap.at<int>(seed.idx_yxz_cropped[i]) = 0;
+    }
+    // generate the valid fg map
+    Mat regMap = seed.idMap == seed_id;
+    volumeDilate(&regMap/*cv_8u*/, seed.fgMap, p4segVol.shift_yxz, MORPH_ELLIPSE);
+}
+
+void cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol){
+
+    // 1st: foreground Detection reusing synQuant
+    synQuantSimple synQuant_refine_seed(seed, p4odStats);
 }

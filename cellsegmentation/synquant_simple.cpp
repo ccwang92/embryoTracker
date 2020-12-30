@@ -1,5 +1,5 @@
 #include "synquant_simple.h"
-#include "img_basic_proc.h"
+
 //public:
 //    Mat zMap, idMap;
 //    vector<float> zscore_list;
@@ -20,7 +20,7 @@
  * @param p4segVol
  * @param p4odStats
  */
-synQuantSimple::synQuantSimple(const Mat *_srcVolume, float _src_var, segParameter const &p4segVol, odStatsParameter const &p4odStats){
+synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4segVol, odStatsParameter &p4odStats){
     srcVolumeUint8 = _srcVolume;
     imArray = (unsigned char*)srcVolumeUint8->data;
     src_var = _src_var;
@@ -30,7 +30,323 @@ synQuantSimple::synQuantSimple(const Mat *_srcVolume, float _src_var, segParamet
     zMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32F, zscore_pointer); //*zscore_list.begin()
     cell_num = floatMap2idMap(zMap, *idMap, 26);
 }
+synQuantSimple::synQuantSimple(singleCellSeed &seed, odStatsParameter &p4odStats){
+    srcVolumeUint8 = &seed.volUint8;
+    imArray = (unsigned char*)srcVolumeUint8->data;
+    componentTree3d4seed(seed, p4odStats);
+}
+void synQuantSimple::componentTree3d4seed(singleCellSeed &seed, odStatsParameter &p4odStats){
+    zSlice = srcVolumeUint8->size[2]; // rows x cols x zslices
+    width = srcVolumeUint8->size[1];
+    height = srcVolumeUint8->size[0];
+    size_t nVoxels=width*height*zSlice; // voxels in a 3D image
+    size_t nPixels = width*height; //pixels in a single slice
 
+    Mat otherCellTerritory; // create a invalid matrix
+    volumeDilate(&seed.otherIdMap, otherCellTerritory, p4odStats.minGapWithOtherCell_yxz, MORPH_ELLIPSE);
+    //Create nodes
+    long x,y,z, rmder, x0,x2,y0,y2,z0, z2;
+    size_t i,j,k;
+    //outputArray = new byte[nVoxels];
+    diffN.resize(nVoxels);
+    fill(diffN.begin(), diffN.end(), 0);
+    voxSumN.resize(nVoxels);
+    fill(voxSumN.begin(), voxSumN.end(), 0);
+    usedN.resize(nVoxels);
+    fill(usedN.begin(), usedN.end(), NOT_USED_AS_N); // or usedNIn[i]
+    areas.resize(nVoxels);
+    fill(areas.begin(), areas.end(), 1);
+    areasN.resize(nVoxels);
+    fill(areasN.begin(), areasN.end(), 0);
+
+    voxSum.resize(nVoxels);
+    BxCor.resize(nVoxels);//ymin,xmin,zmin,  ymax,xmax,zmax.
+
+    for (i=0; i<nVoxels; i++)
+    {
+        rmder = i % nPixels;
+        z = i / nPixels;
+        y=rmder/width;
+        x=rmder-y*width;
+
+        voxSum[i] = imArray[i];
+
+        BxCor[i].resize(6);
+        BxCor[i][0] = y;
+        BxCor[i][1] = x;
+        BxCor[i][2] = z;
+        BxCor[i][3] = y;
+        BxCor[i][4] = x;
+        BxCor[i][5] = z;
+    }
+    parNode.resize(nVoxels);
+
+    //Sort points
+    // create a counting array, counts, with a member for
+    // each possible discrete value in the input.
+    // initialize all counts to 0.
+    int maxP = 255; //default for 8-bit image
+    int minP = 0;
+    size_t nLevels = maxP-minP + 1;
+    size_t counts[nLevels];
+    // for each value in the unsorted array, increment the
+    // count in the corresponding element of the count array
+    for (i=0; i<nVoxels; i++)
+    {
+        counts[srcVolumeUint8->at<unsigned char>(i)-minP]++;
+    }
+    // accumulate the counts - the result is that counts will hold
+    // the offset into the sorted array for the value associated with that index
+    for (i=1; i<nLevels; i++)
+    {
+        counts[i] += counts[i-1];
+    }
+    // store the elements in a new ordered array
+    sortedIndex.resize(nVoxels);
+    for (i = nVoxels-1; i >= 0; i--)
+    {
+        // decrementing the counts value ensures duplicate values in A
+        // are stored at different indices in sorted.
+        sortedIndex[--counts[srcVolumeUint8->at<unsigned char>(i)-minP]] = i;
+    }
+
+    //Init nodes
+    for (i=0; i<nVoxels; i++)
+    {
+        parNode[i]=i;
+    }
+    //Search in decreasing order
+    size_t curNode;
+    size_t adjNode;
+    size_t ii,jj, kk, tmpIdx;
+    bool found;
+    for (i = nVoxels-1; i >= 0; i--)
+    {
+        j=sortedIndex[i];
+        curNode=j;
+        //System.out.println("Image Value"+imArray[j]);
+        rmder = j % nPixels;
+        z = j / nPixels;
+        y=rmder/width;
+        x=rmder-y*width;
+
+
+        found = false;
+        /* ROI selection: for the same z-stack, we use 8 neighbors, but for other z-stacks, we only consider two direct neighbors
+                * the order of the neighbors are very important
+                * we go through the larger neighbors first, then lower ones
+                */
+        y0=y-1;
+        y2=y+1;
+        x0=x-1;
+        x2=x+1;
+        z0=z-1;
+        z2=z+1;
+        /**for debug*
+                if (imArray[j]>0) {
+                    System.out.print(j+" " + imArray[j]+"\n");
+                }
+                if(imArray[j]>=255)//usedN[28+width*28+6*nPixels] != NOT_USED_AS_N)
+                    System.out.println(" "+x+" "+y+" "+z);
+                */
+        //Later neigbours x2,y2
+        if(z2<zSlice) {
+            k = x+width*y+z2*nPixels;
+            if(imArray[k]>=imArray[j])
+            {
+                adjNode=findNode(k);
+                if(curNode!=adjNode)
+                {
+                    curNode=mergeNodes(adjNode,curNode);
+                    found = true;
+                }
+            }
+        }
+        if(y2<height)
+        {
+            k=x+width*y2+z*nPixels;
+            if(imArray[k]>=imArray[j])
+            {
+                adjNode=findNode(k);
+                if(curNode!=adjNode)
+                {
+                    curNode=mergeNodes(adjNode,curNode);
+                    found = true;
+                }
+            }
+            if(x2<width)
+            {
+                k=x2+width*y2+z*nPixels;
+                if(imArray[k]>=imArray[j])
+                {
+                    adjNode=findNode(k);
+                    if(curNode!=adjNode)
+                    {
+                        curNode=mergeNodes(adjNode,curNode);
+                        found = true;
+                    }
+                }
+            }
+            if(x0>=0)
+            {
+                k=x0+width*y2+z*nPixels;
+                if(imArray[k]>=imArray[j])
+                {
+                    adjNode=findNode(k);
+                    if(curNode!=adjNode)
+                    {
+                        curNode=mergeNodes(adjNode,curNode);
+                        found = true;
+                    }
+
+                }
+            }
+        }
+        if(x2<width)
+        {
+            k=x2+width*y+z*nPixels;
+            if(imArray[k]>=imArray[j])
+            {
+                adjNode=findNode(k);
+                if(curNode!=adjNode)
+                {
+                    curNode=mergeNodes(adjNode,curNode);
+                    found = true;
+                }
+            }
+        }
+        //Earlier neighbours x0,y0. No need to check =
+        if(z0>=0) {
+            k = x+width*y+z0*nPixels;
+            if(imArray[k]>imArray[j])
+            {
+                adjNode=findNode(k);
+                if(curNode!=adjNode)
+                {
+                    curNode=mergeNodes(adjNode,curNode);
+                    found = true;
+                }
+            }
+        }
+        if(x0>=0)
+        {
+            k=x0+width*y+z*nPixels;
+            if(imArray[k]>imArray[j])
+            {
+                adjNode=findNode(k);
+                if(curNode!=adjNode)
+                {
+                    curNode=mergeNodes(adjNode,curNode);
+                    found = true;
+                }
+
+            }
+        }
+        if (y0 >= 0) {
+            k = x + width * y0+z*nPixels;
+            if (imArray[k] > imArray[j]) {
+                adjNode = findNode(k);
+                if (curNode != adjNode) {
+                    curNode = mergeNodes(adjNode,curNode);
+                    found = true;
+                }
+            }
+            if(x2<width)
+            {
+                k=x2+width*y0+z*nPixels;
+                if(imArray[k]>imArray[j])
+                {
+                    adjNode=findNode(k);
+                    if(curNode!=adjNode)
+                    {
+                        curNode=mergeNodes(adjNode,curNode);
+                        found = true;
+                    }
+                }
+            }
+            if(x0>=0)
+            {
+                k=x0+width*y0+z*nPixels;
+                if(imArray[k]>imArray[j])
+                {
+                    adjNode=findNode(k);
+                    if(curNode!=adjNode)
+                    {
+                        curNode=mergeNodes(adjNode,curNode);
+                        found = true;
+                    }
+
+                }
+            }
+        }
+
+        if (!found)
+        {
+            /*****Debug***
+                    if(j==13979) {
+                        System.out.print("neighbor: "+voxSumN[j]+" "+areasN[j]+" self: "+voxSum[j]+" "+areas[j]+" "+"\n");
+                    }***/
+            y0= MAX(y-1,0);
+            y2= MIN(y+1, height-1);
+            x0= MAX(x-1,0);
+            x2= MIN(x+1,width-1);
+            z0= MAX(z-1,0);
+            z2= MIN(z+1,zSlice-1);
+            // for neighboring pixels' value we consider 26 neighbors
+            for (ii=z2;ii>=z0;ii--) {
+                for (jj=y2;jj>=y0;jj--) {
+                    for(kk=x2;kk>=x0;kk--) {
+                        if( ii==z & jj==y & kk==x)
+                            continue;
+                        tmpIdx = kk+width*jj+ii*nPixels;
+                        if (usedN[tmpIdx] == NOT_USED_AS_N)
+                        {
+                            voxSumN[j] += imArray[tmpIdx];
+                            areasN[j]++;
+                            usedN[tmpIdx] = USED_AS_N_ONCE;
+                            /*if(j==13979) {
+                                            System.out.print("neighbor val: "+imArray[tmpIdx]+" "+ii +" "+jj+" "+kk+"\n");
+                                        }*/
+                        }
+                    }
+                }
+            }
+            usedN[j] = USED_AS_N_MORE;
+            diffN[j] = voxSum[j]/(double)areas[j];
+            if (areasN[j] > 0)
+                diffN[j] -= voxSumN[j]/(double)areasN[j];
+        }
+
+    }
+    outputArray.resize(nVoxels); // label the output
+    fill(outputArray.begin(), outputArray.end(), UNDEFINED);
+    zscore_list.resize(nVoxels);
+    for (i=0; i<nVoxels; i++)
+    {
+        rmder = i % nPixels;
+        z = i / nPixels;
+        y=rmder/width;
+        x=rmder-y*width;
+        double LH = (double)BxCor[i][4]-BxCor[i][1]+1;
+        double LW = (double)BxCor[i][3]-BxCor[i][0]+1;
+        double LZ = (double)BxCor[i][5]-BxCor[i][2]+1;
+        double ratio = LH>LW? LH/LW: LW/LH;
+
+        if(areas[i]>=p4segVol.max_cell_sz){
+            zscore_list[i] = -1;
+            outputArray[i] = NOT_OBJECT; // no need to update the object label
+        }
+        if(areas[i]<p4segVol.min_cell_sz || ratio>p4segVol.max_WHRatio || (areas[i]/(double)(LH*LW*LZ))<p4segVol.min_fill){
+            zscore_list[i] = -1;
+        }else{
+            zscore_list[i] = zscoreCal(diffN[i], areas[i], areasN[i]);
+            valid_zscore.push_back(zscore_list[i]);
+            valid_zscore_idx.push_back(i);
+        }
+    }
+    // label the object
+    objLabel_descending();
+}
 void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4odStats){
     zSlice = srcVolumeUint8->size[2]; // rows x cols x zslices
     width = srcVolumeUint8->size[1];

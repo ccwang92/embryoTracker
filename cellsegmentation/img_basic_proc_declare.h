@@ -23,6 +23,8 @@ using namespace cv;
 using namespace std;
 
 enum filterDirection{DIRECTION_X = 0, DIRECTION_Y, DIRECTION_Z};
+enum debiasMethods{TTEST2 = 0, TTEST2_VAR_KNOWN, NON_OV_TRUNCATED_NORMAL, OV_TRUNCATED_NORMAL, KSEC, APPROX3SEC};
+
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)
 
 void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
@@ -36,7 +38,7 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
 int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect);
 int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect);
 int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap);
-
+void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range);
 void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities);
 
 void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC);
@@ -67,6 +69,7 @@ template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int
 template <typename T> vector<T> vec_cumsum(vector<T> v1);
 template <typename T> vector<T> vec_pointMultiply(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_Minus(vector<T> v1, vector<T> v2);
+template <typename T> vector<T> vec_Minus(vector<T> v1, T s2);
 template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_pointDivide(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, bool strict = true);

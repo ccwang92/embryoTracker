@@ -2,6 +2,7 @@
 #define SYNQUANTSIMPLE_H
 
 #include "cellsegment_main.h"
+#include "img_basic_proc_declare.h"
 #include <algorithm>
 
 #define UNDEFINED (byte)0
@@ -11,18 +12,18 @@
 #define USED_AS_N_ONCE (byte)1
 #define USED_AS_N_MORE (byte)2
 
-enum debiasMethods{TTEST2 = 0, TTEST2_VAR_KNOWN, NON_OV_TRUNCATED_NORMAL, OV_TRUNCATED_NORMAL, KSEC, APPROX3SEC};
-
 using namespace cv;
 using namespace std;
 class synQuantSimple
 {
 public:
-    synQuantSimple(Mat *_srcVolume, float _src_var, segParameter const &p4segVol, odStatsParameter const &p4odStats);
+    synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4segVol, odStatsParameter &p4odStats);
+    synQuantSimple(singleCellSeed &seed, odStatsParameter &p4odStats);
     //~synQuantSimple(){} //TODO: delete the pointers
 public:
     void processVoxLabel(size_t j);
     void componentTree3d(segParameter p4segVol, odStatsParameter p4odStats);
+    void componentTree3d4seed(singleCellSeed &seed, odStatsParameter &p4odStats);
     float zscoreCal(float t0, size_t M/*in*/, size_t N/*nei*/);
 
     size_t findNode(size_t e);

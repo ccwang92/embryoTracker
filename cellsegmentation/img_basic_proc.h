@@ -34,6 +34,13 @@ template <typename T> vector<T> vec_Minus(vector<T> v1, vector<T> v2){
     }
     return out;
 }
+template <typename T> vector<T> vec_Minus(vector<T> v1, T s2){
+    vector<T> out(v1.size());
+    for (size_t i=0 ;i<v1.size(); i++){
+        out[i] = v1[i] - s2;
+    }
+    return out;
+}
 template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2){
     assert(v1.size() == v2.size());
     vector<T> out(v1.size());

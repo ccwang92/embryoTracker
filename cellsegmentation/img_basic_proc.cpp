@@ -680,7 +680,11 @@ int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap){
     }
     return dst_region_num;
 }
-
+void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range){
+    int min_v = max(0, *min_element(idx_sub.begin(), idx_sub.end()) - shift);
+    int max_v = min(bound, *max_element(idx_sub.begin(), idx_sub.end()) + shift);
+    out_range = Range(min_v, max_v);
+}
 void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities){
     vector<size_t> region_sz(avgIntensities.size());
     fill(region_sz.begin(), region_sz.end(), 0);
@@ -771,30 +775,49 @@ void volumeDilate(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_
     Mat element = getStructuringElement( dilation_type,
                            Size( 2*radiusValues[0] + 1, 2*radiusValues[1]+1 ),
                            Point( radiusValues[0], radiusValues[1] ) );
+    int min_valid_z = z_size - 1, max_valid_z = 0;
+    bool valid_z;
     for (int z = 0; z < z_size; z++)
     {
-        float *ind = (float*)dst3d.data + z * xy_size; // sub-matrix pointer
+        valid_z = false;
+        unsigned char *ind = (unsigned char*)dst3d.data + z * xy_size; // sub-matrix pointer
         Mat subMatrix(2, dst3d.size, CV_8U, ind);
-        dilate(subMatrix, subMatrix, element);
-    }
-    unsigned short max_val;
-    if (radiusValues[2] > 0){
-        for (int i = 0; i < x_size; i++){
-            for (int j = 0; j< y_size; j++){
-                for (int k = 0; k < z_size; k++){
-                    max_val = src3d->at<unsigned short>(i,j,k);
-                    for (int kk = 1; kk < radiusValues[2]; kk++){
-                        if (k+kk < z_size){
-                            max_val = max(src3d->at<unsigned short>(i,j,k+kk), max_val);
-                        }
-                        if (k-kk >= 0){
-                            max_val = max(src3d->at<unsigned short>(i,j,k-kk), max_val);
-                        }
-                    }
-                    dst3d.at<unsigned short>(i,j,k) = max_val;
+        for (size_t i = 0; i < subMatrix.total(); i++){
+            if(subMatrix.at<int>(i) > 0){
+                if(min_valid_z > z ){
+                    min_valid_z = z;
+                }else if(max_valid_z < z){
+                    max_valid_z = z;
                 }
+                valid_z = true;
+                break;
             }
         }
+        if(valid_z){
+            dilate(subMatrix, subMatrix, element);
+        }
+    }
+    //unsigned short max_val;
+    if (radiusValues[2] > 0 && max_valid_z >= min_valid_z){
+//        for (int i = 0; i < x_size; i++){
+//            for (int j = 0; j< y_size; j++){
+        unsigned char *ind = (unsigned char*)dst3d.data + min_valid_z * xy_size; // sub-matrix pointer
+        Mat *subMatrix = new Mat(2, dst3d.size, CV_8U, ind);
+        for (int k = min_valid_z - 1; k >= max(0, min_valid_z - radiusValues[2]); k--){
+            ind = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
+            Mat subMatrix2(2, dst3d.size, CV_8U, ind);
+            subMatrix->copyTo(subMatrix2);
+        }
+
+        ind = (unsigned char*)dst3d.data + max_valid_z * xy_size; // sub-matrix pointer
+        subMatrix = new Mat(2, dst3d.size, CV_8U, ind);
+        for (int k = max_valid_z + 1; k <= max(z_size - 1, max_valid_z + radiusValues[2]); k++){
+            ind = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
+            Mat subMatrix2(2, dst3d.size, CV_8U, ind);
+            subMatrix->copyTo(subMatrix2);
+        }
+//            }
+//        }
     }
 }
 
