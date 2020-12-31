@@ -70,6 +70,7 @@ struct odStatsParameter {
         float varAtRatio;
         int fgSignificanceTestWay;
         int minGapWithOtherCell_yxz[3];
+        int connectInSeedRefine;
     };
 };
 struct singleCellSeed{
@@ -145,6 +146,7 @@ protected:
         p4odStats.minGapWithOtherCell_yxz[0] = 3;
         p4odStats.minGapWithOtherCell_yxz[1] = 3;
         p4odStats.minGapWithOtherCell_yxz[2] = 1;
+        p4odStats.connectInSeedRefine = 6;
     }
 };
 

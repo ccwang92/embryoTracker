@@ -27,6 +27,9 @@ enum debiasMethods{TTEST2 = 0, TTEST2_VAR_KNOWN, NON_OV_TRUNCATED_NORMAL, OV_TRU
 
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)
 
+#define FOREACH_i_MAT(x) for(size_t i=0; i<x.total(); i++)
+#define FOREACH_i_ptrMAT(x) for(size_t i=0; i<x->total(); i++)
+
 void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[]);
@@ -48,6 +51,11 @@ void volumeErode(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_t
 
 void volumeWrite(Mat *src3d, string filename);
 
+void singleRegionCheck(Mat &vol3d, Mat *binary_mask, int connect);
+
+size_t fgMapSize(Mat *src3d, int datatype, float threshold = 0);
+vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
+vector<float> fgMapVals(Mat *val3d, Mat *src3d, int datatype, float threshold_in);
 
 // Function to find t-test of
 // two set of statistical data.
@@ -83,6 +91,7 @@ template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
 template <typename T> T vec_stddev(vector<T> const & func);
 template <typename T> T vec_variance(vector<T> const & func);
 template <typename T> T vec_mean(vector<T> const & func);
+template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx);
 template <typename T> vector<size_t> sort_indexes(const vector<T> &v, bool ascending = true, size_t start_id = 0);
 template <typename T> T ttest2(vector<T> arr1, vector<T> arr2);
 
@@ -90,7 +99,11 @@ template <typename T> T ttest2_var_known(vector<T> arr1, vector<T> arr2, T var_k
 
 template <typename T> void nonOV_truncatedGauss(size_t M, size_t N, T &mu, T &sigma);
 template <typename T> void OV_truncatedGauss(vector<T> fg, vector<T> bg, T &mu, T &sigma);
-template <typename T> T orderStatsKSection(vector<T> fg, vector<T> bg, vector<T> midVals, T &mu, T &sigma);
+template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector<T> otherVals, float &mu, float &sigma);
+
+
+
+template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold = 0);
 
 #endif // IMG_BASIC_PROC_H
 

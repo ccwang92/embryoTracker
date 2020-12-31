@@ -298,6 +298,26 @@ template <typename T> T vec_mean(vector<T> const & func)
 {
     return accumulate(func.begin(), func.end(), 0.0) / func.size();
 }
+template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    double sum = 0.0;
+    if (datatype == CV_8U){
+        FOREACH_i(idx){
+            sum += src3d->at<unsigned char>(idx[i]);
+        }
+        return (float) sum/idx.size();
+    }else if (datatype == CV_32F){
+        FOREACH_i(idx){
+            sum += src3d->at<float>(idx[i]);
+        }
+        return (float) sum/idx.size();
+    }else{ //CV_32S is the same as float
+        FOREACH_i(idx){
+            sum += src3d->at<int>(idx[i]); //int_32_t as default
+        }
+        return (float) sum/idx.size();
+    }
+}
 template <typename T> vector<size_t> sort_indexes(const vector<T> &v, bool ascending, size_t start_id) {
     // initialize original index locations
     vector<size_t> idx(v.size());
@@ -406,14 +426,14 @@ template <typename T> void orderStatsKSection_f1(T x, T &y, T &xnormcdf, T &xnor
 template <typename T> T orderStatsKSection_f2(T x, T xnormcdf, T xnormpdf){
     return 0.5*(xnormcdf*x*x - xnormcdf + xnormpdf*x);
 }
-template <typename T> T orderStatsKSection(vector<T> fg, vector<T> bg, vector<T> midVals, T &mu, T &sigma){
+template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector<T> otherVals, float &mu, float &sigma){
     size_t M = fg.size();
     size_t N = bg.size();
-    size_t mid_sz = midVals.size();
+    size_t mid_sz = otherVals.size();
     size_t n = M+N+mid_sz;
 
     bg.insert(bg.end(), fg.begin(), fg.end());
-    bg.insert(bg.end(), midVals.begin(), midVals.end());// fg: 1-M, bg, M+1-M+N, mid: M+N+1:n
+    bg.insert(bg.end(), otherVals.begin(), otherVals.end());// fg: 1-M, bg, M+1-M+N, mid: M+N+1:n
     vector<size_t> sorted_id = sort_indexes(bg, false, 1);
     vector<byte> sorted_class_id(n);
     for (size_t i = 0; i<sorted_id.size(); i++){
@@ -507,7 +527,7 @@ template <typename T> T orderStatsKSection(vector<T> fg, vector<T> bg, vector<T>
     float A = 2*(t1+t2-t3);
     B = B*B;
 
-    sigma = double(sqrt(A-B)/sqrt(n));
+    sigma = float(sqrt(A-B)/sqrt(n));
 }
 
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, MatSize size){
@@ -537,4 +557,30 @@ template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int
         y[i] = rmder/size[1];
         x[i] = rmder-y[i]*size[0];
     }
+}
+
+
+template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, T threshold_in){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    size_t fg_sz = 0;
+    if (datatype == CV_8U){
+        FOREACH_i(vec_idx){
+            if(src3d->at<unsigned char>(vec_idx[i]) > threshold_in){
+                fg_sz ++;
+            }
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i(vec_idx){
+            if(src3d->at<float>(vec_idx[i]) > threshold_in){
+                fg_sz ++;
+            }
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i(vec_idx){
+            if(src3d->at<int>(vec_idx[i]) > threshold_in){
+                fg_sz ++;
+            }
+        }
+    }
+    return fg_sz;
 }

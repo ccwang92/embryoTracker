@@ -708,7 +708,7 @@ void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int 
     voxList.resize(numCC);
     for (size_t i = 0; i < label3d->total(); i++){
         if(label3d->at<int>(i) > 0){
-            voxList[label3d->at<int>(i)].push_back(i);
+            voxList[label3d->at<int>(i)-1].push_back(i);
         }
     }
 }
@@ -878,5 +878,120 @@ void volumeWrite(Mat *src3d, string filename){
     printf("Multiple files saved in test.tiff\n");
 }
 
+void singleRegionCheck(Mat &binary_3d, Mat *binary_mask, int connect){
+    Mat label_map;
+    int n = connectedComponents3d(&binary_3d, label_map, connect);
+    if(n<=1) return;
+
+    if(binary_mask == nullptr){ // only keep the largest one
+        vector<vector<size_t>> voxIdxList;
+        extractVoxIdxList(&label_map, voxIdxList, n);
+        size_t max_id = 0, max_sz = 0;
+        FOREACH_i(voxIdxList){
+            if (voxIdxList[i].size() > max_sz){
+                max_id = i + 1;
+                max_sz = voxIdxList[i].size();
+            }
+        }
+        for(size_t i = 0; i<binary_3d.total(); i++){
+            if (binary_3d.at<unsigned char>(i) != max_id){
+                binary_3d.at<unsigned char>(i) = 0;
+            }
+        }
+    }else{ // keep the region related the mask
+        vector<vector<size_t>> voxIdxList;
+        extractVoxIdxList(&label_map, voxIdxList, n);
+
+        FOREACH_i(voxIdxList){
+            bool mask_covered = false;
+            for(size_t j = 0; j<voxIdxList[i].size(); j++){
+                if (binary_mask->at<unsigned char>(voxIdxList[i][j]) > 0){
+                    mask_covered = true;
+                    break;
+                }
+            }
+            if (!mask_covered){
+                for(size_t j = 0; j<voxIdxList[i].size(); j++){
+                    binary_3d.at<unsigned char>(voxIdxList[i][j]) = 0;
+                }
+            }
+        }
+    }
+
+}
+
+size_t fgMapSize(Mat *src3d, int datatype, float threshold_in){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    size_t fg_sz = 0;
+    if (datatype == CV_8U){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<unsigned char>(i) > threshold_in){
+                fg_sz ++;
+            }
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<float>(i) > threshold_in){
+                fg_sz ++;
+            }
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<int>(i) > threshold_in){
+                fg_sz ++;
+            }
+        }
+    }
+    return fg_sz;
+}
 
 
+vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    vector<size_t> fg_Idx;
+    if (datatype == CV_8U){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<unsigned char>(i) > threshold_in){
+                fg_Idx.push_back(i);
+            }
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<float>(i) > threshold_in){
+                fg_Idx.push_back(i);
+            }
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<int>(i) > threshold_in){
+                fg_Idx.push_back(i);
+            }
+        }
+    }
+    return fg_Idx;
+}
+
+vector<float> fgMapVals(Mat *val3d, Mat *src3d, int datatype, float threshold_in){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    vector<float> fg_vals;
+    if (datatype == CV_8U){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<unsigned char>(i) > threshold_in){
+                fg_vals.push_back(val3d->at<unsigned char>(i));
+            }
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<float>(i) > threshold_in){
+                fg_vals.push_back(val3d->at<unsigned char>(i));
+            }
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<int>(i) > threshold_in){
+                fg_vals.push_back(val3d->at<unsigned char>(i));
+            }
+        }
+    }
+    return fg_vals;
+}
