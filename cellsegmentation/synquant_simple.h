@@ -18,7 +18,7 @@ class synQuantSimple
 {
 public:
     synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4segVol, odStatsParameter &p4odStats);
-    synQuantSimple(singleCellSeed &seed, odStatsParameter &p4odStats);
+    synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
     //~synQuantSimple(){} //TODO: delete the pointers
 public:
     void processVoxLabel(size_t j);
@@ -37,6 +37,7 @@ public:
     void fdr_control();
     // zscore for comparing fg and bg neighbors using the boundary pixels among fg and bg
     float debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singleCellSeed *seed, odStatsParameter p4odStats);
+    void refineFgWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
 //    template <typename T> T debiasedFgBgCompare(vector<T> const & fg, vector<T> const & bg, vector<T> const & neglectVals,
 //                                                unsigned debiasMethod);
 public:

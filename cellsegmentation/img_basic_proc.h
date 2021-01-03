@@ -298,6 +298,17 @@ template <typename T> T vec_mean(vector<T> const & func)
 {
     return accumulate(func.begin(), func.end(), 0.0) / func.size();
 }
+template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx){
+    auto max_val_it = max_element(func.begin(), func.end());
+    max_val_idx = distance(func.begin(), max_val_it);
+    return *max_val_it;
+}
+template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx){
+    auto min_val_it = min_element(func.begin(), func.end());
+    min_val_idx = distance(func.begin(), min_val_it);
+    return *min_val_it;
+}
+
 template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     double sum = 0.0;
@@ -583,4 +594,54 @@ template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T>
         }
     }
     return fg_sz;
+}
+
+template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    //size_t fg_sz = 0;
+    if (datatype == CV_8U){
+        FOREACH_i(vec_idx){
+            if(src3d->at<unsigned char>(vec_idx[i]) > threshold_in){
+                return false;
+            }
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i(vec_idx){
+            if(src3d->at<float>(vec_idx[i]) > threshold_in){
+                return false;
+            }
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i(vec_idx){
+            if(src3d->at<int>(vec_idx[i]) > threshold_in){
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+
+template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl, float vh){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    if (vl > vh){
+        normalize(*src3d, *dst, il, ih, NORM_MINMAX, CV_32FC1);
+    }else{
+        dst->create(src3d->dims, src3d->size, CV_32F);
+        float term = (vh-vl) / (ih - il);
+
+        if (datatype == CV_8U){
+            FOREACH_i_ptrMAT(src3d){
+                dst->at<unsigned char>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
+            }
+        }else if (datatype == CV_32F){
+            FOREACH_i_ptrMAT(src3d){
+                dst->at<float>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
+            }
+        }else if (datatype == CV_32S){
+            FOREACH_i_ptrMAT(src3d){
+                dst->at<int>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
+            }
+        }
+    }
 }

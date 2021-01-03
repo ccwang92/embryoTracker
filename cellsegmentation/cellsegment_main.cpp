@@ -119,6 +119,7 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], seed.crop_range_yxz[1]);
     getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], seed.crop_range_yxz[2]);
 
+    seed.seedMap = seed.idMap == seed.id;
     seed.eigMap2d = (*eigMap2d)(seed.crop_range_yxz); // all shallow copy
     seed.eigMap3d = (*eigMap3d)(seed.crop_range_yxz); // all shallow copy
     seed.varMap = (*varMap)(seed.crop_range_yxz); // all shallow copy
@@ -143,5 +144,5 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
 void cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol){
 
     // 1st: foreground Detection reusing synQuant
-    synQuantSimple synQuant_refine_seed(seed, p4odStats);
+    synQuantSimple synQuant_refine_seed(seed, p4segVol, p4odStats);
 }

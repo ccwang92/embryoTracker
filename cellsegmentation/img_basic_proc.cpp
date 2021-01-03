@@ -422,7 +422,7 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
 /**
  * @brief connectedComponents3d
  * @param src3d: boolean but represented by CV_8U
- * @param dst3d
+ * @param dst3d: int represented by CV_32S
  * @param connect: 4, 8 for 2d and 6,10,26 for 3d
  */
 int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect){
@@ -435,12 +435,15 @@ int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect){
     size_t xy_size = x_size*y_size;
     size_t numCC = 0;
     if (connect == 4 || connect == 8){
-        src3d->copyTo(dst3d);
+        dst3d = Mat(src3d->dims, src3d->size, CV_32S);
+        //src3d->copyTo(dst3d);
         for (int z = 0; z < z_size; z++)
         {
-            float *ind = (float*)dst3d.data + z * xy_size; // sub-matrix pointer
-            Mat subMatrix(2, dst3d.size, CV_32F, ind);
-            numCC += connectedComponents(subMatrix, subMatrix, connect);
+            int *ind = (int*)dst3d.data + z * xy_size; // sub-matrix pointer
+            Mat subMatrix_dst(2, dst3d.size, CV_32S, ind);
+            unsigned char *ind2 = (unsigned char*)src3d->data + z * xy_size; // sub-matrix pointer
+            Mat subMatrix_src(2, src3d->size, CV_8U, ind2);
+            numCC += connectedComponents(subMatrix_src, subMatrix_dst, connect);
         }
     }else{
         dst3d = Mat::zeros(src3d->dims, src3d->size, CV_32S);
@@ -877,7 +880,13 @@ void volumeWrite(Mat *src3d, string filename){
     imwrite(filename, imgs);
     printf("Multiple files saved in test.tiff\n");
 }
-
+/**
+ * @brief singleRegionCheck: keep the regions that related to the mask, if no mask is provided
+ * keep the region with largest mask
+ * @param binary_3d
+ * @param binary_mask
+ * @param connect
+ */
 void singleRegionCheck(Mat &binary_3d, Mat *binary_mask, int connect){
     Mat label_map;
     int n = connectedComponents3d(&binary_3d, label_map, connect);
@@ -919,7 +928,34 @@ void singleRegionCheck(Mat &binary_3d, Mat *binary_mask, int connect){
     }
 
 }
+/**
+ * @brief largestRegionIdExtract
+ * @param label_map: CV_32S (int) label map
+ * @param mask
+ * @param connect
+ * @return
+ */
+int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask){
+    vector<size_t> cc_sz(numCC);
+    fill(cc_sz.begin(), cc_sz.end(), 0);
+    if (mask == nullptr){
+        FOREACH_i_ptrMAT(label_map){
+            if(label_map->at<int>(i) > 0){
+                cc_sz[label_map->at<int>(i) - 1] ++;
+            }
+        }
+    }else{
+        FOREACH_i_ptrMAT(label_map){
+            if(label_map->at<int>(i) > 0 && mask->at<int>(i) > 0){
+                cc_sz[label_map->at<int>(i) - 1] ++;
+            }
+        }
+    }
+    size_t largest_id;
+    vec_max(cc_sz, largest_id);
 
+    return (int)largest_id;
+}
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     size_t fg_sz = 0;
@@ -944,7 +980,30 @@ size_t fgMapSize(Mat *src3d, int datatype, float threshold_in){
     }
     return fg_sz;
 }
-
+bool isempty(Mat *src3d, int datatype, float threshold_in){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    //size_t fg_sz = 0;
+    if (datatype == CV_8U){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<unsigned char>(i) > threshold_in){
+                return false;
+            }
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<float>(i) > threshold_in){
+                return false;
+            }
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<int>(i) > threshold_in){
+                return false;
+            }
+        }
+    }
+    return true;
+}
 
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);

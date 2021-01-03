@@ -78,10 +78,13 @@ struct singleCellSeed{
     vector<size_t> idx_yxz, idx_yxz_cropped;
     vector<int> y, x, z;
     Range crop_range_yxz[3];
+    Mat seedMap;
     Mat eigMap2d, eigMap3d;
+    Mat score2d, score3d;
     Mat varMap;
     Mat volUint8;
-    Mat idMap;
+    Mat idMap; //idComp
+    Mat idMapGapRemoved; //newIdComp
     Mat fgMap;
     Mat otherIdMap;
 };
