@@ -28,6 +28,7 @@ struct segParameter {
         int graph_cost_design[2];
         int growConnectInTest, growConnectInRefine;
         int edgeConnect, neiMap;
+        int connect4fgGapRemoval;
         int shift_yxz[3];
         bool shrink_flag;
         int fgBoundaryHandle;// leaveAloneFirst, compete or repeat:
@@ -81,6 +82,7 @@ struct singleCellSeed{
     Mat seedMap;
     Mat eigMap2d, eigMap3d;
     Mat score2d, score3d;
+    Mat gap2dMap, gap3dMap;
     Mat varMap;
     Mat volUint8;
     Mat idMap; //idComp
@@ -134,6 +136,7 @@ protected:
         p4segVol.growConnectInRefine = 6;
         p4segVol.edgeConnect = 48;
         p4segVol.neiMap = 26;
+        p4segVol.connect4fgGapRemoval = 26;
         p4segVol.shift_yxz[0] = 20;
         p4segVol.shift_yxz[1] = 20;
         p4segVol.shift_yxz[2] = 4;

@@ -1029,7 +1029,14 @@ vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in){
     }
     return fg_Idx;
 }
-
+/**
+ * @brief fgMapVals: return the values of foreground
+ * @param val3d
+ * @param src3d
+ * @param datatype
+ * @param threshold_in
+ * @return
+ */
 vector<float> fgMapVals(Mat *val3d, Mat *src3d, int datatype, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     vector<float> fg_vals;
@@ -1053,4 +1060,30 @@ vector<float> fgMapVals(Mat *val3d, Mat *src3d, int datatype, float threshold_in
         }
     }
     return fg_vals;
+}
+/**
+ * @brief findUnrelatedCC: return the
+ * @param src3d4testing : CV_32S
+ * @param src3d4reference : CV_8U
+ * @param dst3d : CV_8U
+ */
+bool findUnrelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d){
+    vector<bool> existInReference(numCC);
+    fill(existInReference.begin(), existInReference.end(), false);
+
+    FOREACH_i_ptrMAT(src3d4testing){
+        if(src3d4testing->at<int>(i) > 0 && src3d4reference->at<unsigned char>(i) > 0){
+            existInReference[src3d4testing->at<int>(i)-1] = true;
+        }
+    }
+
+    dst3d = Mat::zeros(src3d4reference->dims, src3d4reference->size, CV_8U);
+    bool found = false;
+    FOREACH_i_MAT(dst3d){
+        if(src3d4testing->at<int>(i) > 0 && !existInReference[src3d4testing->at<int>(i)-1]){
+            dst3d.at<unsigned char>(i) = 255;
+            found = true;
+        }
+    }
+    return found;
 }

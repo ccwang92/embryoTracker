@@ -64,8 +64,8 @@ int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask);
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
-vector<float> fgMapVals(Mat *val3d, Mat *src3d, int datatype, float threshold_in);
-
+vector<float> fgMapVals(Mat *vol3d, Mat *src3d, int datatype, float threshold_in);
+bool findUnrelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d);
 // Function to find t-test of
 // two set of statistical data.
 

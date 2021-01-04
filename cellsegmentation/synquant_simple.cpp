@@ -48,8 +48,14 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odS
     // 4. refine the output from step 3 based on size and other prior knowledge
 
     // 5. test if the idMap (fg) is too small, if so, enlarge it and re-do the previous steps
-}
 
+}
+/**
+ * @brief refineFgWithSeedRegion, extract the largest region if fg and remove those
+ * voxels that has no z-direction neighbors
+ * @param seed
+ * @param p4segVol
+ */
 void synQuantSimple::refineFgWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol){
     Mat labelMap;
     int n = connectedComponents3d(idMap, labelMap, 6);
@@ -74,6 +80,34 @@ void synQuantSimple::refineFgWithSeedRegion(singleCellSeed &seed, segParameter &
     removeSmallCC(labelMap, n, p4segVol.min_cell_sz, false);
     *idMap = labelMap > 0;
 }
+
+void synQuantSimple::fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol){
+    bitwise_and(*idMap, seed.gap3dMap == 0, seed.idMapGapRemoved);
+
+    if (!isempty(&seed.idMapGapRemoved, CV_8U)){
+        Mat seedMapFrom2dMap, mapUnion, mapUnion_label;
+        bitwise_and(*idMap, seed.gap2dMap == 0, seedMapFrom2dMap);// or use -
+        bitwise_or(seedMapFrom2dMap, seed.idMapGapRemoved, mapUnion); // or use +
+        int numCC = connectedComponents3d(&mapUnion, mapUnion_label, p4segVol.connect4fgGapRemoval);
+        Mat newSeedMap; // CV_8U
+        bool found = findUnrelatedCC(&mapUnion_label, numCC, &seed.idMapGapRemoved, newSeedMap);
+        if(found){
+            seed.idMapGapRemoved = seed.idMapGapRemoved + newSeedMap; //CV_8U
+        }
+    }
+}
+/**
+ * @brief gapBasedRegionSegment: use principal curvature to test if current fg contains > 1 cells
+ * @param seed
+ * @param p4segVol
+ * @param p4odStats
+ */
+void synQuantSimple::gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats){
+    //1. remove gaps defined by principal curvature
+    fgGapRemoval(seed, p4segVol);
+}
+
+
 /**
  * @brief synQuantSimple::cellExtractFromSeed, currently, we use the exact version. But this function should also be able
  * to be implemented using component tree condition on the assumption that the intensity has such trend:

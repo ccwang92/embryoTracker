@@ -38,6 +38,9 @@ public:
     // zscore for comparing fg and bg neighbors using the boundary pixels among fg and bg
     float debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singleCellSeed *seed, odStatsParameter p4odStats);
     void refineFgWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
+
+    void fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol);
+    void gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
 //    template <typename T> T debiasedFgBgCompare(vector<T> const & fg, vector<T> const & bg, vector<T> const & neglectVals,
 //                                                unsigned debiasMethod);
 public:

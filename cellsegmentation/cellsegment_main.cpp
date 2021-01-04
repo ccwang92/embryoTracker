@@ -124,6 +124,8 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     seed.eigMap3d = (*eigMap3d)(seed.crop_range_yxz); // all shallow copy
     seed.varMap = (*varMap)(seed.crop_range_yxz); // all shallow copy
 
+    seed.gap2dMap = seed.eigMap2d > 0;
+    seed.gap3dMap = seed.eigMap3d > 0;
     seed.volUint8 = (*data_grayim3d)(seed.crop_range_yxz); // all shallow copy
     seed.idMap = (*idMap)(seed.crop_range_yxz); // all shallow copy
 
