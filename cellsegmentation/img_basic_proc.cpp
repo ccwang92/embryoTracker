@@ -702,28 +702,65 @@ void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avg
     }
 }
 /**
- * @brief extractVoxList
+ * @brief extractVoxList: return the voxel idx of all connected component
  * @param label3d
  * @param voxList
  * @param numCC
+ * @param bk_extract: background also count as a region
  */
-void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC){
-    voxList.resize(numCC);
-    for (size_t i = 0; i < label3d->total(); i++){
-        if(label3d->at<int>(i) > 0){
-            voxList[label3d->at<int>(i)-1].push_back(i);
+void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract){
+    if (bk_extract){
+        voxList.resize(numCC+1);
+        for (size_t i = 0; i < label3d->total(); i++){
+             voxList[label3d->at<int>(i)].push_back(i);
+        }
+    }else{
+        voxList.resize(numCC);
+        for (size_t i = 0; i < label3d->total(); i++){
+            if(label3d->at<int>(i) > 0){
+                voxList[label3d->at<int>(i)-1].push_back(i);
+            }
         }
     }
 }
-
+void extractVoxIdxList(const Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract){
+    if (bk_extract){
+        voxList.resize(numCC+1);
+        for (size_t i = 0; i < label3d->total(); i++){
+             voxList[label3d->at<int>(i)].push_back(i);
+        }
+    }else{
+        voxList.resize(numCC);
+        for (size_t i = 0; i < label3d->total(); i++){
+            if(label3d->at<int>(i) > 0){
+                voxList[label3d->at<int>(i)-1].push_back(i);
+            }
+        }
+    }
+}
 /**
- * @brief removeSmallCC
+ * @brief extractVolume: return the size of all connected component
+ * @param label3d: cv_32s
+ * @param voxSzList
+ * @param numCC
+ */
+void extractVolume(const Mat *label3d, vector<size_t> &voxSzList, int numCC){
+    voxSzList.resize(numCC);
+    fill(voxSzList.begin(), voxSzList.end(), 0);
+    for (size_t i = 0; i < label3d->total(); i++){
+        if(label3d->at<int>(i) > 0){
+            voxSzList[label3d->at<int>(i)-1]++;
+        }
+    }
+}
+/**
+ * @brief removeSmallCC: remove the connected component that smaller than min_size
  * @param label3d
  * @param numCC
  * @param min_size
  * @param relabel
  */
-void removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = true){
+bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = true){
     vector<size_t> cc_size(numCC);
     fill(cc_size.begin(), cc_size.end(), 0);
     for (size_t i = 0; i < label3d.total(); i++){
@@ -731,30 +768,36 @@ void removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = tru
             cc_size[label3d.at<int>(i) - 1]++;
         }
     }
-    if(relabel){
-        vector<size_t> newlabel(numCC);
-        fill(newlabel.begin(), newlabel.end(), 0);
-        int rm_cc_cnt = 0;
-        for (int i = 0; i < numCC; i ++){
-            if (cc_size[i] >= min_size){
-                newlabel[i] = rm_cc_cnt;
-                rm_cc_cnt ++ ;
+    bool cc_removed = false;
+    vector<size_t> newlabel(numCC);
+    fill(newlabel.begin(), newlabel.end(), 0);
+    int rm_cc_cnt = 0;
+    for (int i = 0; i < numCC; i ++){
+        if (cc_size[i] >= min_size){
+            newlabel[i] = rm_cc_cnt;
+            rm_cc_cnt ++ ;
+        }
+    }
+    if(numCC > rm_cc_cnt){
+        cc_removed = true;
+        if(relabel){
+            numCC = rm_cc_cnt;
+            for (size_t i = 0; i < label3d.total(); i++){
+                if(label3d.at<int>(i) > 0){
+                    label3d.at<int>(i) = newlabel[label3d.at<int>(i) - 1];
+                }
             }
         }
-        numCC = rm_cc_cnt;
-        for (size_t i = 0; i < label3d.total(); i++){
-            if(label3d.at<int>(i) > 0){
-                label3d.at<int>(i) = newlabel[label3d.at<int>(i) - 1];
-            }
-        }
-    }else{
-        // no change to numCC, only set invalid CC to 0
-        for (size_t i = 0; i < label3d.total(); i++){
-            if(label3d.at<int>(i) > 0 && cc_size[label3d.at<int>(i) - 1] < min_size){
-                label3d.at<int>(i) = 0;
+        else{
+            // no change to numCC, only set invalid CC to 0
+            for (size_t i = 0; i < label3d.total(); i++){
+                if(label3d.at<int>(i) > 0 && cc_size[label3d.at<int>(i) - 1] < min_size){
+                    label3d.at<int>(i) = 0;
+                }
             }
         }
     }
+    return cc_removed;
 }
 
 /**
@@ -881,13 +924,13 @@ void volumeWrite(Mat *src3d, string filename){
     printf("Multiple files saved in test.tiff\n");
 }
 /**
- * @brief singleRegionCheck: keep the regions that related to the mask, if no mask is provided
+ * @brief validRegionExtract: keep the regions that related to the mask, if no mask is provided
  * keep the region with largest mask
  * @param binary_3d
  * @param binary_mask
  * @param connect
  */
-void singleRegionCheck(Mat &binary_3d, Mat *binary_mask, int connect){
+void validSingleRegionExtract(Mat &binary_3d, Mat *binary_mask, int connect){
     Mat label_map;
     int n = connectedComponents3d(&binary_3d, label_map, connect);
     if(n<=1) return;
@@ -908,23 +951,24 @@ void singleRegionCheck(Mat &binary_3d, Mat *binary_mask, int connect){
             }
         }
     }else{ // keep the region related the mask
-        vector<vector<size_t>> voxIdxList;
-        extractVoxIdxList(&label_map, voxIdxList, n);
+//        vector<vector<size_t>> voxIdxList;
+//        extractVoxIdxList(&label_map, voxIdxList, n);
 
-        FOREACH_i(voxIdxList){
-            bool mask_covered = false;
-            for(size_t j = 0; j<voxIdxList[i].size(); j++){
-                if (binary_mask->at<unsigned char>(voxIdxList[i][j]) > 0){
-                    mask_covered = true;
-                    break;
-                }
-            }
-            if (!mask_covered){
-                for(size_t j = 0; j<voxIdxList[i].size(); j++){
-                    binary_3d.at<unsigned char>(voxIdxList[i][j]) = 0;
-                }
-            }
-        }
+//        FOREACH_i(voxIdxList){
+//            bool mask_covered = false;
+//            for(size_t j = 0; j<voxIdxList[i].size(); j++){
+//                if (binary_mask->at<unsigned char>(voxIdxList[i][j]) > 0){
+//                    mask_covered = true;
+//                    break;
+//                }
+//            }
+//            if (!mask_covered){
+//                for(size_t j = 0; j<voxIdxList[i].size(); j++){
+//                    binary_3d.at<unsigned char>(voxIdxList[i][j]) = 0;
+//                }
+//            }
+//        }
+        findRelatedCC(&label_map, n, binary_mask, binary_3d);
     }
 
 }
@@ -1062,7 +1106,7 @@ vector<float> fgMapVals(Mat *val3d, Mat *src3d, int datatype, float threshold_in
     return fg_vals;
 }
 /**
- * @brief findUnrelatedCC: return the
+ * @brief findUnrelatedCC: return the Mat containing regions unrelated to reference
  * @param src3d4testing : CV_32S
  * @param src3d4reference : CV_8U
  * @param dst3d : CV_8U
@@ -1086,4 +1130,219 @@ bool findUnrelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &d
         }
     }
     return found;
+}
+
+/**
+ * @brief findUnrelatedCC: return the Mat containing regions related to reference
+ * @param src3d4testing : CV_32S
+ * @param src3d4reference : CV_8U
+ * @param dst3d : CV_8U
+ */
+bool findRelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d){
+    vector<bool> existInReference(numCC);
+    fill(existInReference.begin(), existInReference.end(), false);
+
+    FOREACH_i_ptrMAT(src3d4testing){
+        if(src3d4testing->at<int>(i) > 0 && src3d4reference->at<unsigned char>(i) > 0){
+            existInReference[src3d4testing->at<int>(i)-1] = true;
+        }
+    }
+
+    dst3d = Mat::zeros(src3d4reference->dims, src3d4reference->size, CV_8U);
+    bool found = false;
+    FOREACH_i_MAT(dst3d){
+        if(src3d4testing->at<int>(i) > 0 && existInReference[src3d4testing->at<int>(i)-1]){
+            dst3d.at<unsigned char>(i) = 255;
+            found = true;
+        }
+    }
+    return found;
+}
+bool inField( int r, int c, int z, int *sz )
+{
+  if( r < 0 || r >= sz[0] ) return false;
+  if( c < 0 || c >= sz[1] ) return false;
+  if( z < 0 || z >= sz[2] ) return false;
+    return true;
+}
+bool inField( int r, int c, int *sz )
+{
+  if( r < 0 || r >= sz[0] ) return false;
+  if( c < 0 || c >= sz[1] ) return false;
+    return true;
+}
+void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t> &nei_idx, int sz[], int connect){
+    nei_idx.resize(idx.size() * connect);
+    center_idx.resize(idx.size() * connect);
+
+    vector<int> n_y(connect), n_x(connect), n_z(connect);
+    if(connect == 4){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0 };
+    }else if(connect == 8){
+        n_y = { -1,  1,  0, 0 };// 8 shifts to neighbors
+        n_x = {  0,  0, -1, 1 };// used in functions
+        n_z = {  0,  0,  0, 0 };
+    }else if (connect == 6){
+        n_y = { -1, 1,  0, 0, 0,  0 };
+        n_x = { 0,  0, -1, 1, 0,  0 };
+        n_z = { 0,  0,  0, 0, 1, -1 };
+    }else if(connect == 26){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, -1, -1, -1,  1,  1,  1,  0,  0, 0,  -1, -1, -1,  1, 1, 1,  0, 0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1, -1,  0,  1, -1,  0,  1, -1,  1, 0,  -1,  0,  1, -1, 0, 1, -1, 1, 0 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1,  1,  1,  1,  1, 1, 1,  1, 1, 1 };
+    }else if(connect == 10){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, 0,  0 };
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1, 0,  0 };
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, 1, -1 };
+    }else if(connect == 18){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, -1,  1,  0,  0, 0, -1, 1,  0, 0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1,  0,  0, -1,  1, 0,  0, 0, -1, 1, 0 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, 1, 1,  1, 1, 1 };
+    }
+    int x, y, z, remain;
+    int page_sz = sz[0] * sz[1];
+    int cur_nei_idx;
+    size_t linkage_cnt = 0;
+    vector<bool> checked_label(sz[2] * page_sz, false);
+    FOREACH_i(idx){
+        z = idx[i] / page_sz;
+        remain = idx[i] - (z*page_sz);
+        x = remain / sz[0];
+        y = remain - x * sz[0];
+        for(int j = 0; j < n_y.size(); j++){
+            if(inField(y + n_y[j], x + n_x[j], z + n_z[j], sz)){
+                cur_nei_idx = y + n_y[j] + (x + n_x[j])*sz[0] + (z + n_z[j])*page_sz;
+                if(!checked_label[cur_nei_idx]){
+                    center_idx[linkage_cnt] = idx[i];
+                    nei_idx[linkage_cnt] = cur_nei_idx;
+                    linkage_cnt++;
+                }
+                center_idx[cur_nei_idx] = true;
+            }
+        }
+    }
+    if (linkage_cnt < center_idx.size()){ // trim the unused memory
+        center_idx.resize(linkage_cnt);
+        nei_idx.resize(linkage_cnt);
+    }
+}
+//int maxflow(vector<size_t> head, vector<size_t> tail, vector<float> capacity, vector<vector<size_t>> node_list,
+//             vector<size_t> src_ids, vector<size_t> sink_ids, int numNodes, vector<size_t> &out_src_node_ids){
+
+//    typedef Graph<size_t,size_t,float> GraphType;
+//    GraphType *g = new GraphType(numNodes, head.size());
+
+//    g -> add_node(numNodes);
+//    FOREACH_i(src_ids){
+//        g -> add_tweights( src_ids[i],  INFINITY, 0);
+//    }
+//    FOREACH_i(sink_ids){
+//        g -> add_tweights( sink_ids[i],  0, INFINITY);
+//    }
+//    FOREACH_i(head){
+//        g -> add_edge( head[i], tail[i],   capacity[i],   capacity[i] );
+//    }
+
+//    int flow = g -> maxflow();
+
+//    for(int i = 0; i < numNodes; i++){
+//        if (g->what_segment(i) == GraphType::SOURCE){
+//            out_src_node_ids.push_back(i);
+//        }
+//    }
+////    printf("Flow = %d\n", flow);
+////    printf("Minimum cut:\n");
+////    if (g->what_segment(0) == GraphType::SOURCE)
+////        printf("node0 is in the SOURCE set\n");
+////    else
+////        printf("node0 is in the SINK set\n");
+////    if (g->what_segment(1) == GraphType::SOURCE)
+////        printf("node1 is in the SOURCE set\n");
+////    else
+////        printf("node1 is in the SINK set\n");
+
+//    delete g;
+
+//    return flow;
+//}
+/**
+ * @brief regionGrow: grow the region using max-flow (combined idea of watershed and graph-cut)
+ * @param label_map: cv_32s
+ * @param numCC
+ * @param outLabelMap
+ * @param scoreMap
+ * @param fgMap
+ * @param connect
+ * @param cost_design
+ * @param bg2sink
+ */
+void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
+                Mat *fgMap, int connect, int cost_design[], bool bg2sink){
+    outLabelMap = Mat::zeros(label_map->dims, label_map->size, CV_32S);
+    // for each connected component, run max-flow
+
+    vector<size_t> arc_head_in_fg, arc_tail;
+    int mat_sz[] = {label_map->size[0], label_map->size[1], label_map->size[2]};
+    vector<size_t> valid_fg_idx = fgMapIdx(fgMap, CV_8U, 0);
+    neighbor_idx(valid_fg_idx, arc_head_in_fg, arc_tail, mat_sz, connect);
+    vector<float> arc_capacity (arc_head_in_fg.size());
+    float p1, p2;
+    FOREACH_i(arc_head_in_fg){
+        p1 = scoreMap->at<float>(arc_head_in_fg[i]);
+        p2 = scoreMap->at<float>(arc_tail[i]);
+        if (cost_design[0]==ARITHMETIC_AVERAGE){
+            arc_capacity[i] = pow((2/(p1+p2)), cost_design[1]);
+        }else if (cost_design[0]==GEOMETRIC_AVERAGE){
+            if (p2==0) p2 = p1; // there should be no non-negative score, so this line should never be used
+            arc_capacity[i] = pow((1/sqrt(p1*p2)), cost_design[1]);
+        }
+    }
+    vector<vector<int>> label_voxIdx;
+    extractVoxIdxList(label_map, label_voxIdx, numCC, false);
+    vector<size_t> sink_ids (arc_tail.size()); //valid sink nodes will not be larger than tail size
+    size_t sink_ids_cnt = 0;
+    typedef Graph<size_t,size_t,float> GraphType;
+    GraphType *g;
+    for(int i = 1; i<numCC; i++){
+        // build sink_ids
+        if (bg2sink){
+            FOREACH_j(arc_tail){
+                if (label_map->at<int>(arc_tail[j]) != i){
+                    sink_ids[sink_ids_cnt] = arc_tail[j];
+                    sink_ids_cnt++;
+                }
+            }
+        }else{
+            FOREACH_j(arc_tail){
+                if (label_map->at<int>(arc_tail[j])>0 && label_map->at<int>(arc_tail[j]) != i){
+                    sink_ids[sink_ids_cnt] = arc_tail[j];
+                    sink_ids_cnt++;
+                }
+            }
+        }
+        sink_ids.resize(sink_ids_cnt);
+        assert (sink_ids_cnt > 0 && label_voxIdx[i-1].size() > 0);
+        // max-flow the get the grown region
+        g = new GraphType(label_map->total(), arc_head_in_fg.size());
+        g -> add_node(label_map->total());
+        FOREACH_j(label_voxIdx[i-1]){
+            g -> add_tweights( label_voxIdx[i-1][j],  INFINITY, 0);
+        }
+        FOREACH_i(sink_ids){
+            g -> add_tweights( sink_ids[i],  0, INFINITY);
+        }
+        FOREACH_i(arc_head_in_fg){
+            g -> add_edge( arc_head_in_fg[i], arc_tail[i],   arc_capacity[i],   arc_capacity[i] );
+        }
+
+        int flow = g -> maxflow();
+        FOREACH_j(valid_fg_idx){
+            if (g->what_segment(valid_fg_idx[j]) == GraphType::SOURCE){
+                outLabelMap.at<int>(valid_fg_idx[j]) = i;
+            }
+        }
+    }
+
 }

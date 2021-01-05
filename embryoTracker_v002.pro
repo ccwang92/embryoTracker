@@ -12,6 +12,8 @@ CONFIG += c++17
 SOURCES += data_importer.cpp \
     cellsegmentation/cellsegment_main.cpp \
     cellsegmentation/img_basic_proc.cpp \
+    cellsegmentation/maxflow_bk/graph.cpp \
+    cellsegmentation/maxflow_bk/maxflow.cpp \
     cellsegmentation/synquant_simple.cpp \
     main.cpp \
     mainwindow.cpp \
@@ -41,6 +43,8 @@ HEADERS += data_importer.h \
     cellsegmentation/cellsegment_main.h \
     cellsegmentation/img_basic_proc.h \
     cellsegmentation/img_basic_proc_declare.h \
+    cellsegmentation/maxflow_bk/block.h \
+    cellsegmentation/maxflow_bk/graph.h \
     cellsegmentation/synquant_simple.h \
     dialog_import_im_sequence.h \
     mainwindow.h \

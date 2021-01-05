@@ -36,8 +36,10 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odS
     vector<float> var_vals_in_fg = fgMapVals(&seed.varMap, &seed.fgMap, CV_8U, 0);
     src_var = vec_mean(var_vals_in_fg);
     // 1. find best threshold and apply some basic morphlogical operation (ordstat4fg.m)
-    cellExtractFromSeed(seed, p4odStats);
-    refineFgWithSeedRegion(seed, p4segVol);
+    // PS: the region from this step will has no overlap with other cell's terriotory
+    // PPS: the cell territory may contain more than one cell, we need verify it using gaps.
+    cellTerritoryExtractFromSeed(seed, p4odStats);
+    refineCellTerritoryWithSeedRegion(seed, p4segVol);
 
     // 2. update seed's score map based on idMap (fg)
     normalize(seed.eigMap2d, seed.score2d, 0.001, 1, NORM_MINMAX, CV_32F, *idMap);
@@ -56,7 +58,7 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odS
  * @param seed
  * @param p4segVol
  */
-void synQuantSimple::refineFgWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol){
+void synQuantSimple::refineCellTerritoryWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol){
     Mat labelMap;
     int n = connectedComponents3d(idMap, labelMap, 6);
     if (n > 1){
@@ -81,18 +83,24 @@ void synQuantSimple::refineFgWithSeedRegion(singleCellSeed &seed, segParameter &
     *idMap = labelMap > 0;
 }
 
+/**
+ * @brief fgGapRemoval: remove the gap defined by principal curvature. We jointly consider the 2d and 3d
+ * principal curvature, since 3d may be too liberal to remove too much areas
+ * @param seed
+ * @param p4segVol
+ */
 void synQuantSimple::fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol){
-    bitwise_and(*idMap, seed.gap3dMap == 0, seed.idMapGapRemoved);
+    bitwise_and(*idMap, seed.gap3dMap == 0, seed.fgMapGapRemoved);
 
-    if (!isempty(&seed.idMapGapRemoved, CV_8U)){
+    if (!isempty(&seed.fgMapGapRemoved, CV_8U)){
         Mat seedMapFrom2dMap, mapUnion, mapUnion_label;
         bitwise_and(*idMap, seed.gap2dMap == 0, seedMapFrom2dMap);// or use -
-        bitwise_or(seedMapFrom2dMap, seed.idMapGapRemoved, mapUnion); // or use +
+        bitwise_or(seedMapFrom2dMap, seed.fgMapGapRemoved, mapUnion); // or use +
         int numCC = connectedComponents3d(&mapUnion, mapUnion_label, p4segVol.connect4fgGapRemoval);
         Mat newSeedMap; // CV_8U
-        bool found = findUnrelatedCC(&mapUnion_label, numCC, &seed.idMapGapRemoved, newSeedMap);
+        bool found = findUnrelatedCC(&mapUnion_label, numCC, &seed.fgMapGapRemoved, newSeedMap);
         if(found){
-            seed.idMapGapRemoved = seed.idMapGapRemoved + newSeedMap; //CV_8U
+            seed.fgMapGapRemoved = seed.fgMapGapRemoved + newSeedMap; //CV_8U
         }
     }
 }
@@ -103,10 +111,45 @@ void synQuantSimple::fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol){
  * @param p4odStats
  */
 void synQuantSimple::gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats){
-    //1. remove gaps defined by principal curvature
+    // 1. remove gaps defined by principal curvature
     fgGapRemoval(seed, p4segVol);
+    // 2. check if gaps divided the region into multiple valid seeds
+    Mat label_map;
+    int n = connectedComponents3d(&seed.fgMapGapRemoved, label_map, p4segVol.neiMap);
+    removeSmallCC(label_map, n, p4segVol.min_seed_size, REARRANGE_IDS);
+    if(n <= 1){
+        return;
+    }
+    // 3. gap test: test if the gap is true, if so, split the fg with respect to the multiple seeds
+    gapTest2SplitCellTerritory(&label_map, n, seed, p4segVol, p4odStats);
 }
+/**
+ * @brief gapTest2SplitCellTerritory: Given a seeds_map, test if the gap between any two seeds are true or false.
+ * If true, keep them. Otherwise, merge the two seeds divided by the gap. If the gap is indeed dimmer than the
+ * two seeds it split, it is true. Otherwise false.
+ * @param seeds_Map:cv_32s
+ * @param n
+ * @param seed
+ * @param p4segVol
+ * @param p4odStats
+ */
+void synQuantSimple::gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n,
+                                                singleCellSeed &seed, segParameter &p4segVol,
+                                                odStatsParameter &p4odStats){
+    // 1. first grow all seeds until they touch with each other
+    Mat grown_seedMap;
+    Mat scoreMap = seed.score2d + seed.score3d;
+    bool link_bg2sink = false; // this can force seeds to grow as much as they can
+    regionGrow(seeds_Map, n, grown_seedMap, &scoreMap, &seed.fgMap,
+               p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
 
+    // 2. for the connected seeds, test if the gap among them are true
+    // the gap are choosen by dilating the seed regions
+    for(int r = p4segVol.gapTestMinMaxRadius[0]; r <= p4segVol.gapTestMinMaxRadius[1]; r++){
+
+        //TODO: gap_refine may be needed
+    }
+}
 
 /**
  * @brief synQuantSimple::cellExtractFromSeed, currently, we use the exact version. But this function should also be able
@@ -115,7 +158,7 @@ void synQuantSimple::gapBasedRegionSegment(singleCellSeed &seed, segParameter &p
  * @param seed
  * @param p4odStats
  */
-void synQuantSimple::cellExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats){
+void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats){
     //Scalar seed_val = mean(seed.volUint8, seed.fgMap);// scalar is a vector<double> with length 4 for RGBA data
     int ub = MAX(30, round(mat_mean(&seed.volUint8, CV_8U, seed.idx_yxz_cropped)));
     int lb = MAX(5, round(mean(seed.volUint8, seed.fgMap)[0]));
@@ -136,7 +179,7 @@ void synQuantSimple::cellExtractFromSeed(singleCellSeed &seed, odStatsParameter 
     maxZ_intensity_level = -1;
     FOREACH_i(zscore){
         bitwise_and(seed.volUint8 >= (ub-i), otherCellTerritory == 0, cur_reg);
-        singleRegionCheck(cur_reg, &seed.seedMap, p4odStats.connectInSeedRefine);
+        validSingleRegionExtract(cur_reg, &seed.seedMap, p4odStats.connectInSeedRefine);
         bitwise_and(valid_nei, cur_reg==0, cur_valid_nei);
 
         size_t reg_sz = overlap_mat_vec(&cur_reg, CV_8U, seed.idx_yxz_cropped, 0);
@@ -151,7 +194,7 @@ void synQuantSimple::cellExtractFromSeed(singleCellSeed &seed, odStatsParameter 
     }
     if (max_exist_zscore > 0){
         bitwise_and(seed.volUint8 >= maxZ_intensity_level, otherCellTerritory == 0, *idMap);
-        singleRegionCheck(*idMap, &seed.seedMap, p4odStats.connectInSeedRefine);
+        validSingleRegionExtract(*idMap, &seed.seedMap, p4odStats.connectInSeedRefine);
     }else{
         *idMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
         return;

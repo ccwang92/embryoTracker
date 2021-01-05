@@ -96,17 +96,22 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
     //2. for each seed, refine it region
     vector<vector<size_t>> voxIdxList(seed_num);
     extractVoxIdxList(idMap, voxIdxList, seed_num);
+    Mat volStblizedFloat = Mat(dataVolFloat->dims, dataVolFloat->size, CV_32F);
+    float stb_term = 3/8;
+    FOREACH_i_ptrMAT(dataVolFloat){
+        volStblizedFloat.at<float>(i) = sqrt(dataVolFloat->at<float>(i) + stb_term);
+    }
     FOREACH_i(seed_intensity_order){
         int seed_id = seed_intensity_order[i];
         singleCellSeed seed;
-        cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, idMap, eigMap2d,
+        cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, &volStblizedFloat, idMap, eigMap2d,
                         eigMap3d, varMap, seed, p4segVol);
         refineSeed2Region(seed, p4odStats, p4segVol);
 
     }
 }
 
-void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d, Mat *idMap, Mat *eigMap2d,
+void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d, Mat *data_stbized, Mat *idMap, Mat *eigMap2d,
                                Mat *eigMap3d, Mat *varMap, singleCellSeed &seed, segParameter p4segVol){
     seed.id = seed_id;
     seed.idx_yxz = idx_yxz; // shallow copy
@@ -127,7 +132,10 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     seed.gap2dMap = seed.eigMap2d > 0;
     seed.gap3dMap = seed.eigMap3d > 0;
     seed.volUint8 = (*data_grayim3d)(seed.crop_range_yxz); // all shallow copy
+    seed.volStblizedFloat = (*data_stbized)(seed.crop_range_yxz); // all shallow copy
     seed.idMap = (*idMap)(seed.crop_range_yxz); // all shallow copy
+
+
 
     vec_sub2ind(seed.idx_yxz_cropped, vec_Minus(seed.y, seed.crop_range_yxz[0].start),
             vec_Minus(seed.x, seed.crop_range_yxz[1].start),

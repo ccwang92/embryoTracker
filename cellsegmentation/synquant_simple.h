@@ -23,7 +23,7 @@ public:
 public:
     void processVoxLabel(size_t j);
     void componentTree3d(segParameter p4segVol, odStatsParameter p4odStats);
-    void cellExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats);
+    void cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats);
     float zscoreCal(float t0, size_t M/*in*/, size_t N/*nei*/); // directly use non_overlap_gaussian
 
     size_t findNode(size_t e);
@@ -37,10 +37,11 @@ public:
     void fdr_control();
     // zscore for comparing fg and bg neighbors using the boundary pixels among fg and bg
     float debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singleCellSeed *seed, odStatsParameter p4odStats);
-    void refineFgWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
+    void refineCellTerritoryWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
 
     void fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol);
     void gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
+    void gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
 //    template <typename T> T debiasedFgBgCompare(vector<T> const & fg, vector<T> const & bg, vector<T> const & neglectVals,
 //                                                unsigned debiasMethod);
 public:

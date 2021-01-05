@@ -59,6 +59,7 @@ struct segParameter {
 //            q.updateCellsAdjMissingCell = false;% when add missing cell, do we need to update other regions nearby
 //            q.sqrtDistance = false; % euclidian distance or squared euclidian distance
 //        end
+        int gapTestMinMaxRadius[2];
     };
 };
 
@@ -85,8 +86,9 @@ struct singleCellSeed{
     Mat gap2dMap, gap3dMap;
     Mat varMap;
     Mat volUint8;
+    Mat volStblizedFloat;
     Mat idMap; //idComp
-    Mat idMapGapRemoved; //newIdComp
+    Mat fgMapGapRemoved; //newIdComp
     Mat fgMap;
     Mat otherIdMap;
 };
@@ -99,7 +101,7 @@ public:
     void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
     void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat, Mat *idMap, int seed_num, Mat *eigMap2d,
                               Mat *eigMap3d, Mat *varMap, vector<int> test_ids);
-    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *dataVolFloat, Mat *idMap, Mat *eigMap2d,
+    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *dataVolUnit8, Mat *data_stbized, Mat *idMap, Mat *eigMap2d,
                           Mat *eigMap3d, Mat *varMap, singleCellSeed &seed, segParameter p4segVol);
     void refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
 protected:
@@ -130,7 +132,7 @@ protected:
         p4segVol.min_fill = 0.0001;
         p4segVol.max_WHRatio = 100;
         p4segVol.min_seed_size = 10;
-        p4segVol.graph_cost_design[0] = 1;
+        p4segVol.graph_cost_design[0] = ARITHMETIC_AVERAGE; //default 1, GEOMETRIC_AVERAGE = 2;
         p4segVol.graph_cost_design[1] = 2;
         p4segVol.growConnectInTest = 4;
         p4segVol.growConnectInRefine = 6;
@@ -142,7 +144,8 @@ protected:
         p4segVol.shift_yxz[2] = 4;
         p4segVol.shrink_flag = true;
         p4segVol.fgBoundaryHandle = LEAVEALONEFIRST;
-
+        p4segVol.gapTestMinMaxRadius[0] = 2;
+        p4segVol.gapTestMinMaxRadius[1] = 4;
 
         p4odStats.gap4varTrendEst = 2;
         p4odStats.gap4fgbgCompare = 0;

@@ -19,13 +19,19 @@
 #include <numeric>
 #include <algorithm>
 
+#include "maxflow_bk/graph.h" //max-flow BK algorithm
+
 using namespace cv;
 using namespace std;
 
 enum filterDirection{DIRECTION_X = 0, DIRECTION_Y, DIRECTION_Z};
 enum debiasMethods{TTEST2 = 0, TTEST2_VAR_KNOWN, NON_OV_TRUNCATED_NORMAL, OV_TRUNCATED_NORMAL, KSEC, APPROX3SEC};
+enum cost_design_method{ARITHMETIC_AVERAGE = 1, GEOMETRIC_AVERAGE};
 
+#define REARRANGE_IDS true
+#define NOT_REARRANGE_IDS false
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)
+#define FOREACH_j(x) for(size_t j = 0; j<x.size(); j++)
 
 #define FOREACH_i_MAT(x) for(size_t i=0; i<x.total(); i++)
 #define FOREACH_i_ptrMAT(x) for(size_t i=0; i<x->total(); i++)
@@ -52,20 +58,26 @@ int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap);
 void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range);
 void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities);
 
-void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC);
-void removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel);
+void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract = false);
+void extractVoxIdxList(const Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract = false);
+void extractVolume(const Mat *label3d, vector<size_t> &voxSzList, int numCC);
+bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel);
 void volumeDilate(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
 void volumeErode(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
 
 void volumeWrite(Mat *src3d, string filename);
 
-void singleRegionCheck(Mat &vol3d, Mat *binary_mask, int connect);
+void validSingleRegionExtract(Mat &vol3d, Mat *binary_mask, int connect);
 int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask);
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
 vector<float> fgMapVals(Mat *vol3d, Mat *src3d, int datatype, float threshold_in);
 bool findUnrelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d);
+bool findRelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d);
+void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t> &nei_idx, int sz[], int connect);
+void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
+                Mat *fgMap, int connect, int cost_design[], bool bg2sink = true);
 // Function to find t-test of
 // two set of statistical data.
 
