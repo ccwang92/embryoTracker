@@ -1074,36 +1074,74 @@ vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in){
     return fg_Idx;
 }
 /**
- * @brief fgMapVals: return the values of foreground
+ * @brief extractValsGivenMask: return the values of foreground
  * @param val3d
- * @param src3d
+ * @param src3d: mask for value extraction
  * @param datatype
  * @param threshold_in
  * @return
  */
-vector<float> fgMapVals(Mat *val3d, Mat *src3d, int datatype, float threshold_in){
+vector<float> extractValsGivenMask(Mat *val3d, Mat *src3d, int datatype, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     vector<float> fg_vals;
     if (datatype == CV_8U){
         FOREACH_i_ptrMAT(src3d){
             if(src3d->at<unsigned char>(i) > threshold_in){
-                fg_vals.push_back(val3d->at<unsigned char>(i));
+                fg_vals.push_back((float)val3d->at<unsigned char>(i));
             }
         }
     }else if (datatype == CV_32F){
         FOREACH_i_ptrMAT(src3d){
             if(src3d->at<float>(i) > threshold_in){
-                fg_vals.push_back(val3d->at<unsigned char>(i));
+                fg_vals.push_back(val3d->at<float>(i));
             }
         }
     }else if (datatype == CV_32S){
         FOREACH_i_ptrMAT(src3d){
             if(src3d->at<int>(i) > threshold_in){
-                fg_vals.push_back(val3d->at<unsigned char>(i));
+                fg_vals.push_back((float)val3d->at<int>(i));
             }
         }
     }
     return fg_vals;
+}
+
+vector<float> extractValsGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    vector<float> fg_vals;
+    if (datatype == CV_8U){
+        FOREACH_i(idx){
+            fg_vals.push_back((float)vol3d->at<unsigned char>(i));
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i(idx){
+            fg_vals.push_back(vol3d->at<float>(i));
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i(idx){
+            fg_vals.push_back((float)vol3d->at<int>(i));
+        }
+    }
+    return fg_vals;
+}
+
+double extractSumGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    double sum = 0;
+    if (datatype == CV_8U){
+        FOREACH_i(idx){
+            sum += (double)vol3d->at<unsigned char>(i);
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i(idx){
+            sum += (double)vol3d->at<float>(i);
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i(idx){
+            sum += (double)(float)vol3d->at<int>(i);
+        }
+    }
+    return sum;
 }
 /**
  * @brief findUnrelatedCC: return the Mat containing regions unrelated to reference
@@ -1176,11 +1214,11 @@ void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t>
     center_idx.resize(idx.size() * connect);
 
     vector<int> n_y(connect), n_x(connect), n_z(connect);
-    if(connect == 4){
+    if(connect == 8){
         n_y = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
         n_x = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
         n_z = {  0,  0,  0,  0, 0, 0,  0, 0 };
-    }else if(connect == 8){
+    }else if(connect == 4){
         n_y = { -1,  1,  0, 0 };// 8 shifts to neighbors
         n_x = {  0,  0, -1, 1 };// used in functions
         n_z = {  0,  0,  0, 0 };
@@ -1345,4 +1383,255 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
         }
     }
 
+}
+
+/**
+ * @brief gapRefine: remove voxels that not directly between two regions (tail area of the gap)
+ * @param label_map
+ * @param target_label0
+ * @param target_label1
+ * @param gap_idx
+ */
+void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size_t> &gap_idx){
+    // 1. find the gap_idx that touched one of the region
+    vector<size_t> sub_idx0;
+    vector<size_t> sub_idx1;
+    int im_sz[] = {label_map->size[0], label_map->size[1]};
+    int x, y, z, remain;
+    int page_sz = im_sz[0] * im_sz[1];
+
+    int n_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+    int n_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+    FOREACH_i(gap_idx){
+        if (label_map->at<int>(gap_idx[i]) == target_label0){
+            z = gap_idx[i] / page_sz;
+            remain = gap_idx[i] - (z*page_sz);
+            x = remain / im_sz[0];
+            y = remain - x * im_sz[0];
+
+            for(int j = 0; j < 8; j++){
+                if(inField(y+n_y[j], x+n_x[j], im_sz) &&
+                        label_map->at<int>(y+n_y[j], x+n_x[j], z)==0){
+                    sub_idx0.push_back(gap_idx[i]);
+                    sub_idx0.push_back(y);
+                    sub_idx0.push_back(x);
+                    break;
+                }
+            }
+        }else if(label_map->at<int>(gap_idx[i]) == target_label1){
+            z = gap_idx[i] / page_sz;
+            remain = gap_idx[i] - (z*page_sz);
+            x = remain / im_sz[0];
+            y = remain - x * im_sz[0];
+            for(int j = 0; j < 8; j++){
+                if(inField(y+n_y[j], x+n_x[j], im_sz) &&
+                        label_map->at<int>(y+n_y[j], x+n_x[j], z)==0){
+                    sub_idx1.push_back(gap_idx[i]);
+                    sub_idx0.push_back(y);
+                    sub_idx0.push_back(x);
+                    break;
+                }
+            }
+        }
+    }
+    assert(sub_idx0.size()>=6 && sub_idx1.size()>=6);
+    // find the two nodes far away
+    size_t dy, dx, d;
+    if(sub_idx0.size() > 6){
+        size_t max_dist = 0, target_i;
+        for(size_t i = 3; i < sub_idx0.size(); i+=3){
+            dy = sub_idx0[i+1]-sub_idx0[1];
+            dx = sub_idx0[i+2]-sub_idx0[2];
+            d = dy*dy + dx*dx;
+            if(d > max_dist){
+                max_dist = d;
+                target_i = i;
+            }
+        }
+        sub_idx0[3] = sub_idx0[target_i];
+        sub_idx0[4] = sub_idx0[target_i+1];
+        sub_idx0[5] = sub_idx0[target_i+2];
+        sub_idx0.resize(6);
+    }
+    if(sub_idx1.size() > 6){
+        size_t max_dist = 0, target_i;
+        for(size_t i = 3; i < sub_idx1.size(); i+=3){
+            dy = sub_idx1[i+1]-sub_idx1[1];
+            dx = sub_idx1[i+2]-sub_idx1[2];
+            d = dy*dy + dx*dx;
+            if(d > max_dist){
+                max_dist = d;
+                target_i = i;
+            }
+        }
+        sub_idx1[3] = sub_idx1[target_i];
+        sub_idx1[4] = sub_idx1[target_i+1];
+        sub_idx1[5] = sub_idx1[target_i+2];
+        sub_idx1.resize(6);
+    }
+    // trim points that outside the quadrilateral
+    // 1. get the two lines
+    float k_b0[2], k_b1[2];
+    if(sub_idx1[5] == sub_idx0[5]) k_b0[0] = (float)(sub_idx1[4] - sub_idx0[4]);
+    else k_b0[0] = ((float)sub_idx1[4] - sub_idx0[4]) / (sub_idx1[5] - sub_idx0[5]);
+    k_b0[1] = sub_idx1[4] -  k_b0[0] * sub_idx1[5];
+
+    if(sub_idx1[2] == sub_idx0[2]) k_b1[0] = (float)(sub_idx1[1] - sub_idx0[1]);
+    else k_b1[0] = ((float)sub_idx1[1] - sub_idx0[1]) / (sub_idx1[2] - sub_idx0[2]);
+    k_b1[1] = sub_idx1[1] -  k_b1[0] * sub_idx1[2];
+
+    float intersect_x;
+    if(k_b0[0] == k_b1[0]) intersect_x = INFINITY;
+    else intersect_x = ((k_b1[1] - k_b0[1]))/(k_b0[0] - k_b1[0]);
+    //float intersect_y = k_b1[1] * intersect_x + k_b1[0];
+    if(intersect_x <= MAX(sub_idx0[5], sub_idx1[5]) && intersect_x >= MIN(sub_idx0[5], sub_idx1[5])){
+            //intersect_y <= MAX(sub_idx0[4], sub_idx1[4]) && intersect_x >= MIN(sub_idx0[4], sub_idx1[4]) ){
+        size_t tmp = sub_idx0[0];
+        sub_idx0[0] = sub_idx0[3];
+        sub_idx0[3] = tmp;
+        tmp = sub_idx0[1];
+        sub_idx0[1] = sub_idx0[4];
+        sub_idx0[4] = tmp;
+        tmp = sub_idx0[2];
+        sub_idx0[2] = sub_idx0[5];
+        sub_idx0[5] = tmp;
+
+//        if(sub_idx1[5] == sub_idx0[5]) k_b0[0] = (sub_idx1[4] - sub_idx0[4]);
+//        else k_b0[0] = (sub_idx1[4] - sub_idx0[4]) / (sub_idx1[5] - sub_idx0[5]);
+//        k_b0[1] = sub_idx1[4] -  k_b0[0] * sub_idx1[5];
+
+//        if(sub_idx1[2] == sub_idx0[2]) k_b1[0] = (sub_idx1[1] - sub_idx0[1]);
+//        else k_b1[0] = (sub_idx1[1] - sub_idx0[1]) / (sub_idx1[2] - sub_idx0[2]);
+//        k_b1[1] = sub_idx1[1] -  k_b1[0] * sub_idx1[2];
+    }
+    // remove pionts outside the quadrilateral
+    vector<Point> contour(4);
+    contour[0].y = sub_idx0[1];
+    contour[0].x = sub_idx0[2];
+    contour[1].y = sub_idx0[4];
+    contour[1].x = sub_idx0[5];
+    contour[2].y = sub_idx1[4];
+    contour[2].x = sub_idx1[5];
+    contour[3].y = sub_idx1[1];
+    contour[3].x = sub_idx1[2];
+    size_t valid_idx_cnt = 0;
+
+    FOREACH_i(gap_idx){
+        if (label_map->at<int>(gap_idx[i]) == target_label0 ||
+                label_map->at<int>(gap_idx[i]) == target_label1){
+            gap_idx[valid_idx_cnt] = gap_idx[i];
+            valid_idx_cnt ++;
+        }else{
+            z = gap_idx[i] / page_sz;
+            remain = gap_idx[i] - (z*page_sz);
+            x = remain / im_sz[0];
+            y = remain - x * im_sz[0];
+            if(pointPolygonTest(contour, Point2f((float)y, (float)x), false)>=0){
+                gap_idx[valid_idx_cnt] = gap_idx[i];
+                valid_idx_cnt ++;
+            }
+        }
+    }
+    gap_idx.resize(valid_idx_cnt);
+}
+/**
+ * @brief extractGapVoxel: 2d gap test
+ * @param label_map
+ * @param numCC
+ * @param gap_radius
+ * @param gap_voxIdx
+ */
+void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
+                     vector<vector<size_t>> &gap_voxIdx, vector<bool> tested_flag){
+    gap_voxIdx.resize(numCC*numCC);
+    vector<size_t> valid_fg_idx = fgMapIdx(fgMap, CV_8U, 0);
+    int im_sz[] = {label_map->size[0], label_map->size[1]};
+    int x, y, z, remain;
+    int page_sz = im_sz[0] * im_sz[1];
+    int nei_seed_ids[2] = {0,0}, nei_seed_cnt = 0;
+    int cur_label;
+    FOREACH_i(valid_fg_idx){
+        z = valid_fg_idx[i] / page_sz;
+        remain = valid_fg_idx[i] - (z*page_sz);
+        x = remain / im_sz[0];
+        y = remain - x * im_sz[0];
+        nei_seed_cnt = 0;
+        for(int n_x = -gap_radius; n_x <= gap_radius; n_x++){
+            for(int n_y = -gap_radius; n_y <= gap_radius; n_y++){
+                if(n_x != 0 || n_y != 0){
+                    if(inField(y + n_y, x + n_x, im_sz)){
+                        cur_label = label_map->at<int>(y+n_y, x+n_x, z);
+                        if(cur_label >0){
+                            if (nei_seed_cnt == 0 || (nei_seed_cnt == 1 && cur_label != nei_seed_ids[0])){
+                                nei_seed_ids[nei_seed_cnt++] = cur_label;
+                            }else if(cur_label != nei_seed_ids[0] && cur_label != nei_seed_ids[1]){
+                                nei_seed_cnt ++;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if(nei_seed_cnt > 2) break; // do not consider gap pixels among 3 or more regions
+        }
+        if (nei_seed_cnt == 2){
+            size_t tmp_idx = (MIN(nei_seed_ids[0], nei_seed_ids[1])-1) * numCC + (MAX(nei_seed_ids[0], nei_seed_ids[1])-1);
+            //if(tested_flag[tmp_idx] == false){
+            gap_voxIdx[tmp_idx].push_back(valid_fg_idx[i]);
+            //}
+        }
+    }
+    FOREACH_i(gap_voxIdx){
+        if(gap_voxIdx[i].size() > 0){
+            if (tested_flag[i]){ // this gap does not need to test
+                gap_voxIdx[i].resize(0);
+            }else{
+                gapRefine(label_map, i / numCC + 1, i % numCC + 1, gap_voxIdx[i]);
+            }
+        }
+    }
+}
+/**
+ * @brief neighbor_idx_2d: return the neighbor index of idx circle by circle
+ * @param idx
+ * @param fgMap
+ * @param neighbor_idx_list
+ * @param radius: how many circles we would like to dilate
+ */
+void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &neighbor_idx_list, int radius){
+    Mat curr_fg;
+    fgMap->copyTo(curr_fg);
+    neighbor_idx_list.resize(radius);
+    FOREACH_i(idx){
+        curr_fg.at<unsigned char>(idx[i]) = 0;
+    }
+    int im_sz[] = {fgMap->size[0], fgMap->size[1]};
+    int x, y, z, remain;
+    int page_sz = im_sz[0] * im_sz[1];
+    int n_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+    int n_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+    FOREACH_i(neighbor_idx_list){
+        vector<size_t> curr_idx;
+        size_t tmp_idx;
+        if(i == 0){
+            curr_idx = idx;
+        }else{
+            curr_idx = neighbor_idx_list[i-1];
+        }
+        FOREACH_j(curr_idx){
+            z = curr_idx[i] / page_sz;
+            remain = curr_idx[i] - (z*page_sz);
+            x = remain / im_sz[0];
+            y = remain - x * im_sz[0];
+            for(int k = 0; k < 8; k++){
+                if(inField(y+n_y[k], x+n_x[k], im_sz)){
+                    vol_sub2ind(tmp_idx, y+n_y[k], x+n_x[k], z, fgMap->size);
+                    if(fgMap->at<unsigned char>(tmp_idx) > 0){
+                        neighbor_idx_list[i].push_back(tmp_idx);
+                        fgMap->at<unsigned char>(tmp_idx) = 0;
+                    }
+                }
+            }
+        }
+    }
 }

@@ -4,6 +4,7 @@
 #include "cellsegment_main.h"
 //#include "img_basic_proc_declare.h"
 #include <algorithm>
+#include <set>
 
 #define UNDEFINED (byte)0
 #define NOT_OBJECT (byte)1
@@ -38,7 +39,7 @@ public:
     // zscore for comparing fg and bg neighbors using the boundary pixels among fg and bg
     float debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singleCellSeed *seed, odStatsParameter p4odStats);
     void refineCellTerritoryWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
-
+    void refineCellsTerritoriesWithSeedRegions(singleCellSeed &seed, segParameter &p4segVol);
     void fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol);
     void gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
     void gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);

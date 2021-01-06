@@ -27,6 +27,8 @@ using namespace std;
 enum filterDirection{DIRECTION_X = 0, DIRECTION_Y, DIRECTION_Z};
 enum debiasMethods{TTEST2 = 0, TTEST2_VAR_KNOWN, NON_OV_TRUNCATED_NORMAL, OV_TRUNCATED_NORMAL, KSEC, APPROX3SEC};
 enum cost_design_method{ARITHMETIC_AVERAGE = 1, GEOMETRIC_AVERAGE};
+enum fgBoundaryHandleMethod {LEAVEALONEFIRST = 0, COMPETE, REPEAT};
+enum gapTestMethods {GAP_TTEST = 0, GAP_ORDERSTATS, GAP_LOCALORDERSTATS};
 
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
@@ -34,7 +36,9 @@ enum cost_design_method{ARITHMETIC_AVERAGE = 1, GEOMETRIC_AVERAGE};
 #define FOREACH_j(x) for(size_t j = 0; j<x.size(); j++)
 
 #define FOREACH_i_MAT(x) for(size_t i=0; i<x.total(); i++)
+#define FOREACH_j_MAT(x) for(size_t j=0; j<x.total(); j++)
 #define FOREACH_i_ptrMAT(x) for(size_t i=0; i<x->total(); i++)
+#define FOREACH_j_ptrMAT(x) for(size_t j=0; j<x->total(); j++)
 #define FOREACH_ijk_ptrMAT(x) for(int i=0; i<x->size[0]; i++) \
     for(int j=0; j<x->size[1]; j++) \
     for(int k=0; k<x->size[2]; k++)
@@ -72,12 +76,17 @@ int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask);
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
-vector<float> fgMapVals(Mat *vol3d, Mat *src3d, int datatype, float threshold_in);
+vector<float> extractValsGivenMask(Mat *vol3d, Mat *src3d, int datatype, float threshold_in);
+vector<float> extractValsGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
+double extractSumGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
 bool findUnrelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d);
 bool findRelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d);
 void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t> &nei_idx, int sz[], int connect);
 void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
                 Mat *fgMap, int connect, int cost_design[], bool bg2sink = true);
+
+void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius, vector<vector<size_t>> &gap_voxIdx, vector<bool> tested_flag);
+void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &neighbor_idx_list, int radius);
 // Function to find t-test of
 // two set of statistical data.
 
@@ -88,6 +97,16 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
 //template <class T> const T& min (const T& a, const T& b) {
 //  return (a<b)?a:b;     // or: return comp(a,b)?b:a; for version (2)
 //}
+
+//template <typename T> void ind2sub(vector<T> idx, vector<int> &z, vector<int> &y, vector<int> &x, int *sz);
+//template <typename T> void ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, int *sz);
+//template <typename T> void ind2sub(T idx, int &z, int &y, int &x, int *sz);
+//template <typename T> void ind2sub(T idx, int &y, int &x, int *sz);
+
+//template <typename T> void sub2ind(vector<T> &idx, vector<int> z, vector<int> y, vector<int> x, int *sz);
+//template <typename T> void sub2ind(vector<T> &idx, vector<int> y, vector<int> x, int *sz);
+//template <typename T> void sub2ind(T &idx, int z, int y, int x, int *sz);
+//template <typename T> void sub2ind(T &idx, int y, int x, int *sz);
 
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, MatSize size);
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize size);
@@ -127,6 +146,8 @@ template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T>
 template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in = 0);
 
 template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl=1.0, float vh=0.0);
+
+template <typename T> void vec_unique(vector<T> & v);
 #endif // IMG_BASIC_PROC_H
 
 

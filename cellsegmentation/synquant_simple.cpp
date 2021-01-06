@@ -33,7 +33,7 @@ synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4
 synQuantSimple::synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats){
     srcVolumeUint8 = &seed.volUint8;
     imArray = (unsigned char*)srcVolumeUint8->data;
-    vector<float> var_vals_in_fg = fgMapVals(&seed.varMap, &seed.fgMap, CV_8U, 0);
+    vector<float> var_vals_in_fg = extractValsGivenMask(&seed.varMap, &seed.fgMap, CV_8U, 0);
     src_var = vec_mean(var_vals_in_fg);
     // 1. find best threshold and apply some basic morphlogical operation (ordstat4fg.m)
     // PS: the region from this step will has no overlap with other cell's terriotory
@@ -46,10 +46,18 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odS
     normalize(seed.eigMap3d, seed.score3d, 0.001, 1, NORM_MINMAX, CV_32F, *idMap);
 
     // 3. segment idMap (fg) based on gaps from principal curvature
-
+    gapBasedRegionSegment(seed, p4segVol, p4odStats);
     // 4. refine the output from step 3 based on size and other prior knowledge
 
     // 5. test if the idMap (fg) is too small, if so, enlarge it and re-do the previous steps
+
+}
+/**
+ * @brief refineCellsTerritoryWithSeedRegions: the last time of refinement based size and shrinking
+ * @param seed
+ * @param p4segVol
+ */
+void synQuantSimple::refineCellsTerritoriesWithSeedRegions(singleCellSeed &seed, segParameter &p4segVol){
 
 }
 /**
@@ -145,9 +153,129 @@ void synQuantSimple::gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n
 
     // 2. for the connected seeds, test if the gap among them are true
     // the gap are choosen by dilating the seed regions
+    vector<bool> gap_tested_true(n*n, false);
+    float p_treshold = p4odStats.gapTestThreshold / (p4segVol.gapTestMinMaxRadius[1] - p4segVol.gapTestMinMaxRadius[0]);
+    vector<size_t> real_gap_idx;
     for(int r = p4segVol.gapTestMinMaxRadius[0]; r <= p4segVol.gapTestMinMaxRadius[1]; r++){
+        vector<vector<size_t>> gap_idx_list;
+        extractGapVoxel(&grown_seedMap, &seed.fgMap, n, r, gap_idx_list, gap_tested_true);
+        FOREACH_i(gap_idx_list){
+            if(gap_idx_list[i].size() > 0){
+                int id0 = i / n + 1;
+                int id1 = i % n + 1;
+                vector<vector<size_t>> nei_list0, nei_list1;
+                Mat cur_fg = grown_seedMap == id0;
+                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list0, 2*r+1);
+                cur_fg = grown_seedMap == id1;
+                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list1, 2*r+1);
 
-        //TODO: gap_refine may be needed
+                double var_sum = 0;
+                size_t var_idx_num = 0;
+                vector<float> r0, r1, skipped, gap;
+
+                gap = extractValsGivenIdx(&seed.volStblizedFloat, gap_idx_list[i], CV_32F);
+                var_sum += extractSumGivenIdx(&seed.stblizedVarMap, gap_idx_list[i], CV_32F);
+                var_idx_num += gap_idx_list[i].size();
+                for(size_t j = p4odStats.gapTestSkippedBandWidth; j < nei_list0.size(); j++){
+                    vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list0[j], CV_32F);
+                    r0.insert(r0.end(), curr_vals.begin(), curr_vals.end());
+                    var_sum += extractSumGivenIdx(&seed.stblizedVarMap, nei_list0[j], CV_32F);
+                    var_idx_num += nei_list0[j].size();
+                }
+                for(size_t j = p4odStats.gapTestSkippedBandWidth; j < nei_list1.size(); j++){
+                    vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list1[j], CV_32F);
+                    r1.insert(r1.end(), curr_vals.begin(), curr_vals.end());
+                    var_sum += extractSumGivenIdx(&seed.stblizedVarMap, nei_list1[j], CV_32F);
+                    var_idx_num += nei_list1[j].size();
+                }
+                float cur_std = (float)sqrt(var_sum / var_idx_num);
+                float mu, sigma;
+                float p0, p1;
+                if(p4odStats.gapTestMethod == GAP_LOCALORDERSTATS){
+                    float sum_stats0 = vec_mean(r0) - vec_mean(gap);
+                    float sum_stats1 = vec_mean(r1) - vec_mean(gap);
+                    gap.resize(0);
+                    for(size_t j = 0; j < p4odStats.gapTestSkippedBandWidth; j++){
+                        vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list0[j], CV_32F);
+                        skipped.insert(skipped.end(), curr_vals.begin(), curr_vals.end());
+                    }
+                    for(size_t j = 0; j < p4odStats.gapTestSkippedBandWidth; j++){
+                        vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list1[j], CV_32F);
+                        skipped.insert(skipped.end(), curr_vals.begin(), curr_vals.end());
+                    }
+                    orderStatsKSection(r0, gap, skipped, mu, sigma);
+                    mu *= cur_std;
+                    sigma *= cur_std;
+                    p0 = zscore2palue((sum_stats0 - mu) / sigma);
+                    p1 = zscore2palue((sum_stats1 - mu) / sigma);
+                }else if(p4odStats.gapTestMethod == GAP_ORDERSTATS){
+                    float sum_stats0 = vec_mean(r0) - vec_mean(gap);
+                    float sum_stats1 = vec_mean(r1) - vec_mean(gap);
+
+                    orderStatsKSection(r0, gap, skipped, mu, sigma);
+                    mu *= cur_std;
+                    sigma *= cur_std;
+                    p0 = zscore2palue((sum_stats0 - mu) / sigma);
+
+                    orderStatsKSection(r1, gap, skipped, mu, sigma);
+                    mu *= cur_std;
+                    sigma *= cur_std;
+                    p1 = zscore2palue((sum_stats1 - mu) / sigma);
+                }
+
+                if (p0 <= p_treshold && p1 <= p_treshold){ // gap is true
+                    gap_tested_true[i] = true;
+                    real_gap_idx.insert(real_gap_idx.end(), gap_idx_list[i].begin(), gap_idx_list[i].end());
+                }
+            }
+        }
+        gap_idx_list.clear();
+    }
+    vector<vector<int>> groups;
+    FOREACH_i(gap_tested_true){
+        if(gap_tested_true[i]){
+            int target0 = i / n + 1;
+            int target1 = i % n + 1;
+            bool found_group = false;
+            for(size_t j = 0; j < groups.size(); j++){
+                for(size_t k = 0; k < groups[j].size(); k++){
+                    if(target0 == groups[j][k]){
+                        groups[j].push_back(target1);
+                        found_group = true;
+                        break;
+                    }else if(target1 == groups[j][k]){
+                        groups[j].push_back(target0);
+                        found_group = true;
+                        break;
+                    }
+                }
+                if(found_group) break;
+            }
+            if(!found_group){
+                groups.push_back({target0, target1});
+            }
+        }
+    }
+    vector<int> label_map (n);
+    FOREACH_i(label_map){
+        label_map[i] = i + 1;
+    }
+    FOREACH_i(groups){
+        //vec_unique(groups[i]); //sorted also
+        for(size_t j = 1; j < groups[i].size(); j++){
+            assert(label_map[groups[i][j] - 1] == groups[i][j] || label_map[groups[i][j] - 1] == groups[i][0]);// "Duplicated Regions in two groups");
+            label_map[groups[i][j] - 1] = groups[i][0];
+        }
+    }
+    FOREACH_i_MAT(grown_seedMap){
+        if(grown_seedMap.at<int>(i) > 0){
+            grown_seedMap.at<int>(i) = label_map[grown_seedMap.at<int>(i) - 1];
+        }
+    }
+    vector<size_t> non_used;
+    rearrangeIdMap(&grown_seedMap, *idMap, non_used);
+    FOREACH_i(real_gap_idx){ // remove the real gaps
+        idMap->at<int>(real_gap_idx[i]) = 0;
     }
 }
 
@@ -853,9 +981,9 @@ float synQuantSimple::debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singl
     bitwise_and(fg_band, *cur_reg, fg_band);
     fg_center = seed->fgMap - fg_band - bg_band; // key here
     vector<float> fg_band_vals, bg_band_vals, fg_center_vals;
-    fg_band_vals = fgMapVals(&seed->volUint8, &fg_band, CV_8U, 0);
-    bg_band_vals = fgMapVals(&seed->volUint8, &bg_band, CV_8U, 0);
-    fg_center_vals = fgMapVals(&seed->volUint8, &fg_center, CV_8U, 0);
+    fg_band_vals = extractValsGivenMask(&seed->volUint8, &fg_band, CV_8U, 0);
+    bg_band_vals = extractValsGivenMask(&seed->volUint8, &bg_band, CV_8U, 0);
+    fg_center_vals = extractValsGivenMask(&seed->volUint8, &fg_center, CV_8U, 0);
 
     float mu, sigma, zscore = 0;
     if (p4odStats.fgSignificanceTestWay == KSEC){

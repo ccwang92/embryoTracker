@@ -8,7 +8,6 @@
 //#define VOLUME_WH_MAX 100000
 using namespace cv;
 using namespace std;
-enum fgBoundaryHandleMethod {LEAVEALONEFIRST = 0, COMPETE, REPEAT};
 
 struct segParameter {
     union
@@ -73,6 +72,9 @@ struct odStatsParameter {
         int fgSignificanceTestWay;
         int minGapWithOtherCell_yxz[3];
         int connectInSeedRefine;
+        int gapTestMethod;
+        int gapTestSkippedBandWidth;
+        float gapTestThreshold;
     };
 };
 struct singleCellSeed{
@@ -85,6 +87,7 @@ struct singleCellSeed{
     Mat score2d, score3d;
     Mat gap2dMap, gap3dMap;
     Mat varMap;
+    Mat stblizedVarMap;
     Mat volUint8;
     Mat volStblizedFloat;
     Mat idMap; //idComp
@@ -99,10 +102,10 @@ public:
     cellSegmentMain(unsigned char *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/);
     ~cellSegmentMain(){delete data_rows_cols_slices;};
     void cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_frame);
-    void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat, Mat *idMap, int seed_num, Mat *eigMap2d,
-                              Mat *eigMap3d, Mat *varMap, vector<int> test_ids);
-    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *dataVolUnit8, Mat *data_stbized, Mat *idMap, Mat *eigMap2d,
-                          Mat *eigMap3d, Mat *varMap, singleCellSeed &seed, segParameter p4segVol);
+    void regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat, Mat * volStblizedFloat, Mat *idMap /*int*/, int seed_num, Mat *eigMap2d,
+                                               Mat *eigMap3d, Mat *varMap, Mat * stblizedVarMap, vector<int> test_ids);
+    void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d, Mat *data_stbized, Mat *idMap, Mat *eigMap2d,
+                                   Mat *eigMap3d, Mat *varMap, Mat *stblizedVarMap, singleCellSeed &seed, segParameter p4segVol);
     void refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
 protected:
     string debug_folder;
@@ -117,7 +120,9 @@ protected:
     vector<Mat> principalCurv2d;
     vector<Mat> principalCurv3d;
     vector<Mat> varMaps;
+    vector<Mat> stblizedVarMaps;
     vector<vector<float>> varTrends;
+    vector<vector<float>> stblizedVarTrends;
     vector<float> variances;
     vector<size_t> number_cells;
     vector<vector<size_t>> voxIdxList; // cell voxIdx list
@@ -156,6 +161,9 @@ protected:
         p4odStats.minGapWithOtherCell_yxz[1] = 3;
         p4odStats.minGapWithOtherCell_yxz[2] = 1;
         p4odStats.connectInSeedRefine = 6;
+        p4odStats.gapTestMethod = GAP_LOCALORDERSTATS;
+        p4odStats.gapTestSkippedBandWidth = 2;
+        p4odStats.gapTestThreshold = 0.01;
     }
 };
 

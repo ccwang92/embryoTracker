@@ -571,7 +571,7 @@ template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int
 }
 
 
-template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, T threshold_in){
+template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     size_t fg_sz = 0;
     if (datatype == CV_8U){
@@ -644,4 +644,11 @@ template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float i
             }
         }
     }
+}
+
+template <typename T> void vec_unique(vector<T> & v){
+    sort(v.begin(), v.end());
+    typename vector<T>::iterator it;
+    it = unique(v.begin(), v.end());
+    v.resize(distance(v.begin(),it));
 }
