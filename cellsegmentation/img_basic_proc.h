@@ -2,6 +2,8 @@
 
 #include "img_basic_proc_declare.h"
 
+const int n8_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+const int n8_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
 // all the template functions
 
 //double normalCDF(double value) //standard
@@ -551,6 +553,16 @@ template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize si
     y = rmder/size[1];
     x = rmder-y*size[0];
 
+}
+
+template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, int *size){
+    idx = z*size[0]*size[1] + x*size[0] + y;
+}
+template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size){
+    z = idx / (size[0]*size[1]);
+    T rmder = idx % (size[0]*size[1]);
+    y = rmder/size[1];
+    x = rmder-y*size[0];
 }
 
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size){

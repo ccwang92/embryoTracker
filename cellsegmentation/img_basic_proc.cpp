@@ -1196,6 +1196,21 @@ bool findRelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst
     }
     return found;
 }
+bool isOnBoundary2d(Mat *fgMap, size_t idx){
+    int y,x,z;
+    vol_ind2sub(idx, y, x, z, fgMap->size);
+    return isOnBoundary2d(fgMap, y, x, z);
+}
+bool isOnBoundary2d(Mat *fgMap, int y, int x, int z){
+    int im_sz[] = {fgMap->size[0], fgMap->size[1]};
+    for(int i=0; i < 8; i++){
+        if(inField(y + n8_y[i], x + n8_x[i], im_sz)
+                && fgMap->at<unsigned char>(y + n8_y[i], x + n8_x[i], z) == 0){
+            return true;
+        }
+    }
+    return false;
+}
 bool inField( int r, int c, int z, int *sz )
 {
   if( r < 0 || r >= sz[0] ) return false;
@@ -1306,7 +1321,8 @@ void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t>
 //    return flow;
 //}
 /**
- * @brief regionGrow: grow the region using max-flow (combined idea of watershed and graph-cut)
+ * @brief regionGrow: grow the region using max-flow (combined idea of watershed and graph-cut), only voxels in fg will
+ * be considered for regionGrow.
  * @param label_map: cv_32s
  * @param numCC
  * @param outLabelMap
@@ -1385,6 +1401,30 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
 
 }
 
+void setValMat(Mat &vol3d, int datatype, vector<size_t> idx, float v){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+
+    if (datatype == CV_8U){
+        unsigned char v0 = (unsigned char)v;
+        FOREACH_i(idx){
+            vol3d.at<unsigned char>(i) = v0;
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i(idx){
+            vol3d.at<float>(i) = v;
+        }
+    }else if (datatype == CV_32S){
+        int v0 = (int)v;
+        FOREACH_i(idx){
+            vol3d.at<int>(i) = v0;
+        }
+    }
+}
+
+void setValMat(Mat &src, int datatype, Mat *mask, float v){
+    vector<size_t> idx = fgMapIdx(mask, CV_8U, 0);
+    setValMat(src, datatype, idx, v);
+}
 /**
  * @brief gapRefine: remove voxels that not directly between two regions (tail area of the gap)
  * @param label_map

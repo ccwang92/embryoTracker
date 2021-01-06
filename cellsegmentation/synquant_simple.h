@@ -40,13 +40,15 @@ public:
     float debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singleCellSeed *seed, odStatsParameter p4odStats);
     void refineCellTerritoryWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
     void refineCellsTerritoriesWithSeedRegions(singleCellSeed &seed, segParameter &p4segVol);
+    void cellShrinkTest(singleCellSeed &seed, segParameter &p4segVol);
     void fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol);
     void gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
     void gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
 //    template <typename T> T debiasedFgBgCompare(vector<T> const & fg, vector<T> const & bg, vector<T> const & neglectVals,
 //                                                unsigned debiasMethod);
+    void removeOtherSeedsInfgMap(singleCellSeed &seed, segParameter &p4segVol);
 public:
-    Mat *zMap, *idMap;
+    Mat *zMap, *idMap, fgMap, fgMapGapRemoved;
     int cell_num;
     vector<float> zscore_list;
     vector<float> valid_zscore;

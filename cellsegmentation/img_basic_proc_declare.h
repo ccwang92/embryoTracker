@@ -84,9 +84,15 @@ bool findRelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst
 void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t> &nei_idx, int sz[], int connect);
 void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
                 Mat *fgMap, int connect, int cost_design[], bool bg2sink = true);
-
+void setValMat(Mat &src, int datatype, vector<size_t> idx, float v);
+void setValMat(Mat &src, int datatype, Mat *mask, float v);
 void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius, vector<vector<size_t>> &gap_voxIdx, vector<bool> tested_flag);
 void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &neighbor_idx_list, int radius);
+
+bool inField( int r, int c, int z, int *sz );
+bool inField( int r, int c, int *sz );
+bool isOnBoundary2d(Mat *fgMap, size_t idx);
+bool isOnBoundary2d(Mat *fgMap, int r, int c, int z);
 // Function to find t-test of
 // two set of statistical data.
 
@@ -110,6 +116,8 @@ void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &nei
 
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, MatSize size);
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize size);
+template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, int *size);
+template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size);
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size);
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size);
 

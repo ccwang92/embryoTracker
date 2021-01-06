@@ -30,6 +30,7 @@ struct segParameter {
         int connect4fgGapRemoval;
         int shift_yxz[3];
         bool shrink_flag;
+        int shrink_scale_yxz[3];
         int fgBoundaryHandle;// leaveAloneFirst, compete or repeat:
 //            if the fg is touching the boundary of the intial foreground, we can choose to
 //            (1) leaveAloneFirst: if after gap testing, the region is still large, we
@@ -59,6 +60,7 @@ struct segParameter {
 //            q.sqrtDistance = false; % euclidian distance or squared euclidian distance
 //        end
         int gapTestMinMaxRadius[2];
+        bool growSeedInTracking;
     };
 };
 
@@ -85,15 +87,19 @@ struct singleCellSeed{
     Mat seedMap;
     Mat eigMap2d, eigMap3d;
     Mat score2d, score3d;
+    Mat scoreMap;
     Mat gap2dMap, gap3dMap;
     Mat varMap;
     Mat stblizedVarMap;
     Mat volUint8;
     Mat volStblizedFloat;
     Mat idMap; //idComp
-    Mat fgMapGapRemoved; //newIdComp
+    //Mat fgMapGapRemoved; //newIdComp
     Mat fgMap;
     Mat otherIdMap;
+    Mat outputIdMap;
+    int outCell_num;
+    int bestFgThreshold = -1;
 };
 
 class cellSegmentMain
@@ -106,17 +112,18 @@ public:
                                                Mat *eigMap3d, Mat *varMap, Mat * stblizedVarMap, vector<int> test_ids);
     void cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d, Mat *data_stbized, Mat *idMap, Mat *eigMap2d,
                                    Mat *eigMap3d, Mat *varMap, Mat *stblizedVarMap, singleCellSeed &seed, segParameter p4segVol);
-    void refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
+    int refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol);
 protected:
     string debug_folder;
     string default_name;
     int data_type;
     int * data_rows_cols_slices;
     long time_points = 0;
-    //float min_intensity = 0.0;
+    long curr_time_point;
     segParameter p4segVol;
     odStatsParameter p4odStats;
     vector<Mat> cell_label_maps;
+    vector<Mat> threshold_maps;
     vector<Mat> principalCurv2d;
     vector<Mat> principalCurv3d;
     vector<Mat> varMaps;
@@ -148,9 +155,13 @@ protected:
         p4segVol.shift_yxz[1] = 20;
         p4segVol.shift_yxz[2] = 4;
         p4segVol.shrink_flag = true;
+        p4segVol.shrink_scale_yxz[0] = 4;
+        p4segVol.shrink_scale_yxz[1] = 4;
+        p4segVol.shrink_scale_yxz[2] = 4;
         p4segVol.fgBoundaryHandle = LEAVEALONEFIRST;
         p4segVol.gapTestMinMaxRadius[0] = 2;
         p4segVol.gapTestMinMaxRadius[1] = 4;
+        p4segVol.growSeedInTracking = false;
 
         p4odStats.gap4varTrendEst = 2;
         p4odStats.gap4fgbgCompare = 0;
@@ -164,6 +175,11 @@ protected:
         p4odStats.gapTestMethod = GAP_LOCALORDERSTATS;
         p4odStats.gapTestSkippedBandWidth = 2;
         p4odStats.gapTestThreshold = 0.01;
+    }
+    void reset_shift(){
+        p4segVol.shift_yxz[0] = 20;
+        p4segVol.shift_yxz[1] = 20;
+        p4segVol.shift_yxz[2] = 4;
     }
 };
 

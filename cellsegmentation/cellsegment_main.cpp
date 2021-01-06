@@ -4,6 +4,8 @@
 #include <string>
 
 #include "synquant_simple.h"
+
+enum boundary_touched { NO_TOUCH = 0, XY_TOUCH = 1, Z_TOUCH = 2, XYZ_TOUCH = 3};
 cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/)
 {
     init_parameter();
@@ -42,9 +44,11 @@ cellSegmentMain::cellSegmentMain(unsigned char *data_grayim4d, int _data_type, l
     normalize(*data4d, *data4d, 0, 255, NORM_MINMAX, CV_8U);
 
     for (int i = 0; i < time_points; i++){
+        curr_time_point = i;
         unsigned char *ind = (unsigned char*)data4d->data + sz_single_frame*i; // sub-matrix pointer
         Mat *single_frame = new Mat(3, data4d->size, CV_8U, ind);
-        cell_label_maps[i].create(3, data4d->size, CV_32S); // int label
+        cell_label_maps[i] = Mat::zeros(3, data4d->size, CV_32S); // int label
+        threshold_maps[i] = Mat::zeros(3, data4d->size, CV_8U);
         cellSegmentSingleFrame(single_frame , i);
     }
 }
@@ -85,6 +89,40 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
 
     // Finally, return
 }
+
+void boundaryTouchedTest(Mat *label_map, Mat *fgMap, bool &xy_touched, bool &z_touched){
+    int n_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+    int n_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+    //n_z = {  0,  0,  0,  0, 0, 0,  0, 0 };
+    int z_id, y, x;
+    size_t remain;
+    size_t page_sz = label_map->size[0] * label_map->size[1];
+    FOREACH_i_ptrMAT(label_map){
+        if(label_map->at<int>(i) > 0){
+            z_id = i / page_sz;
+            if(z_id == 0 || z_id == (label_map->size[2]-1)){
+                z_touched = true;
+                break;
+            }
+        }
+    }
+    int im_sz[] = {label_map->size[0], label_map->size[1]};
+    FOREACH_i_ptrMAT(label_map){
+        if(label_map->at<int>(i) > 0){
+            z_id = i / page_sz;
+            remain = i - z_id * page_sz;
+            x = remain / label_map->size[0];
+            y = remain - x * label_map->size[0];
+            for(int i=0; i < 8; i++){
+                if(inField(y + n_y[i], x + n_x[i], im_sz)
+                        && fgMap->at<unsigned char>(y + n_y[i], x + n_x[i], z_id) == 0){
+                    xy_touched = true;
+                    return;
+                }
+            }
+        }
+    }
+}
 /**
  * @brief cellSegmentMain::regionWiseAnalysis4d, refine the region based on the results from synQuant
  * @param idMap
@@ -108,14 +146,53 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 //    FOREACH_i_ptrMAT(dataVolFloat){
 //        volStblizedFloat.at<float>(i) = sqrt(dataVolFloat->at<float>(i) + stb_term);
 //    }
+    int cell_cnt = 0;
     FOREACH_i(seed_intensity_order){
         int seed_id = seed_intensity_order[i];
         singleCellSeed seed;
         cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap, eigMap2d,
                         eigMap3d, varMap, stblizedVarMap, seed, p4segVol);
-        refineSeed2Region(seed, p4odStats, p4segVol);
+        int touchBnd = refineSeed2Region(seed, p4odStats, p4segVol);
+        if(touchBnd != NO_TOUCH){ // region too small
+            if(touchBnd == XY_TOUCH || touchBnd == XYZ_TOUCH){
+                p4segVol.shift_yxz[0] *=2;
+                p4segVol.shift_yxz[1] *=2;
+            }
+            if(touchBnd == Z_TOUCH || touchBnd == XYZ_TOUCH){
+                p4segVol.shift_yxz[2] *=2;
+            }
+            Range new_range[3];
+            getRange(seed.y, p4segVol.shift_yxz[0], idMap->size[0], new_range[0]);
+            getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], new_range[1]);
+            getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], new_range[2]);
+            if(new_range[0].size() > seed.fgMap.size[0] ||
+                    new_range[1].size() > seed.fgMap.size[1] ||
+                    new_range[2].size() > seed.fgMap.size[2]){
 
+                cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap, eigMap2d,
+                                eigMap3d, varMap, stblizedVarMap, seed, p4segVol);
+                refineSeed2Region(seed, p4odStats, p4segVol);
+            }
+            reset_shift();
+        }
+        // assign cells to outmap
+        Mat cropLabelMap = cell_label_maps[curr_time_point](seed.crop_range_yxz);
+        FOREACH_i_MAT(seed.outputIdMap){
+            if(seed.outputIdMap.at<int>(i) > 0){
+                assert(cropLabelMap.at<int>(i)==0);
+                cropLabelMap.at<int>(i) = cell_cnt + seed.outputIdMap.at<int>(i);
+            }
+        }
+        cell_cnt += seed.outCell_num;
+        Mat cropThresholdMap = threshold_maps[curr_time_point](seed.crop_range_yxz);
+
+        FOREACH_i_MAT(seed.outputIdMap){
+            if(seed.outputIdMap.at<int>(i) > 0){
+                cropThresholdMap.at<int>(i) = seed.bestFgThreshold;
+            }
+        }
     }
+    number_cells[curr_time_point] = cell_cnt;
 }
 
 void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d, Mat *data_stbized, Mat *idMap, Mat *eigMap2d,
@@ -142,7 +219,7 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     seed.volStblizedFloat = (*data_stbized)(seed.crop_range_yxz); // all shallow copy
     seed.idMap = (*idMap)(seed.crop_range_yxz); // all shallow copy
 
-
+    seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S);
 
     vec_sub2ind(seed.idx_yxz_cropped, vec_Minus(seed.y, seed.crop_range_yxz[0].start),
             vec_Minus(seed.x, seed.crop_range_yxz[1].start),
@@ -158,8 +235,25 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     volumeDilate(&regMap/*cv_8u*/, seed.fgMap, p4segVol.shift_yxz, MORPH_ELLIPSE);
 }
 
-void cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol){
-
-    // 1st: foreground Detection reusing synQuant
+int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol){
+    bool bnd_check = false;
+    if (seed.bestFgThreshold < 0) bnd_check = true; // this is the first time we did seed refine
+    // foreground Detection reusing synQuant
     synQuantSimple synQuant_refine_seed(seed, p4segVol, p4odStats);
+
+    if(bnd_check){
+        // if the fg from refinement touching the fg or not, if so, enlarge the fg
+        bool xy_touched = false, z_touched = false;
+        boundaryTouchedTest(synQuant_refine_seed.idMap, &seed.fgMap, xy_touched, z_touched);
+        if(z_touched && xy_touched){
+            return XYZ_TOUCH;
+        }else if(z_touched){
+            return Z_TOUCH;
+        }else if(xy_touched){
+            return XY_TOUCH;
+        }else
+            return NO_TOUCH;
+    }else{
+        return NO_TOUCH;
+    }
 }
