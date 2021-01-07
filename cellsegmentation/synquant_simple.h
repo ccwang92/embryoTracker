@@ -2,7 +2,7 @@
 #define SYNQUANTSIMPLE_H
 
 #include "cellsegment_main.h"
-//#include "img_basic_proc_declare.h"
+//#include "img_basic_proc.h"
 #include <algorithm>
 #include <set>
 

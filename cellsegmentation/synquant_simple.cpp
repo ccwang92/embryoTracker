@@ -1,5 +1,5 @@
 #include "synquant_simple.h"
-#include "img_basic_proc.h"
+
 //public:
 //    Mat zMap, idMap;
 //    vector<float> zscore_list;
@@ -138,7 +138,7 @@ void synQuantSimple::cellShrinkTest(singleCellSeed &seed, segParameter &p4segVol
             bool link_bg2sink = false;
             regionGrow(&label_shrinked_cell, n, grown_shrinked_cells, &seed.scoreMap, &cur_cell,
                        p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
-            setValMat(*idMap, CV_32S, cur_cell, 0);
+            setValMat(*idMap, CV_32S, &cur_cell, 0.0);
             Mat sub_cell_mask = grown_shrinked_cells == 1;
             setValMat(*idMap, CV_32S, &sub_cell_mask, (float)i);
             for(int j=2; j<=n; j++){
@@ -149,7 +149,6 @@ void synQuantSimple::cellShrinkTest(singleCellSeed &seed, segParameter &p4segVol
         }
     }
     cell_num += extra_cell;
-
 }
 
 /**
@@ -298,8 +297,8 @@ void synQuantSimple::gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n
                     orderStatsKSection(r0, gap, skipped, mu, sigma);
                     mu *= cur_std;
                     sigma *= cur_std;
-                    p0 = zscore2palue((sum_stats0 - mu) / sigma);
-                    p1 = zscore2palue((sum_stats1 - mu) / sigma);
+                    p0 = zscore2pvalue((sum_stats0 - mu) / sigma);
+                    p1 = zscore2pvalue((sum_stats1 - mu) / sigma);
                 }else if(p4odStats.gapTestMethod == GAP_ORDERSTATS){
                     float sum_stats0 = vec_mean(r0) - vec_mean(gap);
                     float sum_stats1 = vec_mean(r1) - vec_mean(gap);
@@ -307,12 +306,12 @@ void synQuantSimple::gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n
                     orderStatsKSection(r0, gap, skipped, mu, sigma);
                     mu *= cur_std;
                     sigma *= cur_std;
-                    p0 = zscore2palue((sum_stats0 - mu) / sigma);
+                    p0 = zscore2pvalue((sum_stats0 - mu) / sigma);
 
                     orderStatsKSection(r1, gap, skipped, mu, sigma);
                     mu *= cur_std;
                     sigma *= cur_std;
-                    p1 = zscore2palue((sum_stats1 - mu) / sigma);
+                    p1 = zscore2pvalue((sum_stats1 - mu) / sigma);
                 }
 
                 if (p0 <= p_treshold && p1 <= p_treshold){ // gap is true

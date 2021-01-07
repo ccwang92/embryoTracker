@@ -65,10 +65,8 @@ void MainWindow::createControlWidgets()
     processMenu->addAction(segmentCell3d);
     processMenu->addAction(trackCell3d);
     /** *************** Debug algorithms *****************/
-    if (algorithmDebug){
-        debugButton = new QAction(tr("Debug"), this);
-        menuBar->addAction(debugButton);
-    }
+    debugButton = new QAction(tr("Debug"), this);
+    menuBar->addAction(debugButton);
     /** *************** About *************************/
     QMenu * aboutMenu = new QMenu(tr("About"), this);
     menuBar->addMenu(aboutMenu);
@@ -222,10 +220,10 @@ MainWindow::~MainWindow()
 }
 void MainWindow::debugAlgorithm()
 {
-    if (algorithmDebug){
-        this->importImageSeries();
-        this->sendData4Segment();
-    }
+    algorithmDebug = true;
+    this->data4test->debugMode = true;
+    this->importImageSeries();
+    this->sendData4Segment();
 }
 void MainWindow::sendData4Segment()
 {
@@ -233,7 +231,7 @@ void MainWindow::sendData4Segment()
         QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
         return;
     }
-    cellSegmenter = new cellSegmentMain(data4test->image4d->getRawData(),
+    cellSegmenter = new cellSegmentMain((void *)data4test->image4d->getRawData(),
                                         data4test->image4d->getDatatype(),
                                         glWidget_raycast->bufSize);
 }

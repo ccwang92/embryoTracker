@@ -150,7 +150,9 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[])
         kernDimension = 2*ceil(2*sigma[2])+1;
         Mat kernel_z = getGaussianKernel(kernDimension, sigma[2], CV_32F);
         // Filter Z dimension
-        filterZdirection(&data4smooth, data4smooth, kernel_z);
+        Mat copyMat;
+        data4smooth.copyTo(copyMat);
+        filterZdirection(&copyMat, data4smooth, kernel_z);
 //        float* kernGauss = (float *)kernel_z.data;
 //        unsigned kernSize = kernel_z.total();
 //        int kernMargin = (kernSize - 1)/2;
@@ -228,6 +230,7 @@ void filterVolume(const Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction){
  */
 void filterZdirection(const Mat* src3d, Mat &dst3d, Mat kernel_z){
     assert(src3d->dims == 3);
+    dst3d.create(src3d->dims, src3d->size, CV_32F);
     int x_size  = src3d->size[0];
     int y_size  = src3d->size[1];
     int z_size  = src3d->size[2];
@@ -320,8 +323,9 @@ float varByTruncate(vector<float> vals4var, int numSigma, int numIter){
  * @param validRatio: consider the validRatio pixels in the data (remove pixels with saturated intensity)
  * @param gap
  */
-float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio = 0.95, int gap=2){
-    Mat meanVal(src3d->dims, src3d->size, CV_32F, Scalar(0));
+float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio, int gap){
+    Mat meanVal; //(src3d->dims, src3d->size, CV_32F, Scalar(0));
+    src3d->copyTo(meanVal);
     Mat kernelx, kernely, kernelz;
     float denominator = 0;
     if(gap == 0){
@@ -340,21 +344,31 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
         denominator = 24;
         //kernelz = (Mat_<float>(1,7)<<1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
     }
-    sepFilter2D(*src3d, meanVal, CV_32F, kernelx, kernely, Point(-1,-1), 0.0, BORDER_REPLICATE);
+    int x_size  = src3d->size[0];
+    int y_size  = src3d->size[1];
+    int z_size  = src3d->size[2];
+    size_t xy_size = x_size*y_size;
+    // Filter XY dimensions for every Z
+    for (int z = 0; z < z_size; z++)
+    {
+        float *ind = (float*)meanVal.data + z * xy_size; // sub-matrix pointer
+        Mat subMatrix(2, meanVal.size, CV_32F, ind);
+        sepFilter2D(subMatrix, subMatrix, CV_32F, kernely, kernelx, Point(-1,-1), 0.0, BORDER_REPLICATE);
+    }
+    //sepFilter2D(*src3d, meanVal, CV_32F, kernelx, kernely, Point(-1,-1), 0.0, BORDER_REPLICATE);
+    double min_intensity, max_intensity;
+//    minMaxIdx(meanVal, &min_intensity, &max_intensity);
     meanVal /= denominator;
     Mat diff = *src3d - meanVal;
     int levels = 200;
-    double min_intensity, max_intensity;
+
     minMaxIdx(meanVal, &min_intensity, &max_intensity);
 
     double unit_intensity = (max_intensity - min_intensity) / (levels-1);
     varTrend.resize(levels);
     //for (int i = 0; i < levels; i++) xx[0] = 0;
     fill(varTrend.begin(), varTrend.end(), 0);
-    int x_size  = src3d->size[0];
-    int y_size  = src3d->size[1];
-    int z_size  = src3d->size[2];
-    size_t xy_size = x_size*y_size;
+
 
     vector<vector<long>> numElements (levels);
     long testedElements = 0, validElements = 0;
@@ -401,18 +415,25 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
                 //if we only want to use a fixed point to reprsent all the variance
                 target_level = cur_level;
         }
+        cur_level++;
     }
-    if (max_intensity>20){
+    if (max_intensity<20){
         for (int i=0;i<3;i++) varTrend[i] = 0;
     }
     else{
         for (int i=0;i<15;i++) varTrend[i] = 0;
     }
+    if (varMap.empty()){
+        varMap = Mat::zeros(meanVal.dims, meanVal.size, CV_32F);
+    }
+    float min_valid_intensity = min_intensity+unit_intensity;
     for(size_t i = 0; i < xy_size*z_size; i++){
-        cur_level = (int) ((meanVal.at<float>(i) - min_intensity)/unit_intensity);
-        if (cur_level >= levels) cur_level = levels - 1;
-        if (cur_level < 0) cur_level = 0;
-        varMap.at<float>(i) = varTrend[cur_level];
+        if (meanVal.at<float>(i) > min_valid_intensity){
+            cur_level = (int) ((meanVal.at<float>(i) - min_intensity)/unit_intensity);
+            if (cur_level >= levels) cur_level = levels - 1;
+            if (cur_level < 0) cur_level = 0;
+            varMap.at<float>(i) = varTrend[cur_level];
+        }
     }
 
     //varTrend = *xx;
@@ -1341,23 +1362,23 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
     int mat_sz[] = {label_map->size[0], label_map->size[1], label_map->size[2]};
     vector<size_t> valid_fg_idx = fgMapIdx(fgMap, CV_8U, 0);
     neighbor_idx(valid_fg_idx, arc_head_in_fg, arc_tail, mat_sz, connect);
-    vector<float> arc_capacity (arc_head_in_fg.size());
+    vector<int> arc_capacity (arc_head_in_fg.size()); //BK algorithm accept only integer capacity
     float p1, p2;
     FOREACH_i(arc_head_in_fg){
         p1 = scoreMap->at<float>(arc_head_in_fg[i]);
         p2 = scoreMap->at<float>(arc_tail[i]);
         if (cost_design[0]==ARITHMETIC_AVERAGE){
-            arc_capacity[i] = pow((2/(p1+p2)), cost_design[1]);
+            arc_capacity[i] = (int)(pow((2/(p1+p2)), cost_design[1]) * 10000);// we keep 1/1000 accuracy
         }else if (cost_design[0]==GEOMETRIC_AVERAGE){
             if (p2==0) p2 = p1; // there should be no non-negative score, so this line should never be used
-            arc_capacity[i] = pow((1/sqrt(p1*p2)), cost_design[1]);
+            arc_capacity[i] = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 10000); // we keep 1/1000 accuracy
         }
     }
     vector<vector<int>> label_voxIdx;
     extractVoxIdxList(label_map, label_voxIdx, numCC, false);
     vector<size_t> sink_ids (arc_tail.size()); //valid sink nodes will not be larger than tail size
     size_t sink_ids_cnt = 0;
-    typedef Graph<size_t,size_t,float> GraphType;
+    typedef Graph<int,int,int> GraphType;
     GraphType *g;
     for(int i = 1; i<numCC; i++){
         // build sink_ids
@@ -1379,7 +1400,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
         sink_ids.resize(sink_ids_cnt);
         assert (sink_ids_cnt > 0 && label_voxIdx[i-1].size() > 0);
         // max-flow the get the grown region
-        g = new GraphType(label_map->total(), arc_head_in_fg.size());
+        g = new GraphType(label_map->total(), (int)arc_head_in_fg.size());
         g -> add_node(label_map->total());
         FOREACH_j(label_voxIdx[i-1]){
             g -> add_tweights( label_voxIdx[i-1][j],  INFINITY, 0);
@@ -1674,4 +1695,32 @@ void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &nei
             }
         }
     }
+}
+
+
+
+
+/**************************Functions for debug*******************************/
+
+void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice){
+    int sz_single_frame = src3d->size[1] * src3d->size[0];
+    Mat *single_slice;
+    if(datatype == CV_8U){
+        unsigned char *ind = (unsigned char*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+        single_slice = new Mat(2, src3d->size, CV_8U, ind);
+    }else if(datatype == CV_16U){
+        unsigned short *ind = (unsigned short*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+        single_slice = new Mat(2, src3d->size, CV_16U, ind);
+    }else if(datatype == CV_32F){
+        float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+        single_slice = new Mat(2, src3d->size, CV_32F, ind);
+        normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX);
+    }else{
+        single_slice = nullptr;
+        qFatal("Unsupported data type!");
+    }
+    imshow("Slice:"+to_string(slice), *single_slice);
+    waitKey(0);
+    destroyWindow("Slice:"+to_string(slice));
+    //destroyAllWindows();
 }

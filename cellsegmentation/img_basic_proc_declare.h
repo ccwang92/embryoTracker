@@ -47,6 +47,9 @@ enum gapTestMethods {GAP_TTEST = 0, GAP_ORDERSTATS, GAP_LOCALORDERSTATS};
     for(int j=0; j<x.size[1]; j++) \
     for(int k=0; k<x.size[2]; k++)
 
+const int n8_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+const int n8_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+
 
 void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
@@ -55,7 +58,7 @@ void filterVolume(const Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction);
 void filterZdirection(const Mat* src3d, Mat &dst3d, Mat kernal_z);
 float truncatedGauss(float mu, float sigma, float lower, float upper, float &t_mu, float &t_sigma);
 float varByTruncate(vector<float> vals4var, int numSigma, int numIter);
-float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio, int gap);
+float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio = 0.95, int gap=2);
 int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect);
 int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect);
 int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap);
@@ -93,6 +96,8 @@ bool inField( int r, int c, int z, int *sz );
 bool inField( int r, int c, int *sz );
 bool isOnBoundary2d(Mat *fgMap, size_t idx);
 bool isOnBoundary2d(Mat *fgMap, int r, int c, int z);
+
+void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 1);
 // Function to find t-test of
 // two set of statistical data.
 
@@ -133,7 +138,7 @@ template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bo
 template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool strict = true);
 template <typename T> T normalCDF(T x, T m = 0, T s = 1);
 template <typename T> T normalPDF(T x, T m = 0, T s = 1);
-template <typename T> T zscore2palue(T z);
+template <typename T> T zscore2pvalue(T z);
 template <typename T> T pvalue2zscore(T p);
 template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
 template <typename T> T vec_stddev(vector<T> const & func);

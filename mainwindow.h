@@ -68,7 +68,7 @@ public:
     void createControlWidgets();
     void connectSignal();
 public:
-    bool algorithmDebug = true;
+    bool algorithmDebug = false;
     QString debugDataPath = QString("/home/ccw/Desktop/test_ims/16bit/embryo_TM481.tif");
     QAction * debugButton;
     cellSegmentMain *cellSegmenter;
