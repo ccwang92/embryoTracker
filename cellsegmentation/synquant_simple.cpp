@@ -26,9 +26,18 @@ synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4
     src_var = _src_var;
 
     componentTree3d(p4segVol, p4odStats);
-    float * zscore_pointer = & (*zscore_list.begin()); // a pointer to the address of zscore_list.begin()
-    zMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32F, zscore_pointer); //*zscore_list.begin()
-    cell_num = floatMap2idMap(zMap, *idMap, 26);
+    //float * zscore_pointer = & (*zscore_list.begin()); // a pointer to the address of zscore_list.begin()
+    zMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32F, Scalar(0)); //*zscore_list.begin()
+    FOREACH_i_ptrMAT(zMap){
+        if(outputArray[i] == OBJECT && zscore_list[i] > 1.96){
+            zMap->at<float>(i) = zscore_list[i];
+        }
+    }
+    ccShowSlice3Dmat(zMap, CV_32F, 3);
+    idMap = new Mat(zMap->dims, zMap->size, CV_32S, Scalar(0));
+    Mat b_map = *zMap > 0;
+    cell_num = connectedComponents3d(&b_map, *idMap, 26); //bug consist, to be checked
+    //cell_num = floatMap2idMap(zMap, *idMap, 26);
 }
 synQuantSimple::synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats){
     srcVolumeUint8 = &seed.volUint8;
@@ -167,11 +176,14 @@ void synQuantSimple::refineCellTerritoryWithSeedRegion(singleCellSeed &seed, seg
     // remove pixels that happen only at one slice
     Mat tmp_map;
     fgMap.copyTo(tmp_map);
+    size_t page_sz = fgMap.size[1] * fgMap.size[0];
+    int width = fgMap.size[1];
     FOREACH_ijk_ptrMAT(idMap){
-        if(tmp_map.at<unsigned char>(i,j,k) > 0){
-            if((k-1>=0 && tmp_map.at<unsigned char>(i,j,k-1) == 0) &&
-                (k+1<tmp_map.size[2] && tmp_map.at<unsigned char>(i,j,k+1) == 0)){
-                fgMap.at<unsigned char>(i,j,k) = 0;
+        size_t idx = vol_sub2ind(i,j,k, width, page_sz);
+        if(tmp_map.at<unsigned char>(idx) > 0){
+            if((k-1>=0 && tmp_map.at<unsigned char>(idx - page_sz) == 0) &&
+                (k+1<tmp_map.size[2] && tmp_map.at<unsigned char>(idx + page_sz) == 0)){
+                fgMap.at<unsigned char>(idx) = 0;
             }
         }
     }
@@ -312,6 +324,10 @@ void synQuantSimple::gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n
                     mu *= cur_std;
                     sigma *= cur_std;
                     p1 = zscore2pvalue((sum_stats1 - mu) / sigma);
+                }else{
+                    qFatal("non-defined method!");
+                    p0 = 0;
+                    p1 = 0;
                 }
 
                 if (p0 <= p_treshold && p1 <= p_treshold){ // gap is true
@@ -439,7 +455,7 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
     //    }
     //Create nodes
     long x,y,z, rmder, x0,x2,y0,y2,z0, z2;
-    size_t i,j,k;
+    long i,j,k;
     //outputArray = new byte[nVoxels];
     diffN.resize(nVoxels);
     fill(diffN.begin(), diffN.end(), 0);
@@ -481,7 +497,7 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
     int maxP = 255; //default for 8-bit image
     int minP = 0;
     size_t nLevels = maxP-minP + 1;
-    size_t counts[nLevels];
+    vector<long> counts(nLevels, 0);
     // for each value in the unsorted array, increment the
     // count in the corresponding element of the count array
     for (i=0; i<nVoxels; i++)
@@ -509,9 +525,9 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
         parNode[i]=i;
     }
     //Search in decreasing order
-    size_t curNode;
-    size_t adjNode;
-    size_t ii,jj, kk, tmpIdx;
+    long curNode;
+    long adjNode;
+    long ii,jj, kk, tmpIdx;
     bool found;
     for (i = nVoxels-1; i >= 0; i--)
     {
@@ -744,7 +760,7 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
 /*Label object or not: here we simply  test the size  to decide object or not*/
 void synQuantSimple::objLabel(size_t minSize ,size_t maxSize)
 {
-    size_t i,j;
+    long i,j;
     size_t nVoxels = sortedIndex.size();
     for (i = nVoxels-1; i >= 0; i--)
     {
@@ -792,20 +808,20 @@ size_t synQuantSimple::mergeNodes(size_t e1,size_t e2)/*e1 adjacent node, e2 cur
             System.out.print("neighbor: "+voxSumN[res]+" "+areasN[res]+" self: "+voxSum[res]+" "+areas[res]+" "+"\n");
         }*/
     //Compute new neighbours
-    size_t z = e2 / (width*height);
-    size_t rmder = e2 % (width*height);
-    size_t y=rmder/width;
-    size_t x=rmder-y*width;
+    long z = e2 / (width*height);
+    long rmder = e2 % (width*height);
+    long y=rmder/width;
+    long x=rmder-y*width;
 
-    size_t y0=max(y-1,(size_t)0);
-    size_t y2=min(y+1, height-1);
-    size_t x0=max(x-1,(size_t)0);
-    size_t x2=min(x+1,width-1);
-    size_t z0=max(z-1,(size_t)0);
-    size_t z2=min(z+1,zSlice-1);
+    long y0=MAX(y-1,0);
+    long y2=MIN(y+1, height-1);
+    long x0=MAX(x-1,0);
+    long x2=MIN(x+1,width-1);
+    long z0=MAX(z-1,0);
+    long z2=MIN(z+1,zSlice-1);
     // for neighboring pixels' value we consider 26 neighbors
     //System.out.print("Before Merging"+voxSumN[res]+" "+areasN[res]+" "+"\n");
-    size_t ii, jj, kk, tmpIdx;
+    long ii, jj, kk, tmpIdx;
     for (ii=z2;ii>=z0;ii--) {
         for (jj=y2;jj>=y0;jj--) {
             for(kk=x2;kk>=x0;kk--) {
@@ -1035,7 +1051,7 @@ void synQuantSimple::processVoxLabel(size_t j){
     }
 }
 void synQuantSimple::objLabel_descending() {
-    size_t j;
+    long j;
     // sort all pixels with their zscore values with descending order
     vector<size_t> zScoreSortedIdx = sort_indexes(valid_zscore, false, 0); //false:descend, 0:start from 0
     // process the voxel with valid zscore first

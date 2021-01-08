@@ -18,6 +18,7 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
+#include <iomanip>      // std::setprecision
 
 #include "maxflow_bk/graph.h" //max-flow BK algorithm
 
@@ -47,30 +48,31 @@ enum gapTestMethods {GAP_TTEST = 0, GAP_ORDERSTATS, GAP_LOCALORDERSTATS};
     for(int j=0; j<x.size[1]; j++) \
     for(int k=0; k<x.size[2]; k++)
 
+#define EPSILON_0 0.00001
 const int n8_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
 const int n8_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
 
 
-void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
-void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
+void principalCv2d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
+void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[]);
-void filterVolume(const Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction);
-void filterZdirection(const Mat* src3d, Mat &dst3d, Mat kernal_z);
+void filterVolume(Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction);
+void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernal_z);
 float truncatedGauss(float mu, float sigma, float lower, float upper, float &t_mu, float &t_sigma);
 float varByTruncate(vector<float> vals4var, int numSigma, int numIter);
-float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio = 0.95, int gap=2);
-int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect);
+float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio = 0.95, int gap=2);
+int connectedComponents3d(Mat* src3d, Mat &dst3d, int connect);
 int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect);
 int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap);
 void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range);
 void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities);
 
-void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract = false);
-void extractVoxIdxList(const Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract = false);
-void extractVolume(const Mat *label3d, vector<size_t> &voxSzList, int numCC);
+void extractVoxIdxList(Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract = false);
+void extractVoxIdxList(Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract = false);
+void extractVolume(Mat *label3d, vector<size_t> &voxSzList, int numCC);
 bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel);
-void volumeDilate(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
-void volumeErode(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
+void volumeDilate(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
+void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
 
 void volumeWrite(Mat *src3d, string filename);
 
@@ -97,7 +99,10 @@ bool inField( int r, int c, int *sz );
 bool isOnBoundary2d(Mat *fgMap, size_t idx);
 bool isOnBoundary2d(Mat *fgMap, int r, int c, int z);
 
-void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 1);
+void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
+void ccShowSliceLabelMat(Mat *src3d, int slice = 0 /*default 2d*/);
+void label2rgb3d(Mat &src, Mat &dst);
+void label2rgb2d(Mat1i &src, Mat3b &dst);
 // Function to find t-test of
 // two set of statistical data.
 
@@ -122,6 +127,7 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 1);
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, MatSize size);
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize size);
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, int *size);
+template <typename T> T vol_sub2ind(int y, int x, int z, int col_num, T page_sz);
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size);
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size);
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size);

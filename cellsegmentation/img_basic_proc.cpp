@@ -7,10 +7,10 @@
  * @param src3d: float mat
  * @param dst3d: float mat
  */
-void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
+void principalCv2d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
     src3d->copyTo(dst3d);
     gaussianSmooth3Ddata(dst3d, sigma);
-
+    //ccShowSlice3Dmat(&dst3d, CV_32F);
     int x_size  = dst3d.size[0];
     int y_size  = dst3d.size[1];
     int z_size  = dst3d.size[2];
@@ -23,22 +23,40 @@ void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity
     int mat_sizes[] = {2,2};
     Mat mat2x2(2, mat_sizes, CV_32F, Scalar(0));
     Mat eigen_values;
+    //float min_intensity = (float) minIntensity;
     for (int z = 0; z < z_size; z++)
     {
         float *ind = (float*)dst3d.data + z * xy_size; // sub-matrix pointer
         Mat subMatrix(2, dst3d.size, CV_32F, ind);
-        Mat lx, ly, lxx, lxy, lyy;
+        Mat lx, ly, lxx, lxy, lyy;//lyx,
 
+        //ccShowSlice3Dmat(&subMatrix, CV_32F);
+//        subMatrix.copyTo(lx);
+//        ccShowSlice3Dmat(&lx, CV_32F);
         filter2D(subMatrix, lx, -1, kernelx);
         filter2D(subMatrix, ly, -1, kernely);
         filter2D(lx, lxy, -1, kernely);
         filter2D(lx, lxx, -1, kernelx);
         //filter2D(ly, lyx, -1, kernelx); // the same as lxy
-        filter2D(ly, lyy, -1, kernelx);
+        filter2D(ly, lyy, -1, kernely);
+//        ccShowSlice3Dmat(&lxy, CV_32F);
+//        ccShowSlice3Dmat(&lxx, CV_32F);
+//        ccShowSlice3Dmat(&lyy, CV_32F);
+//        Mat tmp = subMatrix > 0;
+//        ccShowSlice3Dmat(&tmp, CV_8U);
+
+//        float *ind2 = (float*)src3d->data + z * xy_size; // sub-matrix pointer
+//        Mat subMatrix2(2, dst3d.size, CV_32F, ind2);
+//        for (int c = 0; c < y_size; c ++){
+//                qInfo("%f", src3d->at<float>(c, 484, y_size));
+//        }
+//        ccShowSlice3Dmat(&subMatrix2, CV_32F);
         for (int r = 0; r < x_size; r ++){
+            size_t increment = r*y_size;
             for (int c = 0; c < y_size; c ++){
-                if (src3d->at<float>(r,c,z) <= minIntensity){
-                    dst3d.at<float>(r,c,z) = 0;
+                size_t idx = z*xy_size + c + increment;
+                if (src3d->at<float>(idx) <= minIntensity){
+                    subMatrix.at<float>(r,c) = 0;
                     continue;
                 }
                 mat2x2.at<float>(0,0) = lxx.at<float>(r,c);
@@ -46,10 +64,20 @@ void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity
                 mat2x2.at<float>(1,0) = lxy.at<float>(r,c);
                 mat2x2.at<float>(1,1) = lyy.at<float>(r,c);
                 eigen(mat2x2, eigen_values);
-                dst3d.at<float>(r,c,z) = eigen_values.at<float>(0); // the largest eigen value
+                //float eig_max = MAX(eigen_values.at<float>(0), eigen_values.at<float>(1));
+                //subMatrix.at<float>(r,c) = eigen_values.at<float>(0); // the largest eigen value
+                dst3d.at<float>(idx) = eigen_values.at<float>(0);
+//                if (eig_max > EPSILON_0){
+//                    if (new_r){
+//                        new_r = false;
+//                        qInfo("%d, %d %.4f\n", r, c, eig_max);
+//                    }
+//                    subMatrix.at<float>(r,c) = eig_max; // the largest eigen value
+//                }
             }
         }
-        //sepFilter2D(subMatrix, subMatrix, CV_32F, kernel_row.t(), kernel_col, Point(-1,-1), 0.0, BORDER_REPLICATE);
+
+        //ccShowSlice3Dmat(&dst3d, CV_32F);
     }
 }
 /**
@@ -59,7 +87,7 @@ void principalCv2d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity
  * @param sigma
  * @param minIntensity
  */
-void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
+void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
     src3d->copyTo(dst3d);
     gaussianSmooth3Ddata(dst3d, sigma);
 
@@ -76,8 +104,10 @@ void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity
     Dz.create(dst3d.dims, dst3d.size, CV_32F);
     Dzz.create(dst3d.dims, dst3d.size, CV_32F);
     filterZdirection(&dst3d, Dz, kernelz);
+    //ccShowSlice3Dmat(&Dz, CV_32F, 5);
     filterZdirection(&Dz, Dzz, kernelz);
-    int mat_sizes[] = {2,2};
+    //ccShowSlice3Dmat(&Dzz, CV_32F, 5);
+    int mat_sizes[] = {3,3};
     Mat mat3x3(2, mat_sizes, CV_32F, Scalar(0));
     Mat eigen_values;
     for (int z = 0; z < z_size; z++)
@@ -94,11 +124,14 @@ void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity
         Mat lz(2, dst3d.size, CV_32F, (float*)Dz.data + z * xy_size);
         filter2D(lz, lzx, -1, kernelx);
         filter2D(lz, lzy, -1, kernely);
+        //ccShowSlice3Dmat(&Dzz, CV_32F, 5);
         Mat lzz(2, dst3d.size, CV_32F, (float*)Dzz.data + z * xy_size);
         for (int r = 0; r < x_size; r ++){
+            size_t increment = r * y_size;
             for (int c = 0; c < y_size; c ++){
-                if (src3d->at<float>(r,c,z) <= minIntensity){
-                    dst3d.at<float>(r,c,z) = 0;
+                size_t idx = z*xy_size + c + increment;
+                if (src3d->at<float>(idx) <= minIntensity){
+                    dst3d.at<float>(idx) = 0;
                     continue;
                 }
                 mat3x3.at<float>(0,0) = lxx.at<float>(r,c);
@@ -116,7 +149,7 @@ void principalCv3d(const Mat* src3d, Mat &dst3d, float sigma[], int minIntensity
 
 
                 eigen(mat3x3, eigen_values);
-                dst3d.at<float>(r,c,z) = eigen_values.at<float>(0); // the largest eigen value
+                dst3d.at<float>(idx) = eigen_values.at<float>(0); // the largest eigen value
             }
         }
         //sepFilter2D(subMatrix, subMatrix, CV_32F, kernel_row.t(), kernel_col, Point(-1,-1), 0.0, BORDER_REPLICATE);
@@ -135,9 +168,9 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[])
     int z_size  = data4smooth.size[2];
     size_t xy_size = x_size*y_size;
 
-    int kernDimension = 2*ceil(2*sigma[0])+1;
+    int kernDimension = ceil(2*sigma[0])+1;
     Mat kernel_row = getGaussianKernel(kernDimension, sigma[0], CV_32F);
-    kernDimension = 2*ceil(2*sigma[1])+1;
+    kernDimension = ceil(2*sigma[1])+1;
     Mat kernel_col = getGaussianKernel(kernDimension, sigma[1], CV_32F);
     // Filter XY dimensions for every Z
     for (int z = 0; z < z_size; z++)
@@ -147,7 +180,7 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[])
         sepFilter2D(subMatrix, subMatrix, CV_32F, kernel_row.t(), kernel_col, Point(-1,-1), 0.0, BORDER_REPLICATE);
     }
     if (sigma[2] > 0){
-        kernDimension = 2*ceil(2*sigma[2])+1;
+        kernDimension = ceil(2*sigma[2])+1;
         Mat kernel_z = getGaussianKernel(kernDimension, sigma[2], CV_32F);
         // Filter Z dimension
         Mat copyMat;
@@ -190,7 +223,7 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[])
 //        delete [] lineBuffer;
     }
 }
-void filterVolume(const Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction){
+void filterVolume(Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction){
     if (dst3d.empty()){
         dst3d.create(src3d->dims, src3d->size, CV_32F);
         src3d->copyTo(dst3d);
@@ -228,9 +261,9 @@ void filterVolume(const Mat* src3d, Mat &dst3d, Mat kernel, unsigned direction){
  * @param dst3d : float
  * @param kernel_z : float (border is replicated)
  */
-void filterZdirection(const Mat* src3d, Mat &dst3d, Mat kernel_z){
+void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernel_z){
     assert(src3d->dims == 3);
-    dst3d.create(src3d->dims, src3d->size, CV_32F);
+    if (dst3d.empty()) dst3d.create(src3d->dims, src3d->size, CV_32F);
     int x_size  = src3d->size[0];
     int y_size  = src3d->size[1];
     int z_size  = src3d->size[2];
@@ -314,7 +347,7 @@ float varByTruncate(vector<float> vals4var, int numSigma, int numIter){
         sigma = sigmaTr/sqrt(varCorrectionTerm);
         mu = vec_mean(tmpVals);
     }
-    return sigma;
+    return sigma*sigma;
 }
 
 /**
@@ -323,10 +356,10 @@ float varByTruncate(vector<float> vals4var, int numSigma, int numIter){
  * @param validRatio: consider the validRatio pixels in the data (remove pixels with saturated intensity)
  * @param gap
  */
-float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio, int gap){
+float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend, float validRatio, int gap){
     Mat meanVal; //(src3d->dims, src3d->size, CV_32F, Scalar(0));
     src3d->copyTo(meanVal);
-    Mat kernelx, kernely, kernelz;
+    Mat kernelx, kernely, kernelz, kernel;
     float denominator = 0;
     if(gap == 0){
         kernelx = (Mat_<float>(1,3)<<1.0, 1.0, 1.0);
@@ -341,7 +374,14 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
     }else if(gap == 2){
         kernelx = (Mat_<float>(1,7)<<1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
         kernely = (Mat_<float>(7,1)<<1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
-        denominator = 24;
+        kernel = Mat::zeros(7,7,CV_32F);
+        kernel.at<float>(3) = 1;
+        kernel.at<float>(8) = 1; kernel.at<float>(9) = 1; kernel.at<float>(11) = 1; kernel.at<float>(12) = 1;
+        kernel.at<float>(15) = 1; kernel.at<float>(19) = 1; kernel.at<float>(21) = 1; kernel.at<float>(27) = 1;
+        kernel.at<float>(29) = 1; kernel.at<float>(33) = 1; kernel.at<float>(36) = 1; kernel.at<float>(37) = 1;
+        kernel.at<float>(39) = 1; kernel.at<float>(40) = 1; kernel.at<float>(45) = 1;
+        denominator = 16;
+        kernel /= denominator;
         //kernelz = (Mat_<float>(1,7)<<1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
     }
     int x_size  = src3d->size[0];
@@ -353,12 +393,13 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
     {
         float *ind = (float*)meanVal.data + z * xy_size; // sub-matrix pointer
         Mat subMatrix(2, meanVal.size, CV_32F, ind);
-        sepFilter2D(subMatrix, subMatrix, CV_32F, kernely, kernelx, Point(-1,-1), 0.0, BORDER_REPLICATE);
+        //sepFilter2D(subMatrix, subMatrix, CV_32F, kernely, kernelx, Point(-1,-1), 0.0, BORDER_REPLICATE);
+        filter2D(subMatrix, subMatrix, -1, kernel);
     }
     //sepFilter2D(*src3d, meanVal, CV_32F, kernelx, kernely, Point(-1,-1), 0.0, BORDER_REPLICATE);
     double min_intensity, max_intensity;
 //    minMaxIdx(meanVal, &min_intensity, &max_intensity);
-    meanVal /= denominator;
+//    meanVal /= denominator;
     Mat diff = *src3d - meanVal;
     int levels = 200;
 
@@ -376,48 +417,50 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
     for (int i = gap+1; i < x_size-gap; i++){
         for (int j = gap+1; j< y_size-gap; j++){
             for (int k = 0; k < z_size; k++){
-                cur_level = int((meanVal.at<float>(i,j,k) - min_intensity) / unit_intensity);
+                size_t idx = j + i * y_size + k * xy_size;
+                cur_level = int((meanVal.at<float>(idx) - min_intensity) / unit_intensity);
                 if(cur_level > 0){
                     validElements ++;
-                    numElements[cur_level].push_back(j * x_size + i + k * xy_size);
+                    numElements[cur_level].push_back(idx);
                 }
             }
         }
     }
-    int target_level = 0;
+    int target_level = levels;
     cur_level = 1;
     int nei_vec_step = 1;
 
     while(cur_level < levels){
         nei_vec_step = 1;
-        while (numElements[cur_level].size() < 100){
+        vector<long> cur_level_idx = numElements[cur_level];
+        while (cur_level_idx.size() < 100 && nei_vec_step < 5){
             if (cur_level - nei_vec_step > 0){
-                numElements[cur_level].insert(numElements[cur_level].end(),
-                                              numElements[cur_level-1].begin(),
-                                            numElements[cur_level-1].end());
+                cur_level_idx.insert(cur_level_idx.end(),
+                                              numElements[cur_level-nei_vec_step].begin(),
+                                            numElements[cur_level-nei_vec_step].end());
             }
             if (cur_level + nei_vec_step < levels){
-                numElements[cur_level].insert(numElements[cur_level].end(),
-                                              numElements[cur_level+1].begin(),
-                                            numElements[cur_level+1].end());
+                cur_level_idx.insert(cur_level_idx.end(),
+                                              numElements[cur_level+nei_vec_step].begin(),
+                                            numElements[cur_level+nei_vec_step].end());
             }
             nei_vec_step ++;
         }
-        vector<float> vals4var (numElements[cur_level].size());
-        for (size_t j = 0; j < numElements[cur_level].size(); j++){
-            vals4var[j] = diff.at<float>(numElements[cur_level][j]);
+        vector<float> vals4var (cur_level_idx.size());
+        for (size_t j = 0; j < cur_level_idx.size(); j++){
+            vals4var[j] = diff.at<float>(cur_level_idx[j]);
         }
         float varCur = varByTruncate(vals4var, 2, 3);
         varTrend[cur_level] = (denominator/(denominator+1))*varCur;
-        testedElements += numElements[cur_level].size();
+        testedElements += cur_level_idx.size();
         if (cur_level < target_level &&
-                (testedElements/validElements > validRatio)){
+                ((float)testedElements/validElements > validRatio)){
                 //if we only want to use a fixed point to reprsent all the variance
                 target_level = cur_level;
         }
         cur_level++;
     }
-    if (max_intensity<20){
+    if (max_intensity>20){
         for (int i=0;i<3;i++) varTrend[i] = 0;
     }
     else{
@@ -446,7 +489,7 @@ float calVarianceStablization(const Mat *src3d, Mat & varMap, vector<float> &var
  * @param dst3d: int represented by CV_32S
  * @param connect: 4, 8 for 2d and 6,10,26 for 3d
  */
-int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect){
+int connectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
     //assert(src3d->type()==bool);
     assert(src3d->dims == 3);
     assert(connect == 4 || connect == 8 || connect == 6 || connect == 10 || connect == 26);
@@ -473,22 +516,23 @@ int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect){
             for (int i = 0; i < x_size; i++){
                 for (int j = 0; j< y_size; j++){
                     for (int k = 0; k < z_size; k++){
-                        if (src3d->at<unsigned short>(i,j,k) == 0){
+                        size_t idx = vol_sub2ind(i, j, k, y_size, xy_size);
+                        if (src3d->at<unsigned char>(idx) == 0){
                             continue;
                         }
-                        if (dst3d.at<int>(i,j,k) == 0){
+                        if (dst3d.at<int>(idx) == 0){
                             numCC ++;
-                            dst3d.at<int>(i,j,k) = numCC;
+                            dst3d.at<int>(idx) = numCC;
                         }
-                        current_id = dst3d.at<int>(i,j,k);
-                        if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k)>0){
-                            dst3d.at<unsigned short>(i+1,j,k) = current_id;
+                        current_id = dst3d.at<int>(idx);
+                        if ((i + 1) < x_size && src3d->at<unsigned char>(idx + y_size)>0){
+                            dst3d.at<int>(idx + y_size) = current_id;
                         }
-                        if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k)>0){
-                            dst3d.at<unsigned short>(i,j+1,k) = current_id;
+                        if ((j + 1) < y_size && src3d->at<unsigned char>(idx + 1)>0){
+                            dst3d.at<int>(idx + 1) = current_id;
                         }
-                        if ((k + 1) < z_size && src3d->at<unsigned short>(i,j,k+1)>0){
-                            dst3d.at<unsigned short>(i,j,k+1) = current_id;
+                        if ((k + 1) < z_size && src3d->at<unsigned char>(idx + xy_size)>0){
+                            dst3d.at<int>(idx + xy_size) = current_id;
                         }
                     }
                 }
@@ -499,26 +543,27 @@ int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect){
             for (int i = 0; i < x_size; i++){
                 for (int j = 0; j< y_size; j++){
                     for (int k = 0; k < z_size; k++){
-                        if (src3d->at<unsigned short>(i,j,k) == 0){
+                        size_t idx = vol_sub2ind(i, j, k, y_size, xy_size);
+                        if (src3d->at<unsigned char>(idx) == 0){
                             continue;
                         }
-                        if (dst3d.at<int>(i,j,k) == 0){
+                        if (dst3d.at<int>(idx) == 0){
                             numCC ++;
-                            dst3d.at<int>(i,j,k) = numCC;
+                            dst3d.at<int>(idx) = numCC;
                         }
-                        current_id = dst3d.at<int>(i,j,k);
-                        if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k)>0){
-                            dst3d.at<unsigned short>(i+1,j,k) = current_id;
+                        current_id = dst3d.at<int>(idx);
+                        if ((i + 1) < x_size && src3d->at<unsigned char>(idx + y_size)>0){
+                            dst3d.at<int>(idx + y_size) = current_id;
                         }
-                        if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k)>0){
-                            dst3d.at<unsigned short>(i,j+1,k) = current_id;
+                        if ((j + 1) < y_size && src3d->at<unsigned char>(idx + 1)>0){
+                            dst3d.at<int>(idx + 1) = current_id;
                         }
-                        if ((k + 1) < z_size && src3d->at<unsigned short>(i,j,k+1)>0){
-                            dst3d.at<unsigned short>(i,j,k+1) = current_id;
+                        if ((k + 1) < z_size && src3d->at<unsigned char>(idx + xy_size)>0){
+                            dst3d.at<int>(idx + xy_size) = current_id;
                         }
 
-                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned short>(i+1,j+1,k)>0){
-                            dst3d.at<unsigned short>(i+1,j+1,k) = current_id;
+                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned char>(idx + y_size + 1)>0){
+                            dst3d.at<int>(idx + y_size + 1) = current_id;
                         }
                     }
                 }
@@ -529,36 +574,37 @@ int connectedComponents3d(const Mat* src3d, Mat &dst3d, int connect){
             for (int i = 0; i < x_size; i++){
                 for (int j = 0; j< y_size; j++){
                     for (int k = 0; k < z_size; k++){
-                        if (src3d->at<unsigned short>(i,j,k) == 0){
+                        size_t idx = vol_sub2ind(i, j, k, y_size, xy_size);
+                        if (src3d->at<unsigned char>(idx) == 0){
                             continue;
                         }
-                        if (dst3d.at<int>(i,j,k) == 0){
+                        if (dst3d.at<int>(idx) == 0){
                             numCC ++;
-                            dst3d.at<int>(i,j,k) = numCC;
+                            dst3d.at<int>(idx) = numCC;
                         }
-                        current_id = dst3d.at<int>(i,j,k);
-                        if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k)>0){
-                            dst3d.at<unsigned short>(i+1,j,k) = current_id;
+                        current_id = dst3d.at<int>(idx);
+                        if ((i + 1) < x_size && src3d->at<unsigned char>(idx + y_size)>0){
+                            dst3d.at<int>(idx + y_size) = current_id;
                         }
-                        if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k)>0){
-                            dst3d.at<unsigned short>(i,j+1,k) = current_id;
+                        if ((j + 1) < y_size && src3d->at<unsigned char>(idx + 1)>0){
+                            dst3d.at<int>(idx + 1) = current_id;
                         }
-                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned short>(i+1,j+1,k)>0){
-                            dst3d.at<unsigned short>(i+1,j+1,k) = current_id;
+                        if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned char>(idx + y_size + 1)>0){
+                            dst3d.at<int>(idx + y_size + 1) = current_id;
                         }
 
                         if ((k + 1) < z_size){
-                            if (src3d->at<unsigned short>(i,j,k+1)>0){
-                                dst3d.at<unsigned short>(i,j,k+1) = current_id;
+                            if (src3d->at<unsigned char>(idx + xy_size)>0){
+                                dst3d.at<int>(idx + xy_size) = current_id;
                             }
-                            if ((j + 1) < y_size && src3d->at<unsigned short>(i,j+1,k+1)>0){
-                                dst3d.at<unsigned short>(i,j+1,k+1) = current_id;
+                            if ((j + 1) < y_size && src3d->at<unsigned char>(idx + xy_size + 1)>0){
+                                dst3d.at<int>(idx + xy_size + 1) = current_id;
                             }
-                            if ((i + 1) < x_size && src3d->at<unsigned short>(i+1,j,k+1)>0){
-                                dst3d.at<unsigned short>(i+1,j,k+1) = current_id;
+                            if ((i + 1) < x_size && src3d->at<unsigned char>(idx + xy_size + y_size)>0){
+                                dst3d.at<int>(idx + xy_size + y_size) = current_id;
                             }
-                            if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned short>(i+1,j+1,k+1)>0){
-                                dst3d.at<unsigned short>(i+1,j+1,k+1) = current_id;
+                            if ((i + 1) < x_size && (j + 1) < y_size && src3d->at<unsigned char>(idx + xy_size + y_size + 1)>0){
+                                dst3d.at<int>(idx + xy_size + y_size + 1) = current_id;
                             }
                         }
                     }
@@ -575,32 +621,33 @@ int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect){
     int x_size  = src3d->size[0];
     int y_size  = src3d->size[1];
     int z_size  = src3d->size[2];
-    //size_t xy_size = x_size*y_size;
+    size_t xy_size = x_size*y_size;
     size_t numCC = 0;
 
-    dst3d = Mat::zeros(src3d->dims, src3d->size, CV_32S);
+    if (dst3d.empty()) dst3d = Mat::zeros(src3d->dims, src3d->size, CV_32S);
     int current_id = 0;
     if(connect == 6){
         for (int i = 0; i < x_size; i++){
             for (int j = 0; j< y_size; j++){
                 for (int k = 0; k < z_size; k++){
-                    float curr_val = src3d->at<float>(i,j,k);
+                    size_t idx = vol_sub2ind(i, j, k, y_size, xy_size);
+                    float curr_val = src3d->at<float>(idx);
                     if (curr_val < 1e-5){
                         continue;
                     }
-                    if (dst3d.at<int>(i,j,k) == 0){
+                    if (dst3d.at<int>(idx) == 0){
                         numCC ++;
-                        dst3d.at<int>(i,j,k) = numCC;
+                        dst3d.at<int>(idx) = numCC;
                     }
-                    current_id = dst3d.at<int>(i,j,k);
-                    if ((i + 1) < x_size && (src3d->at<float>(i+1,j,k) - curr_val) < 1e-5){
-                        dst3d.at<int>(i+1,j,k) = current_id;
+                    current_id = dst3d.at<int>(idx);
+                    if ((i + 1) < x_size && (src3d->at<float>(idx + y_size) - curr_val) < 1e-5){
+                        dst3d.at<int>(idx + y_size) = current_id;
                     }
-                    if ((j + 1) < y_size && (src3d->at<float>(i,j+1,k)- curr_val) < 1e-5){
-                        dst3d.at<int>(i,j+1,k) = current_id;
+                    if ((j + 1) < y_size && (src3d->at<float>(idx + 1)- curr_val) < 1e-5){
+                        dst3d.at<int>(idx + 1) = current_id;
                     }
-                    if ((k + 1) < z_size && (src3d->at<float>(i,j,k+1)- curr_val) < 1e-5){
-                        dst3d.at<int>(i,j,k+1) = current_id;
+                    if ((k + 1) < z_size && (src3d->at<float>(idx + xy_size)- curr_val) < 1e-5){
+                        dst3d.at<int>(idx + xy_size) = current_id;
                     }
                 }
             }
@@ -611,27 +658,28 @@ int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect){
         for (int i = 0; i < x_size; i++){
             for (int j = 0; j< y_size; j++){
                 for (int k = 0; k < z_size; k++){
-                    float curr_val = src3d->at<float>(i,j,k);
-                    if (curr_val < 1e-5){
+                    size_t idx = vol_sub2ind(i, j, k, y_size, xy_size);
+                    float curr_val = src3d->at<float>(idx);
+                    if (curr_val < EPSILON_0){
                         continue;
                     }
-                    if (dst3d.at<int>(i,j,k) == 0){
+                    if (dst3d.at<int>(idx) == 0){
                         numCC ++;
-                        dst3d.at<int>(i,j,k) = numCC;
+                        dst3d.at<int>(idx) = numCC;
                     }
-                    current_id = dst3d.at<int>(i,j,k);
-                    if ((i + 1) < x_size && (src3d->at<float>(i+1,j,k) - curr_val) < 1e-5){
-                        dst3d.at<int>(i+1,j,k) = current_id;
+                    current_id = dst3d.at<int>(idx);
+                    if ((i + 1) < x_size && (src3d->at<float>(idx + y_size) - curr_val) < EPSILON_0){
+                        dst3d.at<int>(idx + y_size) = current_id;
                     }
-                    if ((j + 1) < y_size && (src3d->at<float>(i,j+1,k) - curr_val) < 1e-5){
-                        dst3d.at<int>(i,j+1,k) = current_id;
+                    if ((j + 1) < y_size && (src3d->at<float>(idx + 1) - curr_val) < EPSILON_0){
+                        dst3d.at<int>(idx + 1) = current_id;
                     }
-                    if ((k + 1) < z_size && (src3d->at<float>(i,j,k+1) - curr_val) < 1e-5){
-                        dst3d.at<int>(i,j,k+1) = current_id;
+                    if ((k + 1) < z_size && (src3d->at<float>(idx + xy_size) - curr_val) < EPSILON_0){
+                        dst3d.at<int>(idx + xy_size) = current_id;
                     }
 
-                    if ((i + 1) < x_size && (j + 1) < y_size && (src3d->at<float>(i+1,j+1,k) - curr_val) < 1e-5){
-                        dst3d.at<int>(i+1,j+1,k) = current_id;
+                    if ((i + 1) < x_size && (j + 1) < y_size && (src3d->at<float>(idx + y_size + 1) - curr_val) < EPSILON_0){
+                        dst3d.at<int>(idx + y_size + 1) = current_id;
                     }
                 }
             }
@@ -642,37 +690,38 @@ int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect){
         for (int i = 0; i < x_size; i++){
             for (int j = 0; j< y_size; j++){
                 for (int k = 0; k < z_size; k++){
-                    float curr_val = src3d->at<float>(i,j,k);
+                    size_t idx = vol_sub2ind(i, j, k, y_size, xy_size);
+                    float curr_val = src3d->at<float>(idx);
                     if (curr_val < 1e-5){
                         continue;
                     }
-                    if (dst3d.at<int>(i,j,k) == 0){
+                    if (dst3d.at<int>(idx) == 0){
                         numCC ++;
-                        dst3d.at<int>(i,j,k) = numCC;
+                        dst3d.at<int>(idx) = numCC;
                     }
-                    current_id = dst3d.at<int>(i,j,k);
-                    if ((i + 1) < x_size && (src3d->at<float>(i+1,j,k) - curr_val) < 1e-5){
-                        dst3d.at<int>(i+1,j,k) = current_id;
+                    current_id = dst3d.at<int>(idx);
+                    if ((i + 1) < x_size && (src3d->at<float>(idx + y_size) - curr_val) < 1e-5){
+                        dst3d.at<int>(idx + y_size) = current_id;
                     }
-                    if ((j + 1) < y_size && (src3d->at<float>(i,j+1,k) - curr_val) < 1e-5){
-                        dst3d.at<int>(i,j+1,k) = current_id;
+                    if ((j + 1) < y_size && (src3d->at<float>(idx + 1) - curr_val) < 1e-5){
+                        dst3d.at<int>(idx + 1) = current_id;
                     }
-                    if ((i + 1) < x_size && (j + 1) < y_size && (src3d->at<float>(i+1,j+1,k) - curr_val) < 1e-5){
-                        dst3d.at<int>(i+1,j+1,k) = current_id;
+                    if ((i + 1) < x_size && (j + 1) < y_size && (src3d->at<float>(idx + y_size + 1) - curr_val) < 1e-5){
+                        dst3d.at<int>(idx + y_size + 1) = current_id;
                     }
 
                     if ((k + 1) < z_size){
-                        if ((src3d->at<float>(i,j,k+1) - curr_val) < 1e-5){
-                            dst3d.at<int>(i,j,k+1) = current_id;
+                        if ((src3d->at<float>(idx + xy_size) - curr_val) < 1e-5){
+                            dst3d.at<int>(idx + xy_size) = current_id;
                         }
-                        if ((j + 1) < y_size && (src3d->at<float>(i,j+1,k+1) - curr_val) < 1e-5){
-                            dst3d.at<int>(i,j+1,k+1) = current_id;
+                        if ((j + 1) < y_size && (src3d->at<float>(idx + xy_size + 1) - curr_val) < 1e-5){
+                            dst3d.at<int>(idx + xy_size + 1) = current_id;
                         }
-                        if ((i + 1) < x_size && (src3d->at<float>(i+1,j,k+1) - curr_val) < 1e-5){
-                            dst3d.at<int>(i+1,j,k+1) = current_id;
+                        if ((i + 1) < x_size && (src3d->at<float>(idx + xy_size + y_size) - curr_val) < 1e-5){
+                            dst3d.at<int>(idx + xy_size + y_size) = current_id;
                         }
-                        if ((i + 1) < x_size && (j + 1) < y_size && (src3d->at<float>(i+1,j+1,k+1) - curr_val) < 1e-5){
-                            dst3d.at<int>(i+1,j+1,k+1) = current_id;
+                        if ((i + 1) < x_size && (j + 1) < y_size && (src3d->at<float>(idx + xy_size + y_size + 1) - curr_val) < 1e-5){
+                            dst3d.at<int>(idx + y_size + 1+1) = current_id;
                         }
                     }
                 }
@@ -729,7 +778,7 @@ void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avg
  * @param numCC
  * @param bk_extract: background also count as a region
  */
-void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract){
+void extractVoxIdxList(Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract){
     if (bk_extract){
         voxList.resize(numCC+1);
         for (size_t i = 0; i < label3d->total(); i++){
@@ -744,7 +793,7 @@ void extractVoxIdxList(const Mat *label3d, vector<vector<size_t>> &voxList, int 
         }
     }
 }
-void extractVoxIdxList(const Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract){
+void extractVoxIdxList(Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract){
     if (bk_extract){
         voxList.resize(numCC+1);
         for (size_t i = 0; i < label3d->total(); i++){
@@ -765,7 +814,7 @@ void extractVoxIdxList(const Mat *label3d, vector<vector<int>> &voxList, int num
  * @param voxSzList
  * @param numCC
  */
-void extractVolume(const Mat *label3d, vector<size_t> &voxSzList, int numCC){
+void extractVolume(Mat *label3d, vector<size_t> &voxSzList, int numCC){
     voxSzList.resize(numCC);
     fill(voxSzList.begin(), voxSzList.end(), 0);
     for (size_t i = 0; i < label3d->total(); i++){
@@ -827,7 +876,7 @@ bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = tru
  * @param dst3d
  * @param kernel
  */
-void volumeDilate(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
+void volumeDilate(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
 //    int dilation_type = 0;
 //    if( dilation_elem == 0 ){ dilation_type = MORPH_RECT; }
 //    else if( dilation_elem == 1 ){ dilation_type = MORPH_CROSS; }
@@ -864,27 +913,26 @@ void volumeDilate(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_
             dilate(subMatrix, subMatrix, element);
         }
     }
-    //unsigned short max_val;
+    //unsigned char max_val;
     if (radiusValues[2] > 0 && max_valid_z >= min_valid_z){
 //        for (int i = 0; i < x_size; i++){
 //            for (int j = 0; j< y_size; j++){
         unsigned char *ind = (unsigned char*)dst3d.data + min_valid_z * xy_size; // sub-matrix pointer
-        Mat *subMatrix = new Mat(2, dst3d.size, CV_8U, ind);
+        Mat subMatrix_up(2, dst3d.size, CV_8U, ind);
         for (int k = min_valid_z - 1; k >= max(0, min_valid_z - radiusValues[2]); k--){
             ind = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
             Mat subMatrix2(2, dst3d.size, CV_8U, ind);
-            subMatrix->copyTo(subMatrix2);
+            subMatrix_up.copyTo(subMatrix2);
         }
 
         ind = (unsigned char*)dst3d.data + max_valid_z * xy_size; // sub-matrix pointer
-        subMatrix = new Mat(2, dst3d.size, CV_8U, ind);
+        Mat subMatrix_down(2, dst3d.size, CV_8U, ind);
         for (int k = max_valid_z + 1; k <= max(z_size - 1, max_valid_z + radiusValues[2]); k++){
             ind = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
             Mat subMatrix2(2, dst3d.size, CV_8U, ind);
-            subMatrix->copyTo(subMatrix2);
+            subMatrix_down.copyTo(subMatrix2);
         }
-//            }
-//        }
+
     }
 }
 
@@ -894,7 +942,7 @@ void volumeDilate(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_
  * @param dst3d
  * @param kernel
  */
-void volumeErode(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
+void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
     // there is a question here: if dst3d and src3d point to the same memory address?? what will happen
 //    int dilation_type = 0;
 //    if( dilation_elem == 0 ){ dilation_type = MORPH_RECT; }
@@ -917,21 +965,22 @@ void volumeErode(const Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_t
         Mat subMatrix(2, dst3d.size, CV_8U, ind);
         erode(subMatrix, subMatrix, element);
     }
-    unsigned short min_val;
+    unsigned char min_val;
     if (radiusValues[2] > 0){
         for (int i = 0; i < x_size; i++){
             for (int j = 0; j< y_size; j++){
                 for (int k = 0; k < z_size; k++){
-                    min_val = src3d->at<unsigned short>(i,j,k);
+                    size_t idx = vol_sub2ind(i, j, k, y_size, xy_size);
+                    min_val = src3d->at<unsigned char>(idx);
                     for (int kk = 1; kk < radiusValues[2]; kk++){
                         if (k+kk < z_size){
-                            min_val = min(src3d->at<unsigned short>(i,j,k+kk), min_val);
+                            min_val = min(src3d->at<unsigned char>(idx + kk * xy_size), min_val);
                         }
                         if (k-kk >= 0){
-                            min_val = min(src3d->at<unsigned short>(i,j,k-kk), min_val);
+                            min_val = min(src3d->at<unsigned char>(idx - kk * xy_size), min_val);
                         }
                     }
-                    dst3d.at<unsigned short>(i,j,k) = min_val;
+                    dst3d.at<int>(idx) = min_val;
                 }
             }
         }
@@ -1224,9 +1273,10 @@ bool isOnBoundary2d(Mat *fgMap, size_t idx){
 }
 bool isOnBoundary2d(Mat *fgMap, int y, int x, int z){
     int im_sz[] = {fgMap->size[0], fgMap->size[1]};
+    int page_sz = im_sz[0] * im_sz[1];
     for(int i=0; i < 8; i++){
         if(inField(y + n8_y[i], x + n8_x[i], im_sz)
-                && fgMap->at<unsigned char>(y + n8_y[i], x + n8_x[i], z) == 0){
+                && fgMap->at<unsigned char>(vol_sub2ind(y + n8_y[i], x + n8_x[i], z, im_sz[1], page_sz)) == 0){
             return true;
         }
     }
@@ -1287,7 +1337,7 @@ void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t>
         y = remain - x * sz[0];
         for(int j = 0; j < n_y.size(); j++){
             if(inField(y + n_y[j], x + n_x[j], z + n_z[j], sz)){
-                cur_nei_idx = y + n_y[j] + (x + n_x[j])*sz[0] + (z + n_z[j])*page_sz;
+                cur_nei_idx = x + n_x[j] + (y + n_y[j])*sz[1] + (z + n_z[j])*page_sz;
                 if(!checked_label[cur_nei_idx]){
                     center_idx[linkage_cnt] = idx[i];
                     nei_idx[linkage_cnt] = cur_nei_idx;
@@ -1419,7 +1469,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
             }
         }
     }
-
+    delete g;
 }
 
 void setValMat(Mat &vol3d, int datatype, vector<size_t> idx, float v){
@@ -1472,7 +1522,7 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
 
             for(int j = 0; j < 8; j++){
                 if(inField(y+n_y[j], x+n_x[j], im_sz) &&
-                        label_map->at<int>(y+n_y[j], x+n_x[j], z)==0){
+                        label_map->at<int>( gap_idx[i] + n_y[j] * im_sz[1] + n_x[j])==0){
                     sub_idx0.push_back(gap_idx[i]);
                     sub_idx0.push_back(y);
                     sub_idx0.push_back(x);
@@ -1486,7 +1536,7 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
             y = remain - x * im_sz[0];
             for(int j = 0; j < 8; j++){
                 if(inField(y+n_y[j], x+n_x[j], im_sz) &&
-                        label_map->at<int>(y+n_y[j], x+n_x[j], z)==0){
+                        label_map->at<int>(gap_idx[i] + n_y[j] * im_sz[1] + n_x[j])==0){
                     sub_idx1.push_back(gap_idx[i]);
                     sub_idx0.push_back(y);
                     sub_idx0.push_back(x);
@@ -1621,7 +1671,7 @@ void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
             for(int n_y = -gap_radius; n_y <= gap_radius; n_y++){
                 if(n_x != 0 || n_y != 0){
                     if(inField(y + n_y, x + n_x, im_sz)){
-                        cur_label = label_map->at<int>(y+n_y, x+n_x, z);
+                        cur_label = label_map->at<int>(valid_fg_idx[i] + n_y * im_sz[1] + n_x);
                         if(cur_label >0){
                             if (nei_seed_cnt == 0 || (nei_seed_cnt == 1 && cur_label != nei_seed_ids[0])){
                                 nei_seed_ids[nei_seed_cnt++] = cur_label;
@@ -1702,25 +1752,180 @@ void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &nei
 
 /**************************Functions for debug*******************************/
 
-void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice){
+void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
     int sz_single_frame = src3d->size[1] * src3d->size[0];
     Mat *single_slice;
-    if(datatype == CV_8U){
-        unsigned char *ind = (unsigned char*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
-        single_slice = new Mat(2, src3d->size, CV_8U, ind);
-    }else if(datatype == CV_16U){
-        unsigned short *ind = (unsigned short*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
-        single_slice = new Mat(2, src3d->size, CV_16U, ind);
-    }else if(datatype == CV_32F){
-        float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
-        single_slice = new Mat(2, src3d->size, CV_32F, ind);
-        normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX);
+    double min_v, max_v;
+    if (binary){
+        Mat bi_mat = *src3d > EPSILON_0;
+        unsigned char *ind = (unsigned char*)bi_mat.data + sz_single_frame*slice; // sub-matrix pointer
+        single_slice = new Mat(2, src3d->size, CV_8U, ind); // note, this pointer will be null out of this if
+        double min_v, max_v;
+        minMaxIdx(*single_slice, &min_v, &max_v);
+        stringstream s_min, s_max;
+        s_min << fixed << setprecision(2) << min_v;
+        s_max << fixed << setprecision(2) << max_v;
+        string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
+        imshow(title, *single_slice);
+        waitKey(0);
+        destroyWindow(title);
     }else{
-        single_slice = nullptr;
-        qFatal("Unsupported data type!");
+        if(datatype == CV_8U){
+            unsigned char *ind = (unsigned char*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+            single_slice = new Mat(2, src3d->size, CV_8U, ind);
+            minMaxIdx(*single_slice, &min_v, &max_v);
+        }else if(datatype == CV_16U){
+            unsigned short *ind = (unsigned short*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+            single_slice = new Mat(2, src3d->size, CV_16U, ind);
+            minMaxIdx(*single_slice, &min_v, &max_v);
+        }else if(datatype == CV_32F){
+            float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+            single_slice = new Mat(2, src3d->size, CV_32F, ind);
+            minMaxIdx(*single_slice, &min_v, &max_v);
+            normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX);
+        }else{
+            single_slice = nullptr;
+            qFatal("Unsupported data type!");
+        }
+
+        stringstream s_min, s_max;
+        s_min << fixed << setprecision(2) << min_v;
+        s_max << fixed << setprecision(2) << max_v;
+        string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
+        imshow(title, *single_slice);
+        waitKey(0);
+        //destroyWindow(title);
+        //destroyAllWindows();
     }
-    imshow("Slice:"+to_string(slice), *single_slice);
+    delete single_slice;
+}
+
+/**
+ * @brief label2rgb3d
+ * @param src: CV_32S
+ * @param dst: CV_8UC3, RGB data
+ */
+void label2rgb3d(Mat &src, Mat &dst)
+{
+    // Create JET colormap
+    double m;
+    minMaxLoc(src, nullptr, &m);
+    m++;
+
+    int n = ceil(m / 4);
+    Mat1d u(n*3-1, 1, double(1.0));
+
+    for (int i = 1; i <= n; ++i) {
+        u(i-1) = double(i) / n;
+        u((n*3-1) - i) = double(i) / n;
+    }
+
+    vector<double> g(n * 3 - 1, 1);
+    vector<double> r(n * 3 - 1, 1);
+    vector<double> b(n * 3 - 1, 1);
+    for (int i = 0; i < g.size(); ++i)
+    {
+        g[i] = ceil(double(n) / 2) - (int(m)%4 == 1 ? 1 : 0) + i + 1;
+        r[i] = g[i] + n;
+        b[i] = g[i] - n;
+    }
+
+    g.erase(remove_if(g.begin(), g.end(), [m](double v){ return v > m;}), g.end());
+    r.erase(remove_if(r.begin(), r.end(), [m](double v){ return v > m; }), r.end());
+    b.erase(remove_if(b.begin(), b.end(), [](double v){ return v < 1.0; }), b.end());
+
+    Mat1d cmap(m, 3, double(0.0));
+    for (int i = 0; i < r.size(); ++i) { cmap(int(r[i])-1, 2) = u(i); }
+    for (int i = 0; i < g.size(); ++i) { cmap(int(g[i])-1, 1) = u(i); }
+    for (int i = 0; i < b.size(); ++i) { cmap(int(b[i])-1, 0) = u(u.rows - b.size() + i); }
+
+    Mat3d cmap3 = cmap.reshape(3);
+
+    Mat3b colormap;
+    cmap3.convertTo(colormap, CV_8U, 255.0);
+
+
+    // Apply color mapping
+//    dst = Mat3b(src.rows, src.cols, Vec3b(0,0,0));
+//    for (int r = 0; r < src.rows; ++r)
+//    {
+//        for (int c = 0; c < src.cols; ++c)
+//        {
+//            dst(r, c) = colormap(src(r,c));
+//        }
+//    }
+}
+
+/**
+ * @brief label2rgb3d
+ * @param src: CV_32S
+ * @param dst: CV_8UC3, RGB data
+ */
+void label2rgb2d(Mat1i &src, Mat3b &dst)
+{
+    // Create JET colormap
+    double m;
+    minMaxLoc(src, nullptr, &m);
+    m++;
+
+    int n = ceil(m / 4);
+    Mat1d u(n*3-1, 1, double(1.0));
+
+    for (int i = 1; i <= n; ++i) {
+        u(i-1) = double(i) / n;
+        u((n*3-1) - i) = double(i) / n;
+    }
+
+    vector<double> g(n * 3 - 1, 1);
+    vector<double> r(n * 3 - 1, 1);
+    vector<double> b(n * 3 - 1, 1);
+    for (int i = 0; i < g.size(); ++i)
+    {
+        g[i] = ceil(double(n) / 2) - (int(m)%4 == 1 ? 1 : 0) + i + 1;
+        r[i] = g[i] + n;
+        b[i] = g[i] - n;
+    }
+
+    g.erase(remove_if(g.begin(), g.end(), [m](double v){ return v > m;}), g.end());
+    r.erase(remove_if(r.begin(), r.end(), [m](double v){ return v > m; }), r.end());
+    b.erase(remove_if(b.begin(), b.end(), [](double v){ return v < 1.0; }), b.end());
+
+    Mat1d cmap(m, 3, double(0.0));
+    for (int i = 0; i < r.size(); ++i) { cmap(int(r[i])-1, 2) = u(i); }
+    for (int i = 0; i < g.size(); ++i) { cmap(int(g[i])-1, 1) = u(i); }
+    for (int i = 0; i < b.size(); ++i) { cmap(int(b[i])-1, 0) = u(u.rows - b.size() + i); }
+
+    Mat3d cmap3 = cmap.reshape(3);
+
+    Mat3b colormap;
+    cmap3.convertTo(colormap, CV_8U, 255.0);
+
+
+    // Apply color mapping
+    dst = Mat3b(src.rows, src.cols, Vec3b(0,0,0));
+    for (int r = 0; r < src.rows; ++r)
+    {
+        for (int c = 0; c < src.cols; ++c)
+        {
+            dst(r, c) = colormap(src(r,c));
+        }
+    }
+}
+
+void ccShowSliceLabelMat(Mat *src3d, int slice){
+    int sz_single_frame = src3d->size[1] * src3d->size[0];
+    int *ind = (int*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+    Mat single_slice(2, src3d->size, CV_32S, ind);
+    Mat1i mat2show = single_slice;
+    double min_v, max_v;
+
+    minMaxIdx(mat2show, &min_v, &max_v);
+    stringstream s_min, s_max;
+    s_min << fixed << setprecision(2) << min_v;
+    s_max << fixed << setprecision(2) << max_v;
+    string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
+    Mat3b mat2display;
+    label2rgb2d(mat2show, mat2display);
+    imshow(title, mat2display);
     waitKey(0);
-    destroyWindow("Slice:"+to_string(slice));
-    //destroyAllWindows();
 }

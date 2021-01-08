@@ -361,21 +361,21 @@ template <typename T> T ttest2(vector<T> arr1, vector<T> arr2)
 
 template <typename T> T ttest2_var_known(vector<T> fg, vector<T> bg, T var_known){
     T sum_st = vec_mean(fg) - vec_mean(bg);
-    size_t n = length(fg);
-    size_t m = length(bg);
+    double n = (double)fg.size();
+    double m = (double)bg.size();
     T sigma = sqrt(var_known*(n+m)/(n*m));
     return  sum_st / sigma;
 }
 template <typename T> void nonOV_truncatedGauss(size_t M, size_t N, T &mu, T &sigma){
-        T lower_fg = normInv(1-M/(M+N));
+        T lower_fg = normInv(1-(double)M/(M+N));
         T f_mu, f_sigma;
         truncatedGauss(0, 1, lower_fg, INFINITY, f_mu, f_sigma);
-        f_sigma = f_sigma/sqrt(M);
+        f_sigma = f_sigma/sqrt((double)M);
 
         T upper_nei = lower_fg;
         T n_mu, n_sigma;
         truncatedGauss(0, 1, -INFINITY, upper_nei, n_mu, n_sigma);
-        n_sigma = n_sigma/sqrt(N);
+        n_sigma = n_sigma/sqrt((double)M);
 
         mu = f_mu - n_mu;
         sigma = sqrt(f_sigma*f_sigma + n_sigma*n_sigma);
@@ -387,7 +387,7 @@ template <typename T> void nonOV_truncatedGauss(size_t M, size_t N, T &mu, T &si
 }
 
 template <typename T> void OV_truncatedGauss(vector<T> fg, vector<T> bg, T &mu, T &sigma){
-    size_t M = fg.size(), N = bg.size();
+    double M = (double)fg.size(), N = (double)bg.size();
 
     fg.insert(fg.end(), bg.begin(), bg.end());
     vector<size_t> sorted_id = sort_indexes(fg, false, 1);
@@ -438,15 +438,15 @@ template <typename T> T orderStatsKSection_f2(T x, T xnormcdf, T xnormpdf){
     return 0.5*(xnormcdf*x*x - xnormcdf + xnormpdf*x);
 }
 template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector<T> otherVals, float &mu, float &sigma){
-    size_t M = fg.size();
-    size_t N = bg.size();
-    size_t mid_sz = otherVals.size();
-    size_t n = M+N+mid_sz;
+    double M = (double)fg.size();
+    double N = (double)bg.size();
+    double mid_sz = (double)otherVals.size();
+    double n = M+N+mid_sz;
 
     bg.insert(bg.end(), fg.begin(), fg.end());
     bg.insert(bg.end(), otherVals.begin(), otherVals.end());// fg: 1-M, bg, M+1-M+N, mid: M+N+1:n
     vector<size_t> sorted_id = sort_indexes(bg, false, 1);
-    vector<byte> sorted_class_id(n);
+    vector<byte> sorted_class_id((long)n);
     for (size_t i = 0; i<sorted_id.size(); i++){
         if(sorted_id[i] <= M){
             sorted_class_id[i] = (byte)-1;
@@ -540,10 +540,10 @@ template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector
 
     sigma = float(sqrt(A-B)/sqrt(n));
 }
-
+// !!!NOTE: in openCV the index is stored row by row, not like Matlab which is column by column
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, MatSize size){
     // assert(
-    idx = z*size[0]*size[1] + x*size[0] + y;
+    idx = z*size[0]*size[1] + x + y*size[1];
 }
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize size){
     z = idx / (size[0]*size[1]);
@@ -554,19 +554,23 @@ template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize si
 }
 
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, int *size){
-    idx = z*size[0]*size[1] + x*size[0] + y;
+    idx = z*size[0]*size[1] + x + y*size[1];
+}
+
+template <typename T> T vol_sub2ind(int y, int x, int z, int col_num, T page_sz){
+    return z*page_sz + x + y*col_num;
 }
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size){
     z = idx / (size[0]*size[1]);
     T rmder = idx - z*(size[0]*size[1]);
     y = rmder/size[1];
-    x = rmder-y*size[0];
+    x = rmder-y*size[1];
 }
 
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size){
     size_t nPixels_slice = size[0]*size[1];
     FOREACH_i(y){
-        idx[i] = z[i]*nPixels_slice + x[i]*size[0] + y[i];
+        idx[i] = z[i]*nPixels_slice + x[i] + y[i]*size[1];
     }
 }
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size){
@@ -576,7 +580,7 @@ template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int
         z[i] = idx[i] / nPixels_slice;
         rmder = idx[i]  - z[i] * nPixels_slice;
         y[i] = rmder/size[1];
-        x[i] = rmder-y[i]*size[0];
+        x[i] = rmder-y[i]*size[1];
     }
 }
 

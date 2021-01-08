@@ -107,7 +107,7 @@ void cellSegmentMain::init_parameter(){
     p4odStats.gap4varTrendEst = 2;
     p4odStats.gap4fgbgCompare = 0;
     p4odStats.roundNum4fgbgCompare = 3;
-    p4odStats.varAtRatio = 0.95;
+    p4odStats.varAtRatio = 0.80;
     p4odStats.fgSignificanceTestWay = KSEC;
     p4odStats.minGapWithOtherCell_yxz[0] = 3;
     p4odStats.minGapWithOtherCell_yxz[1] = 3;
@@ -137,21 +137,30 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     /******** start to do cell segmentation *******/
     float sigma2d[3] = {3.0, 3.0, 0.0};
     principalCv2d(dataVolFloat, principalCurv2d[curr_frame], sigma2d, p4segVol.min_intensity);
+    //ccShowSlice3Dmat(&principalCurv2d[curr_frame], CV_32F, 3);
     float sigma3d[3] = {5.0, 5.0, 1.0};
     principalCv3d(dataVolFloat, principalCurv3d[curr_frame], sigma3d, p4segVol.min_intensity);
+    //ccShowSlice3Dmat(&principalCurv3d[curr_frame], CV_32F, 3);
 
+    double tmp_min, tmp_max;
+    minMaxIdx(principalCurv2d[curr_frame], &tmp_min, &tmp_max);
+    //ccShowSlice3Dmat(&principalCurv3d[curr_frame], CV_32F);
     variances[curr_frame] = calVarianceStablization(dataVolFloat, varMaps[curr_frame], varTrends[curr_frame],
                                                    p4odStats.varAtRatio, p4odStats.gap4varTrendEst);
-
+    //ccShowSlice3Dmat(dataVolFloat, CV_32F, 3);
+    //ccShowSlice3Dmat(&varMaps[curr_frame], CV_32F, 3);
     Mat *stblizedVol = new Mat(data_grayim3d->dims, data_grayim3d->size, CV_32F);
     float stb_term = 3/8;
     FOREACH_i_ptrMAT(stblizedVol){
         stblizedVol->at<float>(i) = sqrt(dataVolFloat->at<float>(i) + stb_term);
     }
-    calVarianceStablization(stblizedVol, stblizedVarMaps[curr_frame], stblizedVarTrends[curr_frame],
+    float stb_var = calVarianceStablization(stblizedVol, stblizedVarMaps[curr_frame], stblizedVarTrends[curr_frame],
                                                        p4odStats.varAtRatio, p4odStats.gap4varTrendEst);
+    ccShowSlice3Dmat(stblizedVol, CV_32F, 3);
+    ccShowSlice3Dmat(&stblizedVarMaps[curr_frame], CV_32F, 3);
     // first use synQuant to get 1-tier seed regions
     synQuantSimple seeds_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
+    ccShowSliceLabelMat(seeds_from_synQuant.idMap, 3);
     // second refine the seed regions
     vector<int> test_ids(0);
     regionWiseAnalysis4d(data_grayim3d, dataVolFloat, stblizedVol, seeds_from_synQuant.idMap/*int*/,
