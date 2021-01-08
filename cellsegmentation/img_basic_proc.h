@@ -1,4 +1,4 @@
-/** the basic function used in volume image processing */
+/** the basic template function used in volume image processing */
 
 #include "img_basic_proc_declare.h"
 
