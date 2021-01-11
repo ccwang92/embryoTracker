@@ -40,12 +40,15 @@ SOURCES += data_importer.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
+    cellsegmentation/cc3d.hpp \
     cellsegmentation/cellsegment_main.h \
     cellsegmentation/img_basic_proc.h \
     cellsegmentation/img_basic_proc_declare.h \
     cellsegmentation/maxflow_bk/block.h \
     cellsegmentation/maxflow_bk/graph.h \
     cellsegmentation/synquant_simple.h \
+    cellsegmentation/types_define.h \
+    cellsegmentation/vol_basic_proc.hpp \
     dialog_import_im_sequence.h \
     mainwindow.h \
     my4dimage.h \

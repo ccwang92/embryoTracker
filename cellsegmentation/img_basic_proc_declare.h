@@ -22,6 +22,8 @@
 
 #include "maxflow_bk/graph.h" //max-flow BK algorithm
 
+#include "cc3d.hpp" //connected component
+
 using namespace cv;
 using namespace std;
 
@@ -51,7 +53,6 @@ enum gapTestMethods {GAP_TTEST = 0, GAP_ORDERSTATS, GAP_LOCALORDERSTATS};
 #define EPSILON_0 0.00001
 const int n8_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
 const int n8_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
-
 
 void principalCv2d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
 void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity);
@@ -167,6 +168,7 @@ template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> v
 template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl=1.0, float vh=0.0);
 
 template <typename T> void vec_unique(vector<T> & v);
+
 #endif // IMG_BASIC_PROC_H
 
 

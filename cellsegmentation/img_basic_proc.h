@@ -88,7 +88,7 @@ template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bo
     return out;
 }
 template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool strict){
-    assert(ub>lb);
+    assert(ub>=lb);
     vector<T> out;
     if (strict){
         for (size_t i = 0; i < values.size(); i++){
@@ -666,3 +666,5 @@ template <typename T> void vec_unique(vector<T> & v){
     it = unique(v.begin(), v.end());
     v.resize(distance(v.begin(),it));
 }
+
+

@@ -1,8 +1,9 @@
 #ifndef SYNQUANTSIMPLE_H
 #define SYNQUANTSIMPLE_H
 
-#include "cellsegment_main.h"
-//#include "img_basic_proc.h"
+#include "img_basic_proc.h"
+//#include "vol_basic_proc.hpp"
+#include "types_define.h"
 #include <algorithm>
 #include <set>
 
@@ -13,60 +14,57 @@
 #define USED_AS_N_ONCE (byte)1
 #define USED_AS_N_MORE (byte)2
 
-using namespace cv;
-using namespace std;
+
 class synQuantSimple
 {
 public:
-    synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4segVol, odStatsParameter &p4odStats);
-    synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
+    synQuantSimple(cv::Mat *_srcVolume, float _src_var, segParameter &p4segVol, odStatsParameter &p4odStats);
+    synQuantSimple(singleCellSeed &seed);
     //~synQuantSimple(){} //TODO: delete the pointers
 public:
-    void processVoxLabel(size_t j);
+    void processVoxLabel(std::size_t j);
     void componentTree3d(segParameter p4segVol, odStatsParameter p4odStats);
     void cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats);
-    float zscoreCal(float t0, size_t M/*in*/, size_t N/*nei*/); // directly use non_overlap_gaussian
+    float zscoreCal(float t0, std::size_t M/*in*/, std::size_t N/*nei*/); // directly use non_overlap_gaussian
 
-    size_t findNode(size_t e);
-    size_t mergeNodes(size_t e1,size_t e2);
+    std::size_t findNode(std::size_t e);
+    std::size_t mergeNodes(std::size_t e1,std::size_t e2);
 
 
-    void objLabel(size_t minSize ,size_t maxSize); //label objects simply using size constraints
+    void objLabel(std::size_t minSize ,std::size_t maxSize); //label objects simply using size constraints
     void objLabel_zscore(float zscore_thres); // TODO: label objects using a zscore threshold
     void objLabel_descending();//label object from the largest zscore one by one;
 
     void fdr_control();
     // zscore for comparing fg and bg neighbors using the boundary pixels among fg and bg
-    float debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singleCellSeed *seed, odStatsParameter p4odStats);
-    void refineCellTerritoryWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
-    void refineCellsTerritoriesWithSeedRegions(singleCellSeed &seed, segParameter &p4segVol);
-    void cellShrinkTest(singleCellSeed &seed, segParameter &p4segVol);
-    void fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol);
-    void gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
-    void gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
-//    template <typename T> T debiasedFgBgCompare(vector<T> const & fg, vector<T> const & bg, vector<T> const & neglectVals,
-//                                                unsigned debiasMethod);
-    void removeOtherSeedsInfgMap(singleCellSeed &seed, segParameter &p4segVol);
+    float debiasedFgBgBandCompare(cv::Mat *cur_reg, cv::Mat *validNei, singleCellSeed *seed, odStatsParameter p4odStats);
+//    void refineCellTerritoryWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol);
+//    void refineCellsTerritoriesWithSeedRegions(singleCellSeed &seed, segParameter &p4segVol);
+//    void cellShrinkTest(singleCellSeed &seed, segParameter &p4segVol);
+//    void fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol);
+//    void gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
+//    void gapTest2SplitCellTerritory(cv::Mat* seeds_Map /*CV_32S*/, int n, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
+//    void removeOtherSeedsInfgMap(singleCellSeed &seed, segParameter &p4segVol);
 public:
-    Mat *zMap, *idMap, fgMap, fgMapGapRemoved;
+    cv::Mat *zMap, *idMap, fgMap, fgMapGapRemoved;
     int cell_num;
-    vector<float> zscore_list;
-    vector<float> valid_zscore;
-    vector<size_t> valid_zscore_idx;
-    vector<size_t> intensity_levels;
+    std::vector<float> zscore_list;
+    std::vector<float> valid_zscore;
+    std::vector<std::size_t> valid_zscore_idx;
+    std::vector<std::size_t> intensity_levels;
     float max_exist_zscore;
-    size_t maxZ_intensity_level;
+    std::size_t maxZ_intensity_level;
 protected:
-    Mat *srcVolumeUint8;
+    cv::Mat *srcVolumeUint8;
     float src_var;
     unsigned char* imArray;//point to the same address as srcVolume
-    vector<size_t> sortedIndex, parNode;
-    vector<size_t> voxSum, voxSumN, areas, areasN;
-    vector<byte> usedN;
-    vector<byte> outputArray;
-    vector<float> diffN;
-    size_t width, height, zSlice;
-    vector<vector<size_t>> BxCor;
+    std::vector<std::size_t> sortedIndex, parNode;
+    std::vector<std::size_t> voxSum, voxSumN, areas, areasN;
+    std::vector<byte> usedN;
+    std::vector<byte> outputArray;
+    std::vector<float> diffN;
+    std::size_t width, height, zSlice;
+    std::vector<std::vector<std::size_t>> BxCor;
 };
 
 #endif // SYNQUANTSIMPLE_H

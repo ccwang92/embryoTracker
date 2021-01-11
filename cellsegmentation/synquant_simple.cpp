@@ -12,8 +12,12 @@
 //    size_t width, height, zSlice;
 //    Mat boxCoor;
 
+using namespace cv;
+using namespace std;
+//using namespace volproc;
 /**
- * @brief synQuantSimple: the major function of synQuant
+ * @brief synQuantSimple: the major function of synQuant, where the input is the whole FOV data for
+ * a thorough cell segmentation
  * @param srcVolume: float intput
  * @param zMap: float output
  * @param idMap: unsigned int output
@@ -29,374 +33,85 @@ synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4
     //float * zscore_pointer = & (*zscore_list.begin()); // a pointer to the address of zscore_list.begin()
     zMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32F, Scalar(0)); //*zscore_list.begin()
     FOREACH_i_ptrMAT(zMap){
-        if(outputArray[i] == OBJECT && zscore_list[i] > 1.96){
+        if(outputArray[i] == OBJECT && zscore_list[i] > 1.96){//
             zMap->at<float>(i) = zscore_list[i];
         }
     }
-    ccShowSlice3Dmat(zMap, CV_32F, 3);
+
     idMap = new Mat(zMap->dims, zMap->size, CV_32S, Scalar(0));
-    Mat b_map = *zMap > 0;
-    cell_num = connectedComponents3d(&b_map, *idMap, 26); //bug consist, to be checked
-    //cell_num = floatMap2idMap(zMap, *idMap, 26);
+//    Mat b_map = *zMap > 0;
+//    cell_num = connectedComponents3d(&b_map, *idMap, 26);
+
+    cell_num = floatMap2idMap(zMap, *idMap, 26);
+//    for(int i = 0; i < idMap->size[2]; i++)
+//        ccShowSliceLabelMat(idMap, i);
 }
-synQuantSimple::synQuantSimple(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats){
+/**
+ * @brief synQuantSimple: if the input is a seed for a single cell segmentation
+ * @param seed
+ */
+synQuantSimple::synQuantSimple(singleCellSeed &seed){
     srcVolumeUint8 = &seed.volUint8;
     imArray = (unsigned char*)srcVolumeUint8->data;
-    vector<float> var_vals_in_fg = extractValsGivenMask(&seed.varMap, &seed.fgMap, CV_8U, 0);
+    vector<float> var_vals_in_fg = extractValsGivenMask(&seed.varMap, &seed.validSearchAreaMap, CV_8U, 0);
     src_var = vec_mean(var_vals_in_fg);
-    //// 1. find best threshold to get fgMap and apply some basic morphlogical operation (ordstat4fg.m)
-    // PS: the region from this step will has no overlap with other cell's terriotory
-    // PPS: the cell territory may contain more than one cell, we need verify it using gaps.
-    if(seed.bestFgThreshold < 0){
-        // we have no idea what is the best intensity threshold to get the region
-        // we use this funcion to get this.fgMap
-        cellTerritoryExtractFromSeed(seed, p4odStats);
-    } else{
-        // we have alreay have some idea what is the best intensity level
-        // we use thresholding to get this.fgMap
-        bitwise_and(seed.fgMap, seed.volUint8 >= seed.bestFgThreshold, fgMap);
-        // fgMap from simple thresholding may cover >1 cell seeds.
-        removeOtherSeedsInfgMap(seed, p4segVol);
-    }
-    refineCellTerritoryWithSeedRegion(seed, p4segVol);
+    //// the following 5 steps are moved into class cellsegment_main.refineSeed2Region()
+//    //// 1. find best threshold to get fgMap and apply some basic morphlogical operation (ordstat4fg.m)
+//    // PS: the region from this step will has no overlap with other cell's terriotory
+//    // PPS: the cell territory may contain more than one cell, we need verify it using gaps.
+//    if(seed.bestFgThreshold < 0){
+//        // we have no idea what is the best intensity threshold to get the region
+//        // we use this funcion to get this.fgMap
+//        cellTerritoryExtractFromSeed(seed, p4odStats);
+//    } else{
+//        // we have alreay have some idea what is the best intensity level
+//        // we use thresholding to get this.fgMap
+//        bitwise_and(seed.validSearchAreaMap, seed.volUint8 >= seed.bestFgThreshold, fgMap);
+//        // fgMap from simple thresholding may cover >1 cell seeds.
+//        removeOtherSeedsInfgMap(seed, p4segVol);
+//    }
+//    refineCellTerritoryWithSeedRegion(seed, p4segVol);
 
-    //// 2. update seed's score map based on idMap (fg)
-    normalize(seed.eigMap2d, seed.score2d, 0.001, 1, NORM_MINMAX, CV_32F, fgMap);
-    normalize(seed.eigMap3d, seed.score3d, 0.001, 1, NORM_MINMAX, CV_32F, fgMap);
-    seed.scoreMap = seed.score2d + seed.score3d;
-    //// 3. segment fgMap into idMap based on gaps from principal curvature
-    gapBasedRegionSegment(seed, p4segVol, p4odStats);
-    //// 4. refine the idMap from step 3 based on size and other prior knowledge
-    if(cell_num > 1){
-        bool link_bg2sink = false; // this can force seeds to grow as much as they can
-        Mat input_seeds;
-        idMap->copyTo(input_seeds);
-        //Mat scoreMap = seed.score2d + seed.score3d;
-        regionGrow(&input_seeds, cell_num, *idMap, &seed.scoreMap, &fgMap, //idMap is fully included in fgMap
-                   p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
-        //TODO: re-assign extra voxels missed in idMap, but contained in this.fgMap
-    }
-    if(cell_num > 0){ // shrink test
-        cellShrinkTest(seed, p4segVol);
-    }
-    removeSmallCC(*idMap, cell_num, p4segVol.min_cell_sz, true);
+//    //// 2. update seed's score map based on idMap (fg)
+//    normalize(seed.eigMap2d, seed.score2d, 0.001, 1, NORM_MINMAX, CV_32F, fgMap);
+//    normalize(seed.eigMap3d, seed.score3d, 0.001, 1, NORM_MINMAX, CV_32F, fgMap);
+//    seed.scoreMap = seed.score2d + seed.score3d;
+//    //// 3. segment fgMap into idMap based on gaps from principal curvature
+//    gapBasedRegionSegment(seed, p4segVol, p4odStats);
+//    //// 4. refine the idMap from step 3 based on size and other prior knowledge
+//    if(cell_num > 1){
+//        bool link_bg2sink = false; // this can force seeds to grow as much as they can
+//        Mat input_seeds;
+//        idMap->copyTo(input_seeds);
+//        //Mat scoreMap = seed.score2d + seed.score3d;
+//        regionGrow(&input_seeds, cell_num, *idMap, &seed.scoreMap, &fgMap, //idMap is fully included in fgMap
+//                   p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
+//        //TODO: re-assign extra voxels missed in idMap, but contained in this.fgMap
+//    }
+//    if(cell_num > 0){ // shrink test
+//        cellShrinkTest(seed, p4segVol);
+//    }
+//    removeSmallCC(*idMap, cell_num, p4segVol.min_cell_sz, true);
 
-    seed.outCell_num = cell_num;
-    idMap->copyTo(seed.outputIdMap); // output
-    seed.bestFgThreshold = (int) maxZ_intensity_level;
-    //// 5. test if the idMap (fg) is too small, if so, enlarge it and re-do the previous steps
-    // PS: this step id done in cellsegment_main.cpp
+//    seed.outCell_num = cell_num;
+//    idMap->copyTo(seed.outputIdMap); // output
+//    seed.bestFgThreshold = (int) maxZ_intensity_level;
+//    //// 5. test if the idMap (fg) is too small, if so, enlarge it and re-do the previous steps
+//    // PS: this step id done in cellsegment_main.cpp
 }
-/**
- * @brief removeOtherSeedsInfgMap: if we use thresholding, the fgMap may contains more than one seed. This will
- * not happen if we consider othercellterritory as in cellTerritoryExtractFromSeed();
- * @param seed
- * @param p4segVol
- */
-void synQuantSimple::removeOtherSeedsInfgMap(singleCellSeed &seed, segParameter &p4segVol){
-    //// 1. find if there is other cells in fgMap
-    vector<size_t> fg_idx = fgMapIdx(&fgMap, CV_8U, 0);
-    bool other_cell_exist = false;
-    FOREACH_i(fg_idx){
-        if(seed.idMap.at<int>(fg_idx[i]) > 0 &&
-                seed.idMap.at<int>(fg_idx[i]) != seed.id){
-            other_cell_exist = true;
-            break;
-        }
-    }
-    if(!other_cell_exist){
-        return;
-    }
-    Mat seedMap = Mat::zeros(fgMap.dims, fgMap.size, CV_32S);
-    FOREACH_i(fg_idx){
-        if(seed.idMap.at<int>(fg_idx[i]) > 0){
-            if(seed.idMap.at<int>(fg_idx[i]) == seed.id){
-                seedMap.at<int>(fg_idx[i]) = 1;
-            }else{
-                seedMap.at<int>(fg_idx[i]) = 2;
-            }
-        }else if(isOnBoundary2d(&seed.fgMap, fg_idx[i])){
-            // if the boundary of init foreground is also contained, label as sink
-            // this is only considered when we double seed.shift_yxz, since the area are
-            // too large now. The boudnary of init foreground should not be part of target
-            // cell. Before doubling seed.shift_yxz, it is possible.
-            seedMap.at<int>(fg_idx[i]) = 2;
-        }
-    }
-    Mat grownSeedMap2d, grownSeedMap3d;
-    bool bg2sink = true;
-    regionGrow(&seedMap, 2, grownSeedMap2d, &seed.score2d, &fgMap,
-               p4segVol.growConnectInTest, p4segVol.graph_cost_design, bg2sink);
-    bg2sink = false;
-    regionGrow(&grownSeedMap2d, 2, grownSeedMap3d, &seed.scoreMap, &fgMap,
-               p4segVol.growConnectInRefine, p4segVol.graph_cost_design, bg2sink);
 
-    fgMap = grownSeedMap3d == 1;
-}
-void synQuantSimple::cellShrinkTest(singleCellSeed &seed, segParameter &p4segVol){
-
-    int extra_cell = 0;
-    for(int i = 1; i <= cell_num; i++){
-        Mat cur_cell = *idMap == i;
-        Mat shrinked_cell, label_shrinked_cell;
-        volumeErode(&cur_cell, shrinked_cell, p4segVol.shrink_scale_yxz, MORPH_ELLIPSE);
-        int n = connectedComponents3d(&shrinked_cell, label_shrinked_cell, p4segVol.growConnectInRefine);
-
-        if(n > 1){
-            Mat grown_shrinked_cells;
-            bool link_bg2sink = false;
-            regionGrow(&label_shrinked_cell, n, grown_shrinked_cells, &seed.scoreMap, &cur_cell,
-                       p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
-            setValMat(*idMap, CV_32S, &cur_cell, 0.0);
-            Mat sub_cell_mask = grown_shrinked_cells == 1;
-            setValMat(*idMap, CV_32S, &sub_cell_mask, (float)i);
-            for(int j=2; j<=n; j++){
-                sub_cell_mask = grown_shrinked_cells == j;
-                extra_cell ++;
-                setValMat(*idMap, CV_32S, &sub_cell_mask, (float)(extra_cell + cell_num));
-            }
-        }
-    }
-    cell_num += extra_cell;
-}
 
 /**
- * @brief refineFgWithSeedRegion, extract the largest region if fg and remove those
- * voxels that has no z-direction neighbors
- * @param seed
- * @param p4segVol
- */
-void synQuantSimple::refineCellTerritoryWithSeedRegion(singleCellSeed &seed, segParameter &p4segVol){
-    Mat labelMap;
-    int n = connectedComponents3d(&fgMap, labelMap, 6);
-    if (n > 1){
-        int id = largestRegionIdExtract(&labelMap, n, &seed.seedMap);
-        fgMap = labelMap == id;
-    }
-    // remove pixels that happen only at one slice
-    Mat tmp_map;
-    fgMap.copyTo(tmp_map);
-    size_t page_sz = fgMap.size[1] * fgMap.size[0];
-    int width = fgMap.size[1];
-    FOREACH_ijk_ptrMAT(idMap){
-        size_t idx = vol_sub2ind(i,j,k, width, page_sz);
-        if(tmp_map.at<unsigned char>(idx) > 0){
-            if((k-1>=0 && tmp_map.at<unsigned char>(idx - page_sz) == 0) &&
-                (k+1<tmp_map.size[2] && tmp_map.at<unsigned char>(idx + page_sz) == 0)){
-                fgMap.at<unsigned char>(idx) = 0;
-            }
-        }
-    }
-    int radius[] = {1,1,0};
-    volumeDilate(&fgMap, tmp_map, radius, MORPH_ELLIPSE);
-    n = connectedComponents3d(&tmp_map, labelMap, 26);
-    removeSmallCC(labelMap, n, p4segVol.min_cell_sz, false);
-    fgMap = labelMap > 0;
-}
-
-/**
- * @brief fgGapRemoval: remove the gap defined by principal curvature. We jointly consider the 2d and 3d
- * principal curvature, since 3d may be too liberal to remove too much areas
- * @param seed
- * @param p4segVol
- */
-void synQuantSimple::fgGapRemoval(singleCellSeed &seed, segParameter &p4segVol){
-    bitwise_and(fgMap, seed.gap3dMap == 0, fgMapGapRemoved);
-
-    if (!isempty(&fgMapGapRemoved, CV_8U)){
-        Mat seedMapFrom2dMap, mapUnion, mapUnion_label;
-        bitwise_and(fgMap, seed.gap2dMap == 0, seedMapFrom2dMap);// or use -
-        bitwise_or(seedMapFrom2dMap, fgMapGapRemoved, mapUnion); // or use +
-        int numCC = connectedComponents3d(&mapUnion, mapUnion_label, p4segVol.connect4fgGapRemoval);
-        Mat newSeedMap; // CV_8U
-        bool found = findUnrelatedCC(&mapUnion_label, numCC, &fgMapGapRemoved, newSeedMap);
-        if(found){
-            fgMapGapRemoved = fgMapGapRemoved + newSeedMap; //CV_8U
-        }
-    }
-}
-/**
- * @brief gapBasedRegionSegment: use principal curvature to test if current fg contains > 1 cells.
- * @param seed
- * @param p4segVol
- * @param p4odStats
- */
-void synQuantSimple::gapBasedRegionSegment(singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats){
-    // 1. remove gaps defined by principal curvature
-    fgGapRemoval(seed, p4segVol);
-    // 2. check if gaps divided the region into multiple valid seeds
-    Mat label_map;
-    int n = connectedComponents3d(&fgMapGapRemoved, label_map, p4segVol.neiMap);
-    removeSmallCC(label_map, n, p4segVol.min_seed_size, REARRANGE_IDS);
-    if(n <= 1){
-        return;
-    }
-    // 3. gap test: test if the gap is true, if so, split the fg with respect to the multiple seeds
-    gapTest2SplitCellTerritory(&label_map, n, seed, p4segVol, p4odStats);
-}
-/**
- * @brief gapTest2SplitCellTerritory: Given a seeds_map, test if the gap between any two seeds are true or false.
- * If true, keep them. Otherwise, merge the two seeds divided by the gap. If the gap is indeed dimmer than the
- * two seeds it split, it is true. Otherwise false.
- * @param seeds_Map:cv_32s
- * @param n
- * @param seed
- * @param p4segVol
- * @param p4odStats
- */
-void synQuantSimple::gapTest2SplitCellTerritory(Mat* seeds_Map /*CV_32S*/, int n,
-                                                singleCellSeed &seed, segParameter &p4segVol,
-                                                odStatsParameter &p4odStats){
-    // 1. first grow all seeds until they touch with each other
-    Mat grown_seedMap;
-    //Mat scoreMap = seed.score2d + seed.score3d;
-    bool link_bg2sink = false; // this can force seeds to grow as much as they can
-    regionGrow(seeds_Map, n, grown_seedMap, &seed.scoreMap, &fgMap,
-               p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
-
-    // 2. for the connected seeds, test if the gap among them are true
-    // the gap are choosen by dilating the seed regions
-    vector<bool> gap_tested_true(n*n, false);
-    float p_treshold = p4odStats.gapTestThreshold / (p4segVol.gapTestMinMaxRadius[1] - p4segVol.gapTestMinMaxRadius[0]);
-    vector<size_t> real_gap_idx;
-    for(int r = p4segVol.gapTestMinMaxRadius[0]; r <= p4segVol.gapTestMinMaxRadius[1]; r++){
-        vector<vector<size_t>> gap_idx_list;
-        extractGapVoxel(&grown_seedMap, &fgMap, n, r, gap_idx_list, gap_tested_true);
-        FOREACH_i(gap_idx_list){
-            if(gap_idx_list[i].size() > 0){
-                int id0 = i / n + 1;
-                int id1 = i % n + 1;
-                vector<vector<size_t>> nei_list0, nei_list1;
-                Mat cur_fg = grown_seedMap == id0;
-                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list0, 2*r+1);
-                cur_fg = grown_seedMap == id1;
-                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list1, 2*r+1);
-
-                double var_sum = 0;
-                size_t var_idx_num = 0;
-                vector<float> r0, r1, skipped, gap;
-
-                gap = extractValsGivenIdx(&seed.volStblizedFloat, gap_idx_list[i], CV_32F);
-                var_sum += extractSumGivenIdx(&seed.stblizedVarMap, gap_idx_list[i], CV_32F);
-                var_idx_num += gap_idx_list[i].size();
-                for(size_t j = p4odStats.gapTestSkippedBandWidth; j < nei_list0.size(); j++){
-                    vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list0[j], CV_32F);
-                    r0.insert(r0.end(), curr_vals.begin(), curr_vals.end());
-                    var_sum += extractSumGivenIdx(&seed.stblizedVarMap, nei_list0[j], CV_32F);
-                    var_idx_num += nei_list0[j].size();
-                }
-                for(size_t j = p4odStats.gapTestSkippedBandWidth; j < nei_list1.size(); j++){
-                    vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list1[j], CV_32F);
-                    r1.insert(r1.end(), curr_vals.begin(), curr_vals.end());
-                    var_sum += extractSumGivenIdx(&seed.stblizedVarMap, nei_list1[j], CV_32F);
-                    var_idx_num += nei_list1[j].size();
-                }
-                float cur_std = (float)sqrt(var_sum / var_idx_num);
-                float mu, sigma;
-                float p0, p1;
-                if(p4odStats.gapTestMethod == GAP_LOCALORDERSTATS){
-                    float sum_stats0 = vec_mean(r0) - vec_mean(gap);
-                    float sum_stats1 = vec_mean(r1) - vec_mean(gap);
-                    gap.resize(0);
-                    for(size_t j = 0; j < p4odStats.gapTestSkippedBandWidth; j++){
-                        vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list0[j], CV_32F);
-                        skipped.insert(skipped.end(), curr_vals.begin(), curr_vals.end());
-                    }
-                    for(size_t j = 0; j < p4odStats.gapTestSkippedBandWidth; j++){
-                        vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list1[j], CV_32F);
-                        skipped.insert(skipped.end(), curr_vals.begin(), curr_vals.end());
-                    }
-                    orderStatsKSection(r0, gap, skipped, mu, sigma);
-                    mu *= cur_std;
-                    sigma *= cur_std;
-                    p0 = zscore2pvalue((sum_stats0 - mu) / sigma);
-                    p1 = zscore2pvalue((sum_stats1 - mu) / sigma);
-                }else if(p4odStats.gapTestMethod == GAP_ORDERSTATS){
-                    float sum_stats0 = vec_mean(r0) - vec_mean(gap);
-                    float sum_stats1 = vec_mean(r1) - vec_mean(gap);
-
-                    orderStatsKSection(r0, gap, skipped, mu, sigma);
-                    mu *= cur_std;
-                    sigma *= cur_std;
-                    p0 = zscore2pvalue((sum_stats0 - mu) / sigma);
-
-                    orderStatsKSection(r1, gap, skipped, mu, sigma);
-                    mu *= cur_std;
-                    sigma *= cur_std;
-                    p1 = zscore2pvalue((sum_stats1 - mu) / sigma);
-                }else{
-                    qFatal("non-defined method!");
-                    p0 = 0;
-                    p1 = 0;
-                }
-
-                if (p0 <= p_treshold && p1 <= p_treshold){ // gap is true
-                    gap_tested_true[i] = true;
-                    real_gap_idx.insert(real_gap_idx.end(), gap_idx_list[i].begin(), gap_idx_list[i].end());
-                }
-            }
-        }
-        gap_idx_list.clear();
-    }
-    vector<vector<int>> groups;
-    FOREACH_i(gap_tested_true){
-        if(gap_tested_true[i]){
-            int target0 = i / n + 1;
-            int target1 = i % n + 1;
-            bool found_group = false;
-            for(size_t j = 0; j < groups.size(); j++){
-                for(size_t k = 0; k < groups[j].size(); k++){
-                    if(target0 == groups[j][k]){
-                        groups[j].push_back(target1);
-                        found_group = true;
-                        break;
-                    }else if(target1 == groups[j][k]){
-                        groups[j].push_back(target0);
-                        found_group = true;
-                        break;
-                    }
-                }
-                if(found_group) break;
-            }
-            if(!found_group){
-                groups.push_back({target0, target1});
-            }
-        }
-    }
-    vector<int> label_map (n);
-    FOREACH_i(label_map){
-        label_map[i] = i + 1;
-    }
-    FOREACH_i(groups){
-        //vec_unique(groups[i]); //sorted also
-        for(size_t j = 1; j < groups[i].size(); j++){
-            assert(label_map[groups[i][j] - 1] == groups[i][j] || label_map[groups[i][j] - 1] == groups[i][0]);// "Duplicated Regions in two groups");
-            label_map[groups[i][j] - 1] = groups[i][0];
-        }
-    }
-    FOREACH_i_MAT(grown_seedMap){
-        if(grown_seedMap.at<int>(i) > 0){
-            grown_seedMap.at<int>(i) = label_map[grown_seedMap.at<int>(i) - 1];
-        }
-    }
-    vector<size_t> non_used;
-    cell_num = rearrangeIdMap(&grown_seedMap, *idMap, non_used);
-    FOREACH_i(real_gap_idx){ // remove the real gaps
-        idMap->at<int>(real_gap_idx[i]) = 0;
-    }
-}
-
-/**
- * @brief synQuantSimple::cellExtractFromSeed, currently, we use the exact version. But this function should also be able
+ * @brief cellExtractFromSeed: Currently, we use the exact version of synQuant. But this function should also be able
  * to be implemented using component tree condition on the assumption that the intensity has such trend:
  * inner region > boundary > neighbor. The boundary selection can be fulfilled with the similar way as neighbor selection.
  * @param seed
  * @param p4odStats
  */
 void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats){
-    //Scalar seed_val = mean(seed.volUint8, seed.fgMap);// scalar is a vector<double> with length 4 for RGBA data
+    //Scalar seed_val = mean(seed.volUint8, seed.validSearchAreaMap);// scalar is a vector<double> with length 4 for RGBA data
     int ub = MAX(30, round(mat_mean(&seed.volUint8, CV_8U, seed.idx_yxz_cropped)));
-    int lb = MAX(5, round(mean(seed.volUint8, seed.fgMap)[0]));
+    int lb = MAX(5, round(mean(seed.volUint8, seed.validSearchAreaMap)[0]));
     //Mat curr_seed_map = seed.idMap == seed.id; //replaced by seed.seedMap
     if (ub <= lb){
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
@@ -408,7 +123,7 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
     int shift_othercell[] = {3,3,1};
     volumeDilate(&seed.otherIdMap, otherCellTerritory, shift_othercell, MORPH_ELLIPSE);
     bitwise_and(otherCellTerritory, seed.seedMap==0, otherCellTerritory); // remove the area covered by seed region
-    bitwise_and(otherCellTerritory == 0, seed.fgMap, valid_cell_territory); // get the area for current cell and its neighbor
+    bitwise_and(otherCellTerritory == 0, seed.validSearchAreaMap, valid_cell_territory); // get the area for current cell and its neighbor
     double seed_sz = (double)seed.idx_yxz.size();
     max_exist_zscore = -1;
     maxZ_intensity_level = -1;
@@ -1086,7 +801,7 @@ float synQuantSimple::debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singl
     bitwise_and(*validNei, cur_reg_dilate, bg_band);
     volumeDilate(&bg_band, fg_band, dilate_size, MORPH_ELLIPSE);
     bitwise_and(fg_band, *cur_reg, fg_band);
-    fg_center = seed->fgMap - fg_band - bg_band; // key here
+    fg_center = seed->validSearchAreaMap - fg_band - bg_band; // key here
     vector<float> fg_band_vals, bg_band_vals, fg_center_vals;
     fg_band_vals = extractValsGivenMask(&seed->volUint8, &fg_band, CV_8U, 0);
     bg_band_vals = extractValsGivenMask(&seed->volUint8, &bg_band, CV_8U, 0);
