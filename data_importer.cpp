@@ -54,7 +54,6 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
     if (!image4d)  return false;
 
     //now we can simply read files one by one, and arrange them in term of (1) the color channel and (2) z-planes. At this stage we need to verify each plane has the same size, and NOT colored image!!
-
     V3DLONG nsz0=0, nsz1=0;
     ImagePixelType cur_datatype=V3D_UNKNOWN, ndatatype=V3D_UNKNOWN;
     V3DLONG ncolors=0, nthick=0;

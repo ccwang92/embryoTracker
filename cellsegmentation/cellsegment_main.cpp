@@ -15,8 +15,8 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     if (bufSize[0] > INT_MAX || bufSize[1] > INT_MAX || bufSize[2] > INT_MAX){
         qDebug("Data is too large to process: %d!", INT_MAX);
     }
-    data_rows_cols_slices[0] = bufSize[0];
-    data_rows_cols_slices[1] = bufSize[1];
+    data_rows_cols_slices[0] = bufSize[1]; // !!! V3D transpose the image
+    data_rows_cols_slices[1] = bufSize[0];
     data_rows_cols_slices[2] = bufSize[2];
     if (bufSize[3] != 1){
         //qFatal("Input is not a gray image\n");
@@ -65,6 +65,7 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
 //    normalize(tmp, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     Mat normalized_data4d;
     normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
+    //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
     for (int i = 0; i < time_points; i++){
         curr_time_point = i;
@@ -72,6 +73,7 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
         Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
         cell_label_maps[i] = Mat::zeros(3, normalized_data4d.size, CV_32S); // int label
         threshold_maps[i] = Mat::zeros(3, normalized_data4d.size, CV_8U);
+
         cellSegmentSingleFrame(single_frame , i);
     }
 }
@@ -87,7 +89,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     //data_grayim3d is uint8 0-255 datatype
     Mat *dataVolFloat = new Mat(data_grayim3d->dims, data_grayim3d->size, CV_32F);
     data_grayim3d->convertTo(*dataVolFloat, CV_32F);
-    //ccShowSlice3Dmat(dataVolFloat, CV_32F);
+    //ccShowSlice3Dmat(data_grayim3d, CV_8U);
     /******** start to do cell segmentation *******/
     float sigma2d[3] = {3.0, 3.0, 0.0};
     principalCv2d(dataVolFloat, principalCurv2d[curr_frame], sigma2d, p4segVol.min_intensity);
@@ -110,8 +112,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     }
     float stb_var = calVarianceStablization(stblizedVol, stblizedVarMaps[curr_frame], stblizedVarTrends[curr_frame],
                                                        p4odStats.varAtRatio, p4odStats.gap4varTrendEst);
-//    ccShowSlice3Dmat(stblizedVol, CV_32F, 3);
-//    ccShowSlice3Dmat(&stblizedVarMaps[curr_frame], CV_32F, 3);
+    //ccShowSlice3Dmat(&stblizedVarMaps[curr_frame], CV_32F, 3);
     // first use synQuant to get 1-tier seed regions
     synQuantSimple seeds_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
     //ccShowSliceLabelMat(seeds_from_synQuant.idMap, 3);
@@ -243,7 +244,9 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     getRange(seed.y, p4segVol.shift_yxz[0], idMap->size[0], seed.crop_range_yxz[0]);
     getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], seed.crop_range_yxz[1]);
     getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], seed.crop_range_yxz[2]);
-
+    ccShowSliceLabelMat(idMap, 11);
+    seed.idMap = (*idMap)(seed.crop_range_yxz).clone(); // all shallow copy
+    ccShowSliceLabelMat(&seed.idMap, 0);
     seed.seedMap = seed.idMap == seed.id;
     seed.eigMap2d = principalCurv2d[curr_frame](seed.crop_range_yxz); // all shallow copy
     seed.eigMap3d = principalCurv3d[curr_frame](seed.crop_range_yxz); // all shallow copy
@@ -253,7 +256,6 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     seed.gap3dMap = seed.eigMap3d > 0;
     seed.volUint8 = (*data_grayim3d)(seed.crop_range_yxz); // all shallow copy
     seed.volStblizedFloat = (*data_stbized)(seed.crop_range_yxz); // all shallow copy
-    seed.idMap = (*idMap)(seed.crop_range_yxz); // all shallow copy
 
     seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S);
 
@@ -267,8 +269,9 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
         seed.otherIdMap.at<int>(seed.idx_yxz_cropped[i]) = 0;
     }
     // generate the valid fg map
-    Mat regMap = seed.idMap == seed_id;
-    volumeDilate(&regMap/*cv_8u*/, seed.validSearchAreaMap, p4segVol.shift_yxz, MORPH_ELLIPSE);
+    //Mat regMap = (seed.idMap == seed_id);
+    //seed.validSearchAreaMap.create(regMap.dims, regMap.size, CV_8U);
+    volumeDilate(&seed.seedMap/*cv_8u*/, seed.validSearchAreaMap, p4segVol.shift_yxz, MORPH_ELLIPSE);
 }
 
 int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol){

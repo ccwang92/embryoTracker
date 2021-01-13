@@ -340,12 +340,16 @@ float varByTruncate(vector<float> vals4var, int numSigma, int numIter){
     for(int i = 0 ; i< numIter; i++){
         float ub = mu+numSigma*sigma;
         float lb = mu-numSigma*sigma;
-        vector<float> tmpVals = vec_atrange(vals4var, ub, lb, true);
-        float sigmaTr = vec_stddev(tmpVals);
-        //sigmaTr = sqrt(mean(vals(vals<ub & vals>lb).^2));
-        float varCorrectionTerm = truncatedGauss(mu, sigma, lb, ub, t_mu, t_sigma); // only lb and ub is usefull if we only want the third output
-        sigma = sigmaTr/sqrt(varCorrectionTerm);
-        mu = vec_mean(tmpVals);
+        if (lb < ub){
+            vector<float> tmpVals = vec_atrange(vals4var, ub, lb, true);
+            float sigmaTr = vec_stddev(tmpVals);
+            //sigmaTr = sqrt(mean(vals(vals<ub & vals>lb).^2));
+            float varCorrectionTerm = truncatedGauss(mu, sigma, lb, ub, t_mu, t_sigma); // only lb and ub is usefull if we only want the third output
+            sigma = sigmaTr/sqrt(varCorrectionTerm);
+            mu = vec_mean(tmpVals);
+        }else{
+            return 0;
+        }
     }
     return sigma*sigma;
 }
@@ -384,6 +388,7 @@ float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend,
         kernel /= denominator;
         //kernelz = (Mat_<float>(1,7)<<1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0);
     }
+    //ccShowSlice3Dmat(&kernel, CV_32F);
     int x_size  = src3d->size[0];
     int y_size  = src3d->size[1];
     int z_size  = src3d->size[2];
@@ -393,8 +398,10 @@ float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend,
     {
         float *ind = (float*)meanVal.data + z * xy_size; // sub-matrix pointer
         Mat subMatrix(2, meanVal.size, CV_32F, ind);
+        //ccShowSlice3Dmat(src3d, CV_32F);
         //sepFilter2D(subMatrix, subMatrix, CV_32F, kernely, kernelx, Point(-1,-1), 0.0, BORDER_REPLICATE);
         filter2D(subMatrix, subMatrix, -1, kernel);
+        //ccShowSlice3Dmat(&subMatrix, CV_32F);
     }
     //sepFilter2D(*src3d, meanVal, CV_32F, kernelx, kernely, Point(-1,-1), 0.0, BORDER_REPLICATE);
     double min_intensity, max_intensity;
@@ -446,12 +453,16 @@ float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend,
             }
             nei_vec_step ++;
         }
-        vector<float> vals4var (cur_level_idx.size());
-        for (size_t j = 0; j < cur_level_idx.size(); j++){
-            vals4var[j] = diff.at<float>(cur_level_idx[j]);
+        if (cur_level_idx.size() < 100){ // valid pionts are limited
+            if (cur_level > 0) varTrend[cur_level] = varTrend[cur_level-1];
+        }else{
+            vector<float> vals4var (cur_level_idx.size());
+            for (size_t j = 0; j < cur_level_idx.size(); j++){
+                vals4var[j] = diff.at<float>(cur_level_idx[j]);
+            }
+            float varCur = varByTruncate(vals4var, 2, 3);
+            varTrend[cur_level] = (denominator/(denominator+1))*varCur;
         }
-        float varCur = varByTruncate(vals4var, 2, 3);
-        varTrend[cur_level] = (denominator/(denominator+1))*varCur;
         testedElements += cur_level_idx.size();
         if (cur_level < target_level &&
                 ((float)testedElements/validElements > validRatio)){
@@ -470,6 +481,7 @@ float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend,
         varMap = Mat::zeros(meanVal.dims, meanVal.size, CV_32F);
     }
     float min_valid_intensity = min_intensity+unit_intensity;
+    //ccShowSlice3Dmat(&meanVal, CV_32F, 3);
     for(size_t i = 0; i < xy_size*z_size; i++){
         if (meanVal.at<float>(i) > min_valid_intensity){
             cur_level = (int) ((meanVal.at<float>(i) - min_intensity)/unit_intensity);
@@ -478,7 +490,7 @@ float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend,
             varMap.at<float>(i) = varTrend[cur_level];
         }
     }
-
+    //ccShowSlice3Dmat(&varMap, CV_32F, 3);
     //varTrend = *xx;
     return varTrend[target_level];
 }
@@ -1788,7 +1800,7 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
         s_max << fixed << setprecision(2) << max_v;
         string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
         imshow(title, *single_slice);
-        waitKey(0);
+        waitKey(1000);
         destroyWindow(title);
     }else{
         if(datatype == CV_8U){
@@ -1799,6 +1811,8 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
             unsigned short *ind = (unsigned short*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
             single_slice = new Mat(2, src3d->size, CV_16U, ind);
             minMaxIdx(*single_slice, &min_v, &max_v);
+            *single_slice *= 10;
+            //normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX, CV_32F);
         }else if(datatype == CV_32F){
             float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
             single_slice = new Mat(2, src3d->size, CV_32F, ind);
@@ -1814,7 +1828,7 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
         s_max << fixed << setprecision(2) << max_v;
         string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
         imshow(title, *single_slice);
-        waitKey(0);
+        waitKey(1000);
         //destroyWindow(title);
         //destroyAllWindows();
     }
@@ -1948,5 +1962,5 @@ void ccShowSliceLabelMat(Mat *src3d, int slice){
     Mat3b mat2display;
     label2rgb2d(mat2show, mat2display);
     imshow(title, mat2display);
-    waitKey(0);
+    waitKey(1000);
 }

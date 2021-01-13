@@ -569,6 +569,7 @@ template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size)
 
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size){
     size_t nPixels_slice = size[0]*size[1];
+    idx.resize(y.size());
     FOREACH_i(y){
         idx[i] = z[i]*nPixels_slice + x[i] + y[i]*size[1];
     }

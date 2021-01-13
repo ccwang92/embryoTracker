@@ -1244,7 +1244,7 @@ OUT* connected_components3d(
 template <typename T, typename OUT = uint32_t>
 OUT* connected_components3d(
     T* in_labels,
-    const int64_t sx, const int64_t sy, const int64_t sz,
+    const int64_t sy /*#rows*/, const int64_t sx /*#cols*/, const int64_t sz /*#slices*/,
     const int64_t connectivity=26, size_t &N = _dummy_N
   ) {
   const size_t voxels = sx * sy * sz;

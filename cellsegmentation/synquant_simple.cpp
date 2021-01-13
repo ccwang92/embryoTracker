@@ -37,12 +37,14 @@ synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4
             zMap->at<float>(i) = zscore_list[i];
         }
     }
-
+    //ccShowSlice3Dmat(zMap, CV_32F, 3);
     idMap = new Mat(zMap->dims, zMap->size, CV_32S, Scalar(0));
-//    Mat b_map = *zMap > 0;
-//    cell_num = connectedComponents3d(&b_map, *idMap, 26);
-
+    //Mat b_map = *zMap > 0;
+    //ccShowSlice3Dmat(&b_map, CV_8U, 3);
+    //cell_num = connectedComponents3d(&b_map, *idMap, 26);
+    //ccShowSliceLabelMat(idMap, 3);
     cell_num = floatMap2idMap(zMap, *idMap, 26);
+    //ccShowSliceLabelMat(idMap, 0);
 //    for(int i = 0; i < idMap->size[2]; i++)
 //        ccShowSliceLabelMat(idMap, i);
 }
@@ -110,6 +112,7 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed){
  */
 void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats){
     //Scalar seed_val = mean(seed.volUint8, seed.validSearchAreaMap);// scalar is a vector<double> with length 4 for RGBA data
+    ccShowSlice3Dmat(&seed.volUint8, CV_8U, 3);
     int ub = MAX(30, round(mat_mean(&seed.volUint8, CV_8U, seed.idx_yxz_cropped)));
     int lb = MAX(5, round(mean(seed.volUint8, seed.validSearchAreaMap)[0]));
     //Mat curr_seed_map = seed.idMap == seed.id; //replaced by seed.seedMap
