@@ -549,7 +549,7 @@ template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize si
     z = idx / (size[0]*size[1]);
     T rmder = idx % (size[0]*size[1]);
     y = rmder/size[1];
-    x = rmder-y*size[0];
+    x = rmder-y*size[1];
 
 }
 

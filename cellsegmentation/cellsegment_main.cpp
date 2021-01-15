@@ -244,19 +244,69 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     getRange(seed.y, p4segVol.shift_yxz[0], idMap->size[0], seed.crop_range_yxz[0]);
     getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], seed.crop_range_yxz[1]);
     getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], seed.crop_range_yxz[2]);
-    ccShowSliceLabelMat(idMap, 11);
-    seed.idMap = (*idMap)(seed.crop_range_yxz).clone(); // all shallow copy
-    ccShowSliceLabelMat(&seed.idMap, 0);
+
+//// debug of label2rgb function
+    //ccShowSliceLabelMat(idMap);
+//    Mat tmp = idMap->clone();
+//    tmp.convertTo(tmp, CV_8U);
+//    Range xyz[3];
+//    xyz[0] = Range(0, 125);
+//    xyz[1] = Range(0, 250);
+//    xyz[2] = Range(0, 3);
+
+//    Mat subMat = tmp(xyz).clone();
+//    int *ind = (int*) tmp.data;
+//    Mat single_s = Mat(2, tmp.size, CV_8U, ind);
+//    imshow("test_", single_s>0);
+//    waitKey(0);
+//    ccShowSliceLabelMat(&subMat);
+
+//    Range xy[2];
+//    xy[0] = Range(0, 100);
+//    xy[1] = Range(0, 125);
+//    int *ind = (int*) idMap->data;
+//    Mat single_s = Mat(2, idMap->size, CV_32S, ind);
+//    //ccShowSliceLabelMat(&single_s);
+
+////    cv::Rect roi(0, 0, 125, 100);
+////    Mat1i subMat2 = single_s;
+//    //single_s.convertTo(single_s, CV_32S);
+//    Mat subMat3 = single_s(xy).clone();
+//    //imshow("test", subMat3 > 0);
+//    //waitKey(0);
+    //ccShowSliceLabelMat(idMap);
+//    Range xyz[3];
+//    xyz[0] = Range(0, 100);
+//    xyz[1] = Range(0, 250);
+//    xyz[2] = Range(0, 1);
+//    int size[3] = {xyz[0].end - xyz[0].start,
+//                  xyz[1].end - xyz[1].start,
+//                  xyz[2].end - xyz[2].start};
+//    seed.idMap.create(3, size, CV_32S);
+    subVolExtract(idMap, CV_32S, seed.idMap, seed.crop_range_yxz);
+    //ccShowSliceLabelMat(&seed.idMap);
+    //seed.idMap = (*idMap)(seed.crop_range_yxz).clone(); // all shallow copy
+    //ccShowSliceLabelMat(&seed.idMap);
     seed.seedMap = seed.idMap == seed.id;
-    seed.eigMap2d = principalCurv2d[curr_frame](seed.crop_range_yxz); // all shallow copy
-    seed.eigMap3d = principalCurv3d[curr_frame](seed.crop_range_yxz); // all shallow copy
-    seed.varMap = varMaps[curr_frame](seed.crop_range_yxz); // all shallow copy
-    seed.stblizedVarMap = stblizedVarMaps[curr_frame](seed.crop_range_yxz); // all shallow copy
+
+//    seed.eigMap2d = principalCurv2d[curr_frame](seed.crop_range_yxz); // all shallow copy
+//    seed.eigMap3d = principalCurv3d[curr_frame](seed.crop_range_yxz); // all shallow copy
+//    seed.varMap = varMaps[curr_frame](seed.crop_range_yxz); // all shallow copy
+//    seed.stblizedVarMap = stblizedVarMaps[curr_frame](seed.crop_range_yxz); // all shallow copy
+    subVolExtract(&principalCurv2d[curr_frame], CV_32F, seed.eigMap2d, seed.crop_range_yxz);// deep copy
+    subVolExtract(&principalCurv3d[curr_frame], CV_32F, seed.eigMap3d, seed.crop_range_yxz);// deep copy
+    subVolExtract(&varMaps[curr_frame], CV_32F, seed.varMap, seed.crop_range_yxz);// deep copy
+    subVolExtract(&stblizedVarMaps[curr_frame], CV_32F, seed.stblizedVarMap, seed.crop_range_yxz);// deep copy
+    //ccShowSlice3Dmat(&seed.stblizedVarMap, CV_32F);
     seed.gap2dMap = seed.eigMap2d > 0;
     seed.gap3dMap = seed.eigMap3d > 0;
-    seed.volUint8 = (*data_grayim3d)(seed.crop_range_yxz); // all shallow copy
-    seed.volStblizedFloat = (*data_stbized)(seed.crop_range_yxz); // all shallow copy
-
+//    seed.volUint8 = (*data_grayim3d)(seed.crop_range_yxz); // all shallow copy
+//    seed.volStblizedFloat = (*data_stbized)(seed.crop_range_yxz); // all shallow copy
+    subVolExtract(data_grayim3d, CV_8U, seed.volUint8, seed.crop_range_yxz);// deep copy
+    subVolExtract(data_stbized, CV_32F, seed.volStblizedFloat, seed.crop_range_yxz);// deep copy
+    ccShowSliceLabelMat(&seed.idMap, 6);
+    ccShowSlice3Dmat(&seed.seedMap, CV_8U, 6);
+    ccShowSlice3Dmat(&seed.volUint8, CV_8U);
     seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S);
 
     vec_sub2ind(seed.idx_yxz_cropped, vec_Minus(seed.y, seed.crop_range_yxz[0].start),

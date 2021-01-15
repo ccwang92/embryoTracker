@@ -788,7 +788,7 @@ int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap){
 }
 void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range){
     int min_v = max(0, *min_element(idx_sub.begin(), idx_sub.end()) - shift);
-    int max_v = min(bound, *max_element(idx_sub.begin(), idx_sub.end()) + shift);
+    int max_v = min(bound, *max_element(idx_sub.begin(), idx_sub.end()) + shift+1);
     out_range = Range(min_v, max_v);
 }
 void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities){
@@ -1366,8 +1366,8 @@ void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t>
     FOREACH_i(idx){
         z = idx[i] / page_sz;
         remain = idx[i] - (z*page_sz);
-        x = remain / sz[0];
-        y = remain - x * sz[0];
+        y = remain / sz[1];
+        x = remain - x * sz[1];
         for(int j = 0; j < n_y.size(); j++){
             if(inField(y + n_y[j], x + n_x[j], z + n_z[j], sz)){
                 cur_nei_idx = x + n_x[j] + (y + n_y[j])*sz[1] + (z + n_z[j])*page_sz;
@@ -1550,8 +1550,8 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
         if (label_map->at<int>(gap_idx[i]) == target_label0){
             z = gap_idx[i] / page_sz;
             remain = gap_idx[i] - (z*page_sz);
-            x = remain / im_sz[0];
-            y = remain - x * im_sz[0];
+            y = remain / im_sz[1];
+            x = remain - x * im_sz[1];
 
             for(int j = 0; j < 8; j++){
                 if(inField(y+n_y[j], x+n_x[j], im_sz) &&
@@ -1565,8 +1565,8 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
         }else if(label_map->at<int>(gap_idx[i]) == target_label1){
             z = gap_idx[i] / page_sz;
             remain = gap_idx[i] - (z*page_sz);
-            x = remain / im_sz[0];
-            y = remain - x * im_sz[0];
+            y = remain / im_sz[1];
+            x = remain - x * im_sz[1];
             for(int j = 0; j < 8; j++){
                 if(inField(y+n_y[j], x+n_x[j], im_sz) &&
                         label_map->at<int>(gap_idx[i] + n_y[j] * im_sz[1] + n_x[j])==0){
@@ -1668,8 +1668,8 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
         }else{
             z = gap_idx[i] / page_sz;
             remain = gap_idx[i] - (z*page_sz);
-            x = remain / im_sz[0];
-            y = remain - x * im_sz[0];
+            y = remain / im_sz[1];
+            x = remain - x * im_sz[1];
             if(pointPolygonTest(contour, Point2f((float)y, (float)x), false)>=0){
                 gap_idx[valid_idx_cnt] = gap_idx[i];
                 valid_idx_cnt ++;
@@ -1697,8 +1697,8 @@ void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
     FOREACH_i(valid_fg_idx){
         z = valid_fg_idx[i] / page_sz;
         remain = valid_fg_idx[i] - (z*page_sz);
-        x = remain / im_sz[0];
-        y = remain - x * im_sz[0];
+        y = remain / im_sz[1];
+        x = remain - x * im_sz[1];
         nei_seed_cnt = 0;
         for(int n_x = -gap_radius; n_x <= gap_radius; n_x++){
             for(int n_y = -gap_radius; n_y <= gap_radius; n_y++){
@@ -1765,8 +1765,8 @@ void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &nei
         FOREACH_j(curr_idx){
             z = curr_idx[i] / page_sz;
             remain = curr_idx[i] - (z*page_sz);
-            x = remain / im_sz[0];
-            y = remain - x * im_sz[0];
+            y = remain / im_sz[1];
+            x = remain - y * im_sz[1];
             for(int k = 0; k < 8; k++){
                 if(inField(y+n_y[k], x+n_x[k], im_sz)){
                     vol_sub2ind(tmp_idx, y+n_y[k], x+n_x[k], z, fgMap->size);
@@ -1779,8 +1779,63 @@ void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &nei
         }
     }
 }
-
-
+/**
+ * @brief subVolExtract: given range, extrat the sub volume from src voluem
+ * @param src
+ * @param datatype
+ * @param subVol
+ * @param xyz_range
+ */
+void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    int size[3] = {yxz_range[0].end - yxz_range[0].start,
+                  yxz_range[1].end - yxz_range[1].start,
+                  yxz_range[2].end - yxz_range[2].start};
+    subVol.create(3, size, datatype);
+    size_t src_pgsz = src->size[0] * src->size[1];
+    size_t sub_pgsz = size[0] * size[1];
+    size_t src_page_shift, sub_page_shift, src_row_shift, sub_row_shift;
+    if (datatype == CV_8U){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src->size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i) =
+                            src->at<unsigned char>(src_page_shift + src_row_shift + i + yxz_range[1].start);
+                }
+            }
+        }
+    }else if(datatype == CV_32F){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src->size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    subVol.at<float>(sub_page_shift + sub_row_shift + i) =
+                            src->at<float>(src_page_shift + src_row_shift + i + yxz_range[1].start);
+                }
+            }
+        }
+    }else if(datatype == CV_32S){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src->size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    subVol.at<int>(sub_page_shift + sub_row_shift + i) =
+                            src->at<int>(src_page_shift + src_row_shift + i + yxz_range[1].start);
+                }
+            }
+        }
+    }
+}
 
 
 /**************************Functions for debug*******************************/
@@ -1789,48 +1844,63 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
     int sz_single_frame = src3d->size[1] * src3d->size[0];
     Mat *single_slice;
     double min_v, max_v;
-    if (binary){
-        Mat bi_mat = *src3d > EPSILON_0;
-        unsigned char *ind = (unsigned char*)bi_mat.data + sz_single_frame*slice; // sub-matrix pointer
-        single_slice = new Mat(2, src3d->size, CV_8U, ind); // note, this pointer will be null out of this if
-        double min_v, max_v;
-        minMaxIdx(*single_slice, &min_v, &max_v);
-        stringstream s_min, s_max;
-        s_min << fixed << setprecision(2) << min_v;
-        s_max << fixed << setprecision(2) << max_v;
-        string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
-        imshow(title, *single_slice);
-        waitKey(1000);
-        destroyWindow(title);
-    }else{
-        if(datatype == CV_8U){
-            unsigned char *ind = (unsigned char*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
-            single_slice = new Mat(2, src3d->size, CV_8U, ind);
+    while (true){
+        if (binary){
+            Mat bi_mat = *src3d > EPSILON_0;
+            unsigned char *ind = (unsigned char*)bi_mat.data + sz_single_frame*slice; // sub-matrix pointer
+            single_slice = new Mat(2, src3d->size, CV_8U, ind); // note, this pointer will be null out of this if
+            double min_v, max_v;
             minMaxIdx(*single_slice, &min_v, &max_v);
-        }else if(datatype == CV_16U){
-            unsigned short *ind = (unsigned short*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
-            single_slice = new Mat(2, src3d->size, CV_16U, ind);
-            minMaxIdx(*single_slice, &min_v, &max_v);
-            *single_slice *= 10;
-            //normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX, CV_32F);
-        }else if(datatype == CV_32F){
-            float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
-            single_slice = new Mat(2, src3d->size, CV_32F, ind);
-            minMaxIdx(*single_slice, &min_v, &max_v);
-            normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX);
+            stringstream s_min, s_max;
+            s_min << fixed << setprecision(2) << min_v;
+            s_max << fixed << setprecision(2) << max_v;
+            string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
+            imshow(title, *single_slice);
+            //waitKeyEx(0);
+            int key = waitKeyEx(0);
+            if(src3d->dims <3) break;
+            if(key == 65361) slice = MAX(slice-1, 0); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+            else if(key == 65363) slice = MIN(slice+1, src3d->size[2] - 1); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+            else {
+                break;
+            }
+            //destroyWindow(title);
         }else{
-            single_slice = nullptr;
-            qFatal("Unsupported data type!");
-        }
+            if(datatype == CV_8U){
+                unsigned char *ind = (unsigned char*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+                single_slice = new Mat(2, src3d->size, CV_8U, ind);
+                minMaxIdx(*single_slice, &min_v, &max_v);
+            }else if(datatype == CV_16U){
+                unsigned short *ind = (unsigned short*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+                single_slice = new Mat(2, src3d->size, CV_16U, ind);
+                minMaxIdx(*single_slice, &min_v, &max_v);
+                *single_slice *= 10;
+                //normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX, CV_32F);
+            }else if(datatype == CV_32F){
+                float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+                single_slice = new Mat(2, src3d->size, CV_32F, ind);
+                minMaxIdx(*single_slice, &min_v, &max_v);
+                normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX);
+            }else{
+                single_slice = nullptr;
+                qFatal("Unsupported data type!");
+            }
 
-        stringstream s_min, s_max;
-        s_min << fixed << setprecision(2) << min_v;
-        s_max << fixed << setprecision(2) << max_v;
-        string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
-        imshow(title, *single_slice);
-        waitKey(1000);
-        //destroyWindow(title);
-        //destroyAllWindows();
+            stringstream s_min, s_max;
+            s_min << fixed << setprecision(2) << min_v;
+            s_max << fixed << setprecision(2) << max_v;
+            string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
+            imshow(title, *single_slice);
+            int key = waitKeyEx(0);
+            if(src3d->dims <3) break;
+            if(key == 65361) slice = MAX(slice-1, 0); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+            else if(key == 65363) slice = MIN(slice+1, src3d->size[2] - 1); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+            else {
+                break;
+            }
+            //destroyWindow(title);
+            //destroyAllWindows();
+        }
     }
     delete single_slice;
 }
@@ -1948,19 +2018,45 @@ void label2rgb2d(Mat1i &src, Mat3b &dst)
 }
 
 void ccShowSliceLabelMat(Mat *src3d, int slice){
-    int sz_single_frame = src3d->size[1] * src3d->size[0];
-    int *ind = (int*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
-    Mat single_slice(2, src3d->size, CV_32S, ind);
-    Mat1i mat2show = single_slice;
-    double min_v, max_v;
 
-    minMaxIdx(mat2show, &min_v, &max_v);
-    stringstream s_min, s_max;
-    s_min << fixed << setprecision(2) << min_v;
-    s_max << fixed << setprecision(2) << max_v;
-    string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
-    Mat3b mat2display;
-    label2rgb2d(mat2show, mat2display);
-    imshow(title, mat2display);
-    waitKey(1000);
+    while (true){
+        int sz_single_frame = src3d->size[1] * src3d->size[0];
+        int *ind = (int*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+        //// The following line is very dangerous if the input
+        /// matrix is not saved in continuous memory. E.g. if the input
+        /// matrix is just a shallow crop of a intact mat, the index is
+        /// not continuous.
+        Mat single_slice(2, src3d->size, CV_32S, ind);
+//        imshow("test_", single_slice > 0);
+//        waitKey(0);
+        Mat1i mat2show = single_slice;
+        double min_v, max_v;
+
+        minMaxIdx(mat2show, &min_v, &max_v);
+        stringstream s_min, s_max;
+        s_min << fixed << setprecision(2) << min_v;
+        s_max << fixed << setprecision(2) << max_v;
+        string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str() + ".";
+    //    if (getWindowProperty(title, WND_PROP_AUTOSIZE) >= 0){
+    //        title += " -1";
+    //    }
+        int i = rand();
+        title += to_string(i);
+        Mat3b mat2display;
+        label2rgb2d(mat2show, mat2display);
+        string folder = "/home/ccw/Desktop/embryo_res_folder/crop_embryo_data_500x500x30x40/imgs/";
+        //imwrite(folder + title + ".png", mat2show);
+//        imshow(title, single_slice>0);
+//        waitKey(0);
+//        imshow(title, mat2show>0);
+//        waitKey(0);
+        imshow(title, mat2display);
+        int key = waitKeyEx(0);
+        if(src3d->dims <3) break;
+        if(key == 65361) slice = MAX(slice-1, 0); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+        else if(key == 65363) slice = MIN(slice+1, src3d->size[2] - 1); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+        else {
+            break;
+        }
+    }
 }
