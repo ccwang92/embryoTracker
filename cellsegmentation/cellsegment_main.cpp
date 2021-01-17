@@ -176,6 +176,7 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
     //1. sort the seeds based on intensity levels
     vector<float> seed_intensity(seed_num);
     regionAvgIntensity(dataVolFloat, idMap, seed_intensity);
+    //ccShowSlice3Dmat(dataVolFloat, CV_32F);
     vector<size_t> seed_intensity_order;
     seed_intensity_order = sort_indexes(seed_intensity, false); // false->descending
     //2. for each seed, refine it region
@@ -184,7 +185,7 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 
     int cell_cnt = 0;
     FOREACH_i(seed_intensity_order){
-        int seed_id = seed_intensity_order[i];
+        int seed_id = seed_intensity_order[i] + 1;
         singleCellSeed seed;
         cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap,
                 curr_frame, seed, p4segVol);
@@ -240,7 +241,7 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     seed.x.resize(idx_yxz.size());
     seed.z.resize(idx_yxz.size());
     vec_ind2sub(idx_yxz, seed.y, seed.x, seed.z, idMap->size);// MatSize itself is a vector
-
+//    ccShowSliceLabelMat(idMap);
     getRange(seed.y, p4segVol.shift_yxz[0], idMap->size[0], seed.crop_range_yxz[0]);
     getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], seed.crop_range_yxz[1]);
     getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], seed.crop_range_yxz[2]);
@@ -304,24 +305,36 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
 //    seed.volStblizedFloat = (*data_stbized)(seed.crop_range_yxz); // all shallow copy
     subVolExtract(data_grayim3d, CV_8U, seed.volUint8, seed.crop_range_yxz);// deep copy
     subVolExtract(data_stbized, CV_32F, seed.volStblizedFloat, seed.crop_range_yxz);// deep copy
-    ccShowSliceLabelMat(&seed.idMap, 6);
-    ccShowSlice3Dmat(&seed.seedMap, CV_8U, 6);
-    ccShowSlice3Dmat(&seed.volUint8, CV_8U);
+//    ccShowSliceLabelMat(&seed.idMap, 6);
+//    ccShowSlice3Dmat(&seed.seedMap, CV_8U, 6);
+//    ccShowSlice3Dmat(&seed.volUint8, CV_8U, 6);
     seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S);
-
+    //ccShowSliceLabelMat(idMap);
     vec_sub2ind(seed.idx_yxz_cropped, vec_Minus(seed.y, seed.crop_range_yxz[0].start),
             vec_Minus(seed.x, seed.crop_range_yxz[1].start),
             vec_Minus(seed.z, seed.crop_range_yxz[2].start), seed.idMap.size);// MatSize itself is a vector
-
+    //ccShowSliceLabelMat(idMap);
     //seed.idMap.copyTo(seed.otherIdMap);
     seed.otherIdMap = seed.idMap > 0;
     FOREACH_i(seed.idx_yxz_cropped){
-        seed.otherIdMap.at<int>(seed.idx_yxz_cropped[i]) = 0;
+        seed.otherIdMap.at<unsigned char>(seed.idx_yxz_cropped[i]) = 0;
     }
+    //ccShowSliceLabelMat(idMap);
     // generate the valid fg map
     //Mat regMap = (seed.idMap == seed_id);
-    //seed.validSearchAreaMap.create(regMap.dims, regMap.size, CV_8U);
+
+    //ccShowSliceLabelMat(idMap);
+    //p4segVol.shift_yxz[2] = 0;
+    //// NOTE: if there is a segmentation error, check first if the Mat format is wrongly
+    /// assigned. This is a problem of using opencv, where data format is predefined everywhere.
+    //seed.validSearchAreaMap.create(seed.seedMap.dims, seed.seedMap.size, CV_8U);
     volumeDilate(&seed.seedMap/*cv_8u*/, seed.validSearchAreaMap, p4segVol.shift_yxz, MORPH_ELLIPSE);
+    //ccShowSlice3Dmat(&seed.idMap, CV_32S, 7);
+//    ccShowSlice3Dmat(data_grayim3d, CV_8U);
+//    ccShowSliceLabelMat(idMap);
+//    ccShowSliceLabelMat(&seed.idMap);
+//    ccShowSlice3Dmat(&seed.seedMap, CV_8U, 7);
+//    ccShowSlice3Dmat(&seed.validSearchAreaMap, CV_8U);
 }
 
 int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4odStats, segParameter p4segVol){
@@ -343,6 +356,7 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         // fgMap from simple thresholding may cover >1 cell seeds.
         removeOtherSeedsInfgMap(cellSegFromSynQuant, seed, p4segVol);
     }
+    ccShowSlice3Dmat(&cellSegFromSynQuant.fgMap, CV_8U);
     refineCellTerritoryWithSeedRegion(cellSegFromSynQuant, seed, p4segVol);
 
     //// 2. update seed's score map based on idMap (fg)

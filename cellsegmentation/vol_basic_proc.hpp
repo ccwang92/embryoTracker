@@ -1912,7 +1912,7 @@ vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in){
  * @param threshold_in
  * @return
  */
-vector<float> extractValsGivenMask(Mat *val3d, Mat *src3d, int datatype, float threshold_in){
+vector<float> extractValsGivenMask(Mat *val3d, int datatype, Mat *src3d, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     vector<float> fg_vals;
     if (datatype == CV_8U){
@@ -1923,13 +1923,13 @@ vector<float> extractValsGivenMask(Mat *val3d, Mat *src3d, int datatype, float t
         }
     }else if (datatype == CV_32F){
         FOREACH_i_ptrMAT(src3d){
-            if(src3d->at<float>(i) > threshold_in){
+            if(src3d->at<unsigned char>(i) > threshold_in){
                 fg_vals.push_back(val3d->at<float>(i));
             }
         }
     }else if (datatype == CV_32S){
         FOREACH_i_ptrMAT(src3d){
-            if(src3d->at<int>(i) > threshold_in){
+            if(src3d->at<unsigned char>(i) > threshold_in){
                 fg_vals.push_back((float)val3d->at<int>(i));
             }
         }

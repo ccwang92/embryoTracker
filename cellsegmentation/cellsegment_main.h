@@ -79,8 +79,8 @@ public:
         p4segVol.growSeedInTracking = false;
 
         p4odStats.gap4varTrendEst = 2;
-        p4odStats.gap4fgbgCompare = 0;
-        p4odStats.roundNum4fgbgCompare = 3;
+        p4odStats.gap4fgbgCompare = 0; // the fg and bg should be adjacent
+        p4odStats.roundNum4fgbgCompare = 3; // fg/bg both are width-3 band
         p4odStats.varAtRatio = 0.80;
         p4odStats.fgSignificanceTestWay = KSEC;
         p4odStats.minGapWithOtherCell_yxz[0] = 3;

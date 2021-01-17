@@ -82,7 +82,7 @@ int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask);
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
-vector<float> extractValsGivenMask(Mat *vol3d, Mat *src3d, int datatype, float threshold_in);
+vector<float> extractValsGivenMask(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
 vector<float> extractValsGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
 double extractSumGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
 bool findUnrelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d);
@@ -137,7 +137,7 @@ template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size);
 
 
-template <typename T> vector<T> vec_cumsum(vector<T> v1);
+template <typename T> vector<double> vec_cumsum(vector<T> v1);
 template <typename T> vector<T> vec_pointMultiply(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_Minus(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_Minus(vector<T> v1, T s2);
@@ -153,7 +153,7 @@ template <typename T> T pvalue2zscore(T p);
 template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
 template <typename T> T vec_stddev(vector<T> const & func);
 template <typename T> T vec_variance(vector<T> const & func);
-template <typename T> T vec_mean(vector<T> const & func);
+template <typename T> float vec_mean(vector<T> const & func);
 template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx);
 template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx);
 template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx);

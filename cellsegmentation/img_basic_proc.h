@@ -9,9 +9,9 @@
 //   return 0.5 * erfc(-value * M_SQRT1_2);
 //}
 /** template functions needs to be implemented in header files. */
-template <typename T> vector<T> vec_cumsum(vector<T> v1){
+template <typename T> vector<double> vec_cumsum(vector<T> v1){
     assert(v1.size() > 0);
-    vector<T> out(v1.size());
+    vector<double> out(v1.size());
     out[0] = v1[0];
     for (size_t i=1 ;i<v1.size(); i++){
         out[i] = v1[i] + out[i-1];
@@ -294,9 +294,9 @@ template <typename T> T vec_variance(vector<T> const & func)
         [mean](T const & x, T const & y) { return (x - mean)*(y - mean); });
     return sq_sum / ( func.size() - 1 );
 }
-template <typename T> T vec_mean(vector<T> const & func)
+template <typename T> float vec_mean(vector<T> const & func)
 {
-    return accumulate(func.begin(), func.end(), 0.0) / func.size();
+    return (float)(accumulate(func.begin(), func.end(), 0.0) / func.size());
 }
 template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx){
     auto max_val_it = max_element(func.begin(), func.end());
@@ -316,23 +316,23 @@ template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx){
         FOREACH_i(idx){
             sum += src3d->at<unsigned char>(idx[i]);
         }
-        return (float) sum/idx.size();
+        return (float) (sum/idx.size());
     }else if (datatype == CV_32F){
         FOREACH_i(idx){
             sum += src3d->at<float>(idx[i]);
         }
-        return (float) sum/idx.size();
+        return (float) (sum/idx.size());
     }else{ //CV_32S is the same as float
         FOREACH_i(idx){
             sum += src3d->at<int>(idx[i]); //int_32_t as default
         }
-        return (float) sum/idx.size();
+        return (float) (sum/idx.size());
     }
 }
 template <typename T> vector<size_t> sort_indexes(const vector<T> &v, bool ascending, size_t start_id) {
     // initialize original index locations
     vector<size_t> idx(v.size());
-    iota(idx.begin(), idx.end(), start_id);
+    iota(idx.begin(), idx.end(), 0);
 
     // sort indexes based on comparing values in v
     // using std::stable_sort instead of std::sort
@@ -344,6 +344,10 @@ template <typename T> vector<size_t> sort_indexes(const vector<T> &v, bool ascen
     else
         stable_sort(idx.begin(), idx.end(),
                     [&v](size_t i1, size_t i2) {return v[i1] > v[i2];});
+    if (start_id != 0)
+    {
+        FOREACH_i(idx) idx[i] += start_id;
+    }
     return idx;
 }
 
@@ -443,12 +447,18 @@ template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector
     double mid_sz = (double)otherVals.size();
     double n = M+N+mid_sz;
 
+//    vector<float> zz(4);
+//    zz[0] = 3;
+//    zz[1] = 2;
+//    zz[2] = 1;
+//    zz[3] = 4;
+//    vector<size_t> zz_si = sort_indexes(zz, true, 1);
     bg.insert(bg.end(), fg.begin(), fg.end());
     bg.insert(bg.end(), otherVals.begin(), otherVals.end());// fg: 1-M, bg, M+1-M+N, mid: M+N+1:n
-    vector<size_t> sorted_id = sort_indexes(bg, false, 1);
+    vector<size_t> sorted_id = sort_indexes(bg, true, 1);
     vector<byte> sorted_class_id((long)n);
     for (size_t i = 0; i<sorted_id.size(); i++){
-        if(sorted_id[i] <= M){
+        if(sorted_id[i] <= N){
             sorted_class_id[i] = (byte)-1;
         }else if(sorted_id[i] <= M+N){
             sorted_class_id[i] = (byte)1;
@@ -464,7 +474,7 @@ template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector
         }
     }
     //bkpts = find(labels(2:end)-labels(1:end-1));
-    vector<float> ai(bkpts.size() + 1);
+    vector<double> ai(bkpts.size() + 1);
     //ai = cat(1, labels(bkpts), labels(end));
     for (size_t i=0; i<bkpts.size(); i++){
         if (sorted_class_id[bkpts[i]] == (byte)-1){
@@ -484,14 +494,14 @@ template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector
     }
     float delta = 1.0/n;
     // bi is start, ti is end of the i-th section
-    vector<float> bi (ai.size()); bi[0] = 0.0;
-    vector<float> ti (ai.size()); ti[ti.size()-1] = 1.0;
+    vector<double> bi (ai.size()); bi[0] = 0.0;
+    vector<double> ti (ai.size()); ti[ti.size()-1] = 1.0;
     for(size_t i = 0; i< bi.size()-1; i++){
         bi[i+1] = (bkpts[i] + 1) * delta;
         ti[i] = bi[i+1];
     }
 
-    vector<float> Finvbi(ai.size()), Finvti(ai.size());
+    vector<double> Finvbi(ai.size()), Finvti(ai.size());
     for(size_t i=1;i<ai.size();i++){
         Finvbi[i] = normInv(bi[i]);
         Finvti[i-1] = normInv(ti[i-1]);
@@ -506,39 +516,46 @@ template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector
 
 
     // mat implementaion
-    vector<float> f1Finvti(Finvti.size()), FinvtiNcdf(Finvti.size()), FinvtiNpdf(Finvti.size());
+    vector<double> f1Finvti(Finvti.size()), FinvtiNcdf(Finvti.size()), FinvtiNpdf(Finvti.size());
     FOREACH_i(Finvti){
         orderStatsKSection_f1(Finvti[i], f1Finvti[i], FinvtiNcdf[i], FinvtiNpdf[i]);
     }
-    vector<float> f1Finvbi(Finvbi.size()), FinvbiNcdf(Finvbi.size()), FinvbiNpdf(Finvbi.size());
+    vector<double> f1Finvbi(Finvbi.size()), FinvbiNcdf(Finvbi.size()), FinvbiNpdf(Finvbi.size());
     FOREACH_i(Finvti){
         orderStatsKSection_f1(Finvbi[i], f1Finvbi[i], FinvbiNcdf[i], FinvbiNpdf[i]);
     }
-    vector<float> f1Finvti_f1Finvbi = vec_Minus(f1Finvti, f1Finvbi);
-    vector<float> aixFinvtj_Finvbj = vec_pointMultiply(ai, vec_Minus(Finvti, Finvbi));
-    vector<float> cumsum_aixFinvtj_Finvbj = vec_cumsum(aixFinvtj_Finvbj);
-    float all_sum = cumsum_aixFinvtj_Finvbj[cumsum_aixFinvtj_Finvbj.size() - 1];
+    vector<double> f1Finvti_f1Finvbi = vec_Minus(f1Finvti, f1Finvbi);
+    vector<double> aixFinvtj_Finvbj = vec_pointMultiply(ai, vec_Minus(Finvti, Finvbi));
+    vector<double> cumsum_aixFinvtj_Finvbj = vec_cumsum(aixFinvtj_Finvbj);
+    double all_sum = cumsum_aixFinvtj_Finvbj[cumsum_aixFinvtj_Finvbj.size() - 1];
     FOREACH_i(cumsum_aixFinvtj_Finvbj){
         cumsum_aixFinvtj_Finvbj[i] = all_sum - cumsum_aixFinvtj_Finvbj[i];
     }
 
-    float t1 = 0.0, t2=0.0, t3=0.0, B = 0.0; //vector<float> t1_all (ai.size());
+    //double t1 = 0.0, t2=0.0, t3=0.0, B = 0.0; //vector<float> t1_all (ai.size());
+    double B = 0.0, delta_t = 0.0;
+    //double A_minus_B;
     FOREACH_i(ai){
-        t1 += ai[i] * cumsum_aixFinvtj_Finvbj[i] * f1Finvti_f1Finvbi[i];
-        t2 += ai[i] * ai[i] * Finvti[i] * f1Finvti_f1Finvbi[i];
+//        t1 += ai[i] * cumsum_aixFinvtj_Finvbj[i] * f1Finvti_f1Finvbi[i];
+//        t2 += ai[i] * ai[i] * Finvti[i] * f1Finvti_f1Finvbi[i];
 
-        t3 += ai[i] * ai[i] * (orderStatsKSection_f2(Finvti[i], FinvtiNcdf[i], FinvtiNpdf[i])-
+//        t3 += ai[i] * ai[i] * (orderStatsKSection_f2(Finvti[i], FinvtiNcdf[i], FinvtiNpdf[i])-
+//             orderStatsKSection_f2(Finvbi[i], FinvbiNcdf[i], FinvbiNpdf[i]));
+        delta_t += ai[i] * cumsum_aixFinvtj_Finvbj[i] * f1Finvti_f1Finvbi[i];
+        delta_t += ai[i] * ai[i] * Finvti[i] * f1Finvti_f1Finvbi[i];
+
+        delta_t -= ai[i] * ai[i] * (orderStatsKSection_f2(Finvti[i], FinvtiNcdf[i], FinvtiNpdf[i])-
              orderStatsKSection_f2(Finvbi[i], FinvbiNcdf[i], FinvbiNpdf[i]));
-
         B += ai[i] * f1Finvti_f1Finvbi[i];
     }
     //vec_pointMultiply(vec_pointMultiply(ai, cumsum_aixFinvtj_Finvbj), f1Finvti_f1Finvbi);
     //float t1 = accumulate(t1_all.begin(), t1_all.end(), 0.0);
 
-    float A = 2*(t1+t2-t3);
-    B = B*B;
-
-    sigma = float(sqrt(A-B)/sqrt(n));
+//    double A = 2*delta_t;
+//    B = B*B;
+//    sigma = (float)(sqrt(A-B)/sqrt(n));
+    double A_sqrt = sqrt(2*delta_t);
+    sigma = (float)(sqrt(A_sqrt+B)*sqrt(A_sqrt-B)/sqrt(n));
 }
 // !!!NOTE: in openCV the index is stored row by row, not like Matlab which is column by column
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, MatSize size){

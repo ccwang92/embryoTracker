@@ -505,6 +505,9 @@ int connectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
     //assert(src3d->type()==bool);
     assert(src3d->dims == 3);
     assert(connect == 4 || connect == 8 || connect == 6 || connect == 10 || connect == 26);
+    if(dst3d.empty()){
+        dst3d.create(src3d->dims, src3d->size, CV_32S);
+    }
     size_t numCC;
     if (connect == 4 || connect == 8){
         int x_size  = src3d->size[0];
@@ -877,7 +880,7 @@ bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = tru
     int rm_cc_cnt = 0;
     for (int i = 0; i < numCC; i ++){
         if (cc_size[i] >= min_size){
-            newlabel[i] = rm_cc_cnt;
+            newlabel[i] = rm_cc_cnt + 1;
             rm_cc_cnt ++ ;
         }
     }
@@ -931,11 +934,13 @@ void volumeDilate(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
         valid_z = false;
         unsigned char *ind = (unsigned char*)dst3d.data + z * xy_size; // sub-matrix pointer
         Mat subMatrix(2, dst3d.size, CV_8U, ind);
+
         for (size_t i = 0; i < subMatrix.total(); i++){
-            if(subMatrix.at<int>(i) > 0){
+            if(subMatrix.at<unsigned char>(i) > 0){
                 if(min_valid_z > z ){
                     min_valid_z = z;
-                }else if(max_valid_z < z){
+                }
+                if(max_valid_z < z){
                     max_valid_z = z;
                 }
                 valid_z = true;
@@ -943,32 +948,46 @@ void volumeDilate(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
             }
         }
         if(valid_z){
+            //ccShowSlice3Dmat(&subMatrix, CV_8U);
             dilate(subMatrix, subMatrix, element);
+            //ccShowSlice3Dmat(&subMatrix, CV_8U);
+//            unsigned char *ind_up = (unsigned char*)dst3d.data; // sub-matrix pointer
+//            Mat subMatrix_up(2, dst3d.size, CV_8U, ind_up);
+//            ccShowSlice3Dmat(&subMatrix_up, CV_8U);
+//            subMatrix.copyTo(subMatrix_up);
+//            ccShowSlice3Dmat(&subMatrix_up, CV_8U);
         }
+
     }
     //unsigned char max_val;
     if (radiusValues[2] > 0 && max_valid_z >= min_valid_z){
 //        for (int i = 0; i < x_size; i++){
 //            for (int j = 0; j< y_size; j++){
-        unsigned char *ind = (unsigned char*)dst3d.data + min_valid_z * xy_size; // sub-matrix pointer
-        Mat subMatrix_up(2, dst3d.size, CV_8U, ind);
+        unsigned char *ind_up = (unsigned char*)dst3d.data + min_valid_z * xy_size; // sub-matrix pointer
+        Mat subMatrix_up(2, dst3d.size, CV_8U, ind_up);
+        //ccShowSlice3Dmat(&subMatrix_up, CV_8U);
         for (int k = min_valid_z - 1; k >= max(0, min_valid_z - radiusValues[2]); k--){
-            ind = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
-            Mat subMatrix2(2, dst3d.size, CV_8U, ind);
+            ind_up = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
+            Mat subMatrix2(2, dst3d.size, CV_8U, ind_up);
             subMatrix_up.copyTo(subMatrix2);
         }
-
-        ind = (unsigned char*)dst3d.data + max_valid_z * xy_size; // sub-matrix pointer
-        Mat subMatrix_down(2, dst3d.size, CV_8U, ind);
-        for (int k = max_valid_z + 1; k <= max(z_size - 1, max_valid_z + radiusValues[2]); k++){
-            ind = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
-            Mat subMatrix2(2, dst3d.size, CV_8U, ind);
+        //ccShowSlice3Dmat(&subMatrix_up, CV_8U);
+        unsigned char *ind_down = (unsigned char*)dst3d.data + max_valid_z * xy_size; // sub-matrix pointer
+        Mat subMatrix_down(2, dst3d.size, CV_8U, ind_down);
+        //ccShowSlice3Dmat(&subMatrix_down, CV_8U);
+        for (int k = max_valid_z + 1; k <= min(z_size - 1, max_valid_z + radiusValues[2]); k++){
+            ind_down = (unsigned char*)dst3d.data + k * xy_size; // sub-matrix pointer
+            Mat subMatrix2(2, dst3d.size, CV_8U, ind_down);
             subMatrix_down.copyTo(subMatrix2);
         }
-
+        //ccShowSlice3Dmat(&subMatrix_down, CV_8U);
+        //ccShowSlice3Dmat(&dst3d, CV_8U);
     }
+
 }
 
+//// This volume dilation and erosion algorithm should be implemented using distance transform with
+/// O(n) complexity. (Though now is already O(n), the constant part is large.)
 /**
  * @brief volumeErode: x,y direction is formal, while z direction is fixed to morph_corss
  * @param src3d: boolean (but represented by CV_8U)
@@ -1178,13 +1197,13 @@ vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in){
 }
 /**
  * @brief extractValsGivenMask: return the values of foreground
- * @param val3d
- * @param src3d: mask for value extraction
+ * @param val3d: CV_8U, CV_32F, CV_32S
+ * @param src3d: mask for value extraction, CV_8U
  * @param datatype
  * @param threshold_in
  * @return
  */
-vector<float> extractValsGivenMask(Mat *val3d, Mat *src3d, int datatype, float threshold_in){
+vector<float> extractValsGivenMask(Mat *val3d, int datatype, Mat *src3d, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     vector<float> fg_vals;
     if (datatype == CV_8U){
@@ -1195,13 +1214,13 @@ vector<float> extractValsGivenMask(Mat *val3d, Mat *src3d, int datatype, float t
         }
     }else if (datatype == CV_32F){
         FOREACH_i_ptrMAT(src3d){
-            if(src3d->at<float>(i) > threshold_in){
+            if(src3d->at<unsigned char>(i) > threshold_in){
                 fg_vals.push_back(val3d->at<float>(i));
             }
         }
     }else if (datatype == CV_32S){
         FOREACH_i_ptrMAT(src3d){
-            if(src3d->at<int>(i) > threshold_in){
+            if(src3d->at<unsigned char>(i) > threshold_in){
                 fg_vals.push_back((float)val3d->at<int>(i));
             }
         }
@@ -1841,6 +1860,7 @@ void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]){
 /**************************Functions for debug*******************************/
 
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
+    assert(datatype == CV_8U || datatype == CV_16U || datatype == CV_32F || datatype == CV_32S);
     int sz_single_frame = src3d->size[1] * src3d->size[0];
     Mat *single_slice;
     double min_v, max_v;
@@ -1876,6 +1896,11 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
                 minMaxIdx(*single_slice, &min_v, &max_v);
                 *single_slice *= 10;
                 //normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX, CV_32F);
+            }else if(datatype == CV_32S){
+                int *ind = (int*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
+                single_slice = new Mat(2, src3d->size, CV_32S, ind);
+                minMaxIdx(*single_slice, &min_v, &max_v);
+                //normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX, CV_32F);
             }else if(datatype == CV_32F){
                 float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
                 single_slice = new Mat(2, src3d->size, CV_32F, ind);
@@ -1893,10 +1918,17 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
             imshow(title, *single_slice);
             int key = waitKeyEx(0);
             if(src3d->dims <3) break;
-            if(key == 65361) slice = MAX(slice-1, 0); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
-            else if(key == 65363) slice = MIN(slice+1, src3d->size[2] - 1); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+            if(key == 65361) {
+                slice = MAX(slice-1, 0); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+                destroyWindow(title);
+            }
+            else if(key == 65363) {
+                slice = MIN(slice+1, src3d->size[2] - 1); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+                destroyWindow(title);
+            }
             else {
                 break;
+                destroyWindow(title);
             }
             //destroyWindow(title);
             //destroyAllWindows();
@@ -2053,10 +2085,17 @@ void ccShowSliceLabelMat(Mat *src3d, int slice){
         imshow(title, mat2display);
         int key = waitKeyEx(0);
         if(src3d->dims <3) break;
-        if(key == 65361) slice = MAX(slice-1, 0); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
-        else if(key == 65363) slice = MIN(slice+1, src3d->size[2] - 1); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+        if(key == 65361) {
+            slice = MAX(slice-1, 0); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+            destroyWindow(title);
+        }
+        else if(key == 65363) {
+            slice = MIN(slice+1, src3d->size[2] - 1); //Left: 2424832 Up: 2490368 Right: 2555904 Down: 2621440
+            destroyWindow(title);
+        }
         else {
             break;
+            destroyWindow(title);
         }
     }
 }

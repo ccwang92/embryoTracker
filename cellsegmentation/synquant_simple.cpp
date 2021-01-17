@@ -55,8 +55,8 @@ synQuantSimple::synQuantSimple(Mat *_srcVolume, float _src_var, segParameter &p4
 synQuantSimple::synQuantSimple(singleCellSeed &seed){
     srcVolumeUint8 = &seed.volUint8;
     imArray = (unsigned char*)srcVolumeUint8->data;
-    vector<float> var_vals_in_fg = extractValsGivenMask(&seed.varMap, &seed.validSearchAreaMap, CV_8U, 0);
-    src_var = vec_mean(var_vals_in_fg);
+    vector<float> var_vals_in_fg = extractValsGivenMask(&seed.varMap, CV_32F, &seed.validSearchAreaMap, 0);
+    src_var = (float)vec_mean(var_vals_in_fg);
     //// the following 5 steps are moved into class cellsegment_main.refineSeed2Region()
 //    //// 1. find best threshold to get fgMap and apply some basic morphlogical operation (ordstat4fg.m)
 //    // PS: the region from this step will has no overlap with other cell's terriotory
@@ -112,16 +112,17 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed){
  */
 void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats){
     //Scalar seed_val = mean(seed.volUint8, seed.validSearchAreaMap);// scalar is a vector<double> with length 4 for RGBA data
-    ccShowSlice3Dmat(&seed.volUint8, CV_8U, 3);
+    //ccShowSlice3Dmat(&seed.volUint8, CV_8U, 3);
     int ub = MAX(30, round(mat_mean(&seed.volUint8, CV_8U, seed.idx_yxz_cropped)));
-    int lb = MAX(5, round(mean(seed.volUint8, seed.validSearchAreaMap)[0]));
+    int lb = MAX(5, round(mean(seed.volUint8, seed.validSearchAreaMap).val[0]));
     //Mat curr_seed_map = seed.idMap == seed.id; //replaced by seed.seedMap
     if (ub <= lb){
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
+        qInfo("No valid fg can be found.");
         return;
     }
     vector<float> zscore (ub-lb+1);
-
+    qInfo("%d thresholds totally.", ub-lb+1);
     Mat otherCellTerritory, valid_cell_territory, cur_reg, cur_valid_nei; // uint8
     int shift_othercell[] = {3,3,1};
     volumeDilate(&seed.otherIdMap, otherCellTerritory, shift_othercell, MORPH_ELLIPSE);
@@ -139,7 +140,8 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
         if ((reg_sz / seed_sz) < 0.5){
             continue;
         }
-        float cur_zscore = debiasedFgBgBandCompare(&cur_reg, &valid_cell_territory, &seed, p4odStats);
+        float cur_zscore = debiasedFgBgBandCompare(&cur_reg, &cur_valid_nei, &seed, p4odStats);
+        qInfo("threshold:%d, zscore:%.2f", ub-i, cur_zscore);
         if (max_exist_zscore < cur_zscore){
             maxZ_intensity_level = (ub-i);
             max_exist_zscore = cur_zscore;
@@ -148,13 +150,16 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
     if (max_exist_zscore > 0){
         bitwise_and(seed.volUint8 >= maxZ_intensity_level, valid_cell_territory, fgMap);
         validSingleRegionExtract(fgMap, &seed.seedMap, p4odStats.connectInSeedRefine);
+
     }else{
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
+        qInfo("No valid fg can be found.");
         return;
     }
     // refine the resultant region
     if (isempty_mat_vec(&fgMap, CV_8U, seed.idx_yxz_cropped, 0)){
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
+        qInfo("No valid fg can be found.");
         return;
     }
 }
@@ -795,24 +800,29 @@ void synQuantSimple::objLabel_descending() {
 float synQuantSimple::debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singleCellSeed *seed,
                                                     odStatsParameter p4odStats){
     Mat cur_reg_dilate, cur_reg_erode;
-    int dilate_size[] = {p4odStats.gap4fgbgCompare, p4odStats.gap4fgbgCompare, 0};
+    int dilate_size[] = {p4odStats.roundNum4fgbgCompare, p4odStats.roundNum4fgbgCompare, 0};
     volumeDilate(cur_reg, cur_reg_dilate, dilate_size, MORPH_ELLIPSE);
     //volumeErode(cur_reg, cur_reg_erode, dilate_size, MORPH_ELLIPSE);
-
+    //ccShowSlice3Dmat(&cur_reg_dilate, CV_8U);
     Mat fg_center, fg_band, bg_band;
     //bitwise_and(*cur_reg, cur_reg_erode == 0, fg_band);
     bitwise_and(*validNei, cur_reg_dilate, bg_band);
+    //ccShowSlice3Dmat(&bg_band, CV_8U);
     volumeDilate(&bg_band, fg_band, dilate_size, MORPH_ELLIPSE);
+    //ccShowSlice3Dmat(&fg_band, CV_8U);
     bitwise_and(fg_band, *cur_reg, fg_band);
+    //ccShowSlice3Dmat(&fg_band, CV_8U);
     fg_center = seed->validSearchAreaMap - fg_band - bg_band; // key here
     vector<float> fg_band_vals, bg_band_vals, fg_center_vals;
-    fg_band_vals = extractValsGivenMask(&seed->volUint8, &fg_band, CV_8U, 0);
-    bg_band_vals = extractValsGivenMask(&seed->volUint8, &bg_band, CV_8U, 0);
-    fg_center_vals = extractValsGivenMask(&seed->volUint8, &fg_center, CV_8U, 0);
+    fg_band_vals = extractValsGivenMask(&seed->volUint8, CV_8U, &fg_band, 0);
+    bg_band_vals = extractValsGivenMask(&seed->volUint8, CV_8U, &bg_band, 0);
+    fg_center_vals = extractValsGivenMask(&seed->volUint8, CV_8U, &fg_center, 0);
 
     float mu, sigma, zscore = 0;
     if (p4odStats.fgSignificanceTestWay == KSEC){
+        //fg_center_vals.resize(3000);
         orderStatsKSection(fg_band_vals, bg_band_vals, fg_center_vals, mu, sigma);
+        qInfo("mu:%.4f, sigma:%.4f", mu, sigma);
         float sum_stats = vec_mean(fg_band_vals) - vec_mean(bg_band_vals);
         zscore = (sum_stats - mu*sqrt(src_var))/(sigma*sqrt(src_var));
     }else{
