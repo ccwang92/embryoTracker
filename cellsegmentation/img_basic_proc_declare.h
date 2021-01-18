@@ -69,6 +69,7 @@ void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range);
 void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities);
 
 void extractVoxIdxList(Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract = false);
+void extractVoxIdxGivenId(Mat *label3d, vector<size_t> &voxList, int id);
 void extractVoxIdxList(Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract = false);
 void extractVolume(Mat *label3d, vector<size_t> &voxSzList, int numCC);
 bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel);
@@ -92,7 +93,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
                 Mat *fgMap, int connect, int cost_design[], bool bg2sink = true);
 void setValMat(Mat &src, int datatype, vector<size_t> idx, float v);
 void setValMat(Mat &src, int datatype, Mat *mask, float v);
-void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius, vector<vector<size_t>> &gap_voxIdx, vector<bool> tested_flag);
+void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius, vector<vector<size_t>> &gap_voxIdx, vector<int> tested_flag);
 void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &neighbor_idx_list, int radius);
 
 bool inField( int r, int c, int z, int *sz );
@@ -151,6 +152,7 @@ template <typename T> T normalPDF(T x, T m = 0, T s = 1);
 template <typename T> T zscore2pvalue(T z);
 template <typename T> T pvalue2zscore(T p);
 template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
+
 template <typename T> T vec_stddev(vector<T> const & func);
 template <typename T> T vec_variance(vector<T> const & func);
 template <typename T> float vec_mean(vector<T> const & func);
@@ -171,7 +173,7 @@ template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> v
 template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl=1.0, float vh=0.0);
 
 template <typename T> void vec_unique(vector<T> & v);
-
+template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2);
 #endif // IMG_BASIC_PROC_H
 
 

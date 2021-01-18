@@ -506,7 +506,7 @@ int connectedComponents3d(Mat* src3d, Mat &dst3d, int connect){
     assert(src3d->dims == 3);
     assert(connect == 4 || connect == 8 || connect == 6 || connect == 10 || connect == 26);
     if(dst3d.empty()){
-        dst3d.create(src3d->dims, src3d->size, CV_32S);
+        dst3d = Mat(src3d->dims, src3d->size, CV_32S);
     }
     size_t numCC;
     if (connect == 4 || connect == 8){
@@ -769,6 +769,7 @@ int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect){
 }
 int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap){
     double min, max;
+    if (dst3d.empty()) dst3d.create(src3d->dims, src3d->size, CV_32S);
     minMaxIdx(*src3d, &min, &max);
     idMap.resize(round(max) + 1);
     fill(idMap.begin(), idMap.end(), 0);
@@ -841,6 +842,14 @@ void extractVoxIdxList(Mat *label3d, vector<vector<int>> &voxList, int numCC, bo
             if(label3d->at<int>(i) > 0){
                 voxList[label3d->at<int>(i)-1].push_back(i);
             }
+        }
+    }
+}
+
+void extractVoxIdxGivenId(Mat *label3d, vector<size_t> &voxList, int id){
+    for (size_t i = 0; i < label3d->total(); i++){
+        if(label3d->at<int>(i) == id){
+            voxList.push_back(i);
         }
     }
 }
@@ -1007,6 +1016,7 @@ void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
     int z_size  = src3d->size[2];
     size_t xy_size = x_size*y_size;
     //Mat org_src3d;
+    //if(dst3d.empty()) dst3d = Mat(src3d->dims, src3d->size, CV_8U);
     src3d->copyTo(dst3d);
     Mat element = getStructuringElement( dilation_type,
                            Size( 2*radiusValues[0] + 1, 2*radiusValues[1]+1 ),
@@ -1032,7 +1042,7 @@ void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
                             min_val = min(src3d->at<unsigned char>(idx - kk * xy_size), min_val);
                         }
                     }
-                    dst3d.at<int>(idx) = min_val;
+                    dst3d.at<unsigned char>(idx) = min_val;
                 }
             }
         }
@@ -1233,15 +1243,15 @@ vector<float> extractValsGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype){
     vector<float> fg_vals;
     if (datatype == CV_8U){
         FOREACH_i(idx){
-            fg_vals.push_back((float)vol3d->at<unsigned char>(i));
+            fg_vals.push_back((float)vol3d->at<unsigned char>(idx[i]));
         }
     }else if (datatype == CV_32F){
         FOREACH_i(idx){
-            fg_vals.push_back(vol3d->at<float>(i));
+            fg_vals.push_back(vol3d->at<float>(idx[i]));
         }
     }else if (datatype == CV_32S){
         FOREACH_i(idx){
-            fg_vals.push_back((float)vol3d->at<int>(i));
+            fg_vals.push_back((float)vol3d->at<int>(idx[i]));
         }
     }
     return fg_vals;
@@ -1252,15 +1262,15 @@ double extractSumGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype){
     double sum = 0;
     if (datatype == CV_8U){
         FOREACH_i(idx){
-            sum += (double)vol3d->at<unsigned char>(i);
+            sum += (double)vol3d->at<unsigned char>(idx[i]);
         }
     }else if (datatype == CV_32F){
         FOREACH_i(idx){
-            sum += (double)vol3d->at<float>(i);
+            sum += (double)vol3d->at<float>(idx[i]);
         }
     }else if (datatype == CV_32S){
         FOREACH_i(idx){
-            sum += (double)(float)vol3d->at<int>(i);
+            sum += (double)vol3d->at<int>(idx[i]);
         }
     }
     return sum;
@@ -1386,7 +1396,7 @@ void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t>
         z = idx[i] / page_sz;
         remain = idx[i] - (z*page_sz);
         y = remain / sz[1];
-        x = remain - x * sz[1];
+        x = remain - y * sz[1];
         for(int j = 0; j < n_y.size(); j++){
             if(inField(y + n_y[j], x + n_x[j], z + n_z[j], sz)){
                 cur_nei_idx = x + n_x[j] + (y + n_y[j])*sz[1] + (z + n_z[j])*page_sz;
@@ -1395,9 +1405,9 @@ void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t>
                     nei_idx[linkage_cnt] = cur_nei_idx;
                     linkage_cnt++;
                 }
-                center_idx[cur_nei_idx] = true;
             }
         }
+        checked_label[idx[i]] = true;
     }
     if (linkage_cnt < center_idx.size()){ // trim the unused memory
         center_idx.resize(linkage_cnt);
@@ -1469,31 +1479,42 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
     FOREACH_i(arc_head_in_fg){
         p1 = scoreMap->at<float>(arc_head_in_fg[i]);
         p2 = scoreMap->at<float>(arc_tail[i]);
-        if (cost_design[0]==ARITHMETIC_AVERAGE){
-            arc_capacity[i] = (int)(pow((2/(p1+p2)), cost_design[1]) * 10000);// we keep 1/1000 accuracy
-        }else if (cost_design[0]==GEOMETRIC_AVERAGE){
-            if (p2==0) p2 = p1; // there should be no non-negative score, so this line should never be used
-            arc_capacity[i] = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 10000); // we keep 1/1000 accuracy
+        if(p1+p2 == 0 || p1==0){
+            arc_capacity[i] = INFINITY;
+        }else{
+            if (cost_design[0]==ARITHMETIC_AVERAGE){
+                arc_capacity[i] = (int)(pow((2/(p1+p2)), cost_design[1]) * 10000);// we keep 1/1000 accuracy
+            }else if (cost_design[0]==GEOMETRIC_AVERAGE){
+                if (p2==0) p2 = p1; // there should be no non-negative score, so this line should never be used
+                arc_capacity[i] = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 10000); // we keep 1/1000 accuracy
+            }
+            if(arc_capacity[i] < 0){
+                qFatal("Wrong cap value!");
+            }
         }
     }
     vector<vector<int>> label_voxIdx;
-    extractVoxIdxList(label_map, label_voxIdx, numCC, false);
-    vector<size_t> sink_ids (arc_tail.size()); //valid sink nodes will not be larger than tail size
-    size_t sink_ids_cnt = 0;
+    extractVoxIdxList(label_map, label_voxIdx, numCC, false /*no_bk*/);
     typedef Graph<int,int,int> GraphType;
     GraphType *g;
-    for(int i = 1; i<numCC; i++){
+    for(int i = 1; i <= numCC; i++){
         // build sink_ids
+        vector<size_t> sink_ids (arc_tail.size()); //valid sink nodes will not be larger than tail size
+        //fill(sink_ids.begin(), sink_ids.end(), -1);
+        size_t sink_ids_cnt = 0;
         if (bg2sink){
             FOREACH_j(arc_tail){
-                if (label_map->at<int>(arc_tail[j]) != i){
+                if (fgMap->at<unsigned char>(arc_tail[j])==0 ||
+                        (label_map->at<int>(arc_tail[j])>0 &&
+                        label_map->at<int>(arc_tail[j]) != i)){
                     sink_ids[sink_ids_cnt] = arc_tail[j];
                     sink_ids_cnt++;
                 }
             }
         }else{
             FOREACH_j(arc_tail){
-                if (label_map->at<int>(arc_tail[j])>0 && label_map->at<int>(arc_tail[j]) != i){
+                if (label_map->at<int>(arc_tail[j])>0 &&
+                        label_map->at<int>(arc_tail[j]) != i){
                     sink_ids[sink_ids_cnt] = arc_tail[j];
                     sink_ids_cnt++;
                 }
@@ -1517,6 +1538,9 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
         int flow = g -> maxflow();
         FOREACH_j(valid_fg_idx){
             if (g->what_segment(valid_fg_idx[j]) == GraphType::SOURCE){
+                if (outLabelMap.at<int>(valid_fg_idx[j]) > 0){
+                    qInfo("error occured");
+                }
                 outLabelMap.at<int>(valid_fg_idx[j]) = i;
             }
         }
@@ -1548,6 +1572,55 @@ void setValMat(Mat &src, int datatype, Mat *mask, float v){
     vector<size_t> idx = fgMapIdx(mask, CV_8U, 0);
     setValMat(src, datatype, idx, v);
 }
+void findGapGatePoints(Mat* label_map, int target_label0, vector<size_t> &gap_idx_y_x){
+    float dy, dx;
+    vector<size_t> target_voxIdx0;
+    vector<int> y, x, z;
+    extractVoxIdxGivenId(label_map, target_voxIdx0, target_label0);
+    vec_ind2sub(target_voxIdx0, y, x, z, label_map->size);
+    float y_center = vec_mean(y);
+    float x_center = vec_mean(x);
+    float min_dist2center = INFINITY;
+    vector<float> dist2center(gap_idx_y_x.size()/3);
+    for(size_t i = 0; i <gap_idx_y_x.size(); i+=3){
+        dy = gap_idx_y_x[i+1]-y_center;
+        dx = gap_idx_y_x[i+2]-x_center;
+        dist2center[i/3] = sqrt(dy*dy + dx*dx);
+        if(dist2center[i/3] < min_dist2center){
+            min_dist2center = dist2center[i/3];
+        }
+    }
+    //update y and x
+    vector<float> scaled_y(gap_idx_y_x.size()/3), scaled_x(gap_idx_y_x.size()/3);
+    for(size_t i = 0; i < gap_idx_y_x.size(); i+=3){
+        dy = gap_idx_y_x[i+1]-y_center;
+        dx = gap_idx_y_x[i+2]-x_center;
+        scaled_y[i/3] = y_center + dy * (min_dist2center / dist2center[i/3]);
+        scaled_x[i/3] = x_center + dx * (min_dist2center / dist2center[i/3]);
+    }
+    float max_dist = 0, curr_dist;
+    size_t target_i, target_j;
+    for(int i = 0 ; i < scaled_y.size(); i ++){
+        for (int j = i + 1; j < scaled_x.size(); j++){
+            curr_dist = pow((scaled_y[i] - scaled_y[j]),2) +
+                    pow((scaled_x[i] - scaled_x[j]),2);
+            if(curr_dist > max_dist){
+                max_dist = curr_dist;
+                target_i = i * 3;
+                target_j = j * 3;
+            }
+        }
+    }
+//    qInfo("%ld element and %ld element is the best pair out of %ld ",
+//          target_i, target_j, gap_idx_y_x.size());
+    gap_idx_y_x[0] = gap_idx_y_x[target_i];
+    gap_idx_y_x[1] = gap_idx_y_x[target_i+1];
+    gap_idx_y_x[2] = gap_idx_y_x[target_i+2];
+    gap_idx_y_x[3] = gap_idx_y_x[target_j];
+    gap_idx_y_x[4] = gap_idx_y_x[target_j+1];
+    gap_idx_y_x[5] = gap_idx_y_x[target_j+2];
+    gap_idx_y_x.resize(6);
+}
 /**
  * @brief gapRefine: remove voxels that not directly between two regions (tail area of the gap)
  * @param label_map
@@ -1557,145 +1630,188 @@ void setValMat(Mat &src, int datatype, Mat *mask, float v){
  */
 void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size_t> &gap_idx){
     // 1. find the gap_idx that touched one of the region
-    vector<size_t> sub_idx0;
-    vector<size_t> sub_idx1;
+    vector<vector<size_t>> sub_idx0(label_map->size[2]);
+    vector<vector<size_t>> sub_idx1(label_map->size[2]);
     int im_sz[] = {label_map->size[0], label_map->size[1]};
     int x, y, z, remain;
     int page_sz = im_sz[0] * im_sz[1];
 
     int n_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
     int n_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+    vector<vector<size_t>> gap_idx_z_divid(label_map->size[2]);
     FOREACH_i(gap_idx){
+        z = gap_idx[i] / page_sz;
+        remain = gap_idx[i] - (z*page_sz);
+        y = remain / im_sz[1];
+        x = remain - y * im_sz[1];
+        gap_idx_z_divid[z].push_back(gap_idx[i]);
         if (label_map->at<int>(gap_idx[i]) == target_label0){
-            z = gap_idx[i] / page_sz;
-            remain = gap_idx[i] - (z*page_sz);
-            y = remain / im_sz[1];
-            x = remain - x * im_sz[1];
-
             for(int j = 0; j < 8; j++){
                 if(inField(y+n_y[j], x+n_x[j], im_sz) &&
-                        label_map->at<int>( gap_idx[i] + n_y[j] * im_sz[1] + n_x[j])==0){
-                    sub_idx0.push_back(gap_idx[i]);
-                    sub_idx0.push_back(y);
-                    sub_idx0.push_back(x);
+                        label_map->at<int>( gap_idx[i] + n_y[j] * im_sz[1] + n_x[j])!=target_label0){
+                    sub_idx0[z].push_back(gap_idx[i]);
+                    sub_idx0[z].push_back(y);
+                    sub_idx0[z].push_back(x);
                     break;
                 }
             }
         }else if(label_map->at<int>(gap_idx[i]) == target_label1){
-            z = gap_idx[i] / page_sz;
-            remain = gap_idx[i] - (z*page_sz);
-            y = remain / im_sz[1];
-            x = remain - x * im_sz[1];
             for(int j = 0; j < 8; j++){
                 if(inField(y+n_y[j], x+n_x[j], im_sz) &&
-                        label_map->at<int>(gap_idx[i] + n_y[j] * im_sz[1] + n_x[j])==0){
-                    sub_idx1.push_back(gap_idx[i]);
-                    sub_idx0.push_back(y);
-                    sub_idx0.push_back(x);
+                        label_map->at<int>(gap_idx[i] + n_y[j] * im_sz[1] + n_x[j])!=target_label1){
+                    sub_idx1[z].push_back(gap_idx[i]);
+                    sub_idx1[z].push_back(y);
+                    sub_idx1[z].push_back(x);
                     break;
                 }
             }
         }
     }
-    assert(sub_idx0.size()>=6 && sub_idx1.size()>=6);
-    // find the two nodes far away
-    size_t dy, dx, d;
-    if(sub_idx0.size() > 6){
-        size_t max_dist = 0, target_i;
-        for(size_t i = 3; i < sub_idx0.size(); i+=3){
-            dy = sub_idx0[i+1]-sub_idx0[1];
-            dx = sub_idx0[i+2]-sub_idx0[2];
-            d = dy*dy + dx*dx;
-            if(d > max_dist){
-                max_dist = d;
-                target_i = i;
+    vector<size_t> refined_gap_idx(gap_idx.size());
+    size_t refined_gap_idx_size = 0;
+    for (int z_s = 0; z_s < label_map->size[2]; z_s++){
+        if(sub_idx0[z_s].size()<=6 || sub_idx1[z_s].size()<=6){
+            for(size_t i = 0; i < sub_idx0[z_s].size(); i+=3){
+                refined_gap_idx[refined_gap_idx_size++] = sub_idx0[z_s][i];
+            }
+            for(size_t i = 0; i < sub_idx1[z_s].size(); i+=3){
+                refined_gap_idx[refined_gap_idx_size++] = sub_idx0[z_s][i];
+            }
+            continue;
+        }
+        // find the two nodes far away
+//        float dy, dx, d;
+//        vector<size_t> target_voxIdx0;
+//        vector<int> y, x, z;
+//        extractVoxIdxGivenId(label_map, target_voxIdx0, target_label0);
+//        vec_ind2sub(target_voxIdx0, y, x, z, label_map->size);
+//        float y_center = vec_mean(y);
+//        float x_center = vec_mean(x);
+//        float min_dist2center = INFINITY;
+//        vector<float> dist2center(sub_idx0[z_s].size()/3);
+//        for(size_t i = 0; i < sub_idx0[z_s].size(); i+=3){
+//            dy = sub_idx0[z_s][i+1]-y_center;
+//            dx = sub_idx0[z_s][i+2]-x_center;
+//            dist2center[i/3] = sqrt(dy*dy + dx*dx);
+//            if(dist2center[i/3] < min_dist2center){
+//                min_dist2center = dist2center[i/3];
+//            }
+//        }
+//        //update y and x
+//        vector<float> scaled_y(sub_idx0[z_s].size()/3), scaled_x(sub_idx0[z_s].size()/3);
+//        for(size_t i = 0; i < sub_idx0[z_s].size(); i+=3){
+//            dy = sub_idx0[z_s][i+1]-y_center;
+//            dx = sub_idx0[z_s][i+2]-x_center;
+//            scaled_y[i/3] = y_center + dy * (min_dist2center / dist2center[i/3]);
+//            scaled_x[i/3] = x_center + dx * (min_dist2center / dist2center[i/3]);
+//        }
+//        float max_dist = 0, curr_dist;
+//        size_t target_i, target_j;
+//        for(int i = 0 ; i < scaled_y.size(); i ++){
+//            for (int j = i + 1; j < scaled_x.size(); j++){
+//                curr_dist = pow((scaled_y[i] - scaled_y[j]),2) +
+//                        pow((scaled_x[i] - scaled_x[j]),2);
+//                if(curr_dist > max_dist){
+//                    max_dist = curr_dist;
+//                    target_i = i * 3;
+//                    target_j = j * 3;
+//                }
+//            }
+//        }
+//        sub_idx0[z_s][0] = sub_idx0[z_s][target_i];
+//        sub_idx0[z_s][1] = sub_idx0[z_s][target_i+1];
+//        sub_idx0[z_s][2] = sub_idx0[z_s][target_i+2];
+//        sub_idx0[z_s][3] = sub_idx0[z_s][target_i];
+//        sub_idx0[z_s][4] = sub_idx0[z_s][target_i+1];
+//        sub_idx0[z_s][5] = sub_idx0[z_s][target_i+2];
+//        sub_idx0[z_s].resize(6);
+//        for(size_t i = 3; i < sub_idx1.size(); i+=3){
+//            dy = sub_idx1[i+1]-sub_idx1[1];
+//            dx = sub_idx1[i+2]-sub_idx1[2];
+//            d = dy*dy + dx*dx;
+//            if(d > max_dist){
+//                max_dist = d;
+//                target_i = i;
+//            }
+//        }
+//        sub_idx1[3] = sub_idx1[target_i];
+//        sub_idx1[4] = sub_idx1[target_i+1];
+//        sub_idx1[5] = sub_idx1[target_i+2];
+//        sub_idx1.resize(6);
+        findGapGatePoints(label_map, target_label0, sub_idx0[z_s]);
+        findGapGatePoints(label_map, target_label1, sub_idx1[z_s]);
+
+        // trim points that outside the quadrilateral
+        // 1. get the two lines
+        float k_b0[2], k_b1[2];
+        if(sub_idx1[z_s][5] == sub_idx0[z_s][5]) k_b0[0] = (float)(sub_idx1[z_s][4] - sub_idx0[z_s][4]);
+        else k_b0[0] = ((float)sub_idx1[z_s][4] - sub_idx0[z_s][4]) / (sub_idx1[z_s][5] - sub_idx0[z_s][5]);
+        k_b0[1] = sub_idx1[z_s][4] -  k_b0[0] * sub_idx1[z_s][5];
+
+        if(sub_idx1[z_s][2] == sub_idx0[z_s][2]) k_b1[0] = (float)(sub_idx1[z_s][1] - sub_idx0[z_s][1]);
+        else k_b1[0] = ((float)sub_idx1[z_s][1] - sub_idx0[z_s][1]) / (sub_idx1[z_s][2] - sub_idx0[z_s][2]);
+        k_b1[1] = sub_idx1[z_s][1] -  k_b1[0] * sub_idx1[z_s][2];
+
+        float intersect_x;
+        if(k_b0[0] == k_b1[0]) intersect_x = INFINITY;
+        else intersect_x = ((k_b1[1] - k_b0[1]))/(k_b0[0] - k_b1[0]);
+        //float intersect_y = k_b1[1] * intersect_x + k_b1[0];
+        if(intersect_x <= MAX(sub_idx0[z_s][5], sub_idx1[z_s][5]) && intersect_x >= MIN(sub_idx0[z_s][5], sub_idx1[z_s][5])){
+            //intersect_y <= MAX(sub_idx0[z_s][4], sub_idx1[z_s][4]) && intersect_x >= MIN(sub_idx0[z_s][4], sub_idx1[z_s][4]) ){
+            size_t tmp = sub_idx0[z_s][0];
+            sub_idx0[z_s][0] = sub_idx0[z_s][3];
+            sub_idx0[z_s][3] = tmp;
+            tmp = sub_idx0[z_s][1];
+            sub_idx0[z_s][1] = sub_idx0[z_s][4];
+            sub_idx0[z_s][4] = tmp;
+            tmp = sub_idx0[z_s][2];
+            sub_idx0[z_s][2] = sub_idx0[z_s][5];
+            sub_idx0[z_s][5] = tmp;
+
+            //        if(sub_idx1[5] == sub_idx0[5]) k_b0[0] = (sub_idx1[4] - sub_idx0[4]);
+            //        else k_b0[0] = (sub_idx1[4] - sub_idx0[4]) / (sub_idx1[5] - sub_idx0[5]);
+            //        k_b0[1] = sub_idx1[4] -  k_b0[0] * sub_idx1[5];
+
+            //        if(sub_idx1[2] == sub_idx0[2]) k_b1[0] = (sub_idx1[1] - sub_idx0[1]);
+            //        else k_b1[0] = (sub_idx1[1] - sub_idx0[1]) / (sub_idx1[2] - sub_idx0[2]);
+            //        k_b1[1] = sub_idx1[1] -  k_b1[0] * sub_idx1[2];
+        }
+        // remove pionts outside the quadrilateral
+        vector<Point> contour(4);
+        contour[0].y = sub_idx0[z_s][1];
+        contour[0].x = sub_idx0[z_s][2];
+        contour[1].y = sub_idx0[z_s][4];
+        contour[1].x = sub_idx0[z_s][5];
+        contour[2].y = sub_idx1[z_s][4];
+        contour[2].x = sub_idx1[z_s][5];
+        contour[3].y = sub_idx1[z_s][1];
+        contour[3].x = sub_idx1[z_s][2];
+        //size_t valid_idx_cnt = 0;
+
+        FOREACH_i(gap_idx_z_divid[z_s]){
+            if (label_map->at<int>(gap_idx_z_divid[z_s][i]) == target_label0 ||
+                    label_map->at<int>(gap_idx_z_divid[z_s][i]) == target_label1){
+                refined_gap_idx[refined_gap_idx_size++] = gap_idx_z_divid[z_s][i];
+                //gap_idx[valid_idx_cnt] = gap_idx[i];
+                //valid_idx_cnt ++;
+            }else{
+                z = gap_idx_z_divid[z_s][i] / page_sz; // z == z_s
+                assert(z == z_s);
+                remain = gap_idx_z_divid[z_s][i] - (z*page_sz);
+                y = remain / im_sz[1];
+                x = remain - y * im_sz[1];
+                if(pointPolygonTest(contour, Point2f((float)y, (float)x), false)>=0){
+                    //gap_idx[valid_idx_cnt] = gap_idx[i];
+                    //valid_idx_cnt ++;
+                    refined_gap_idx[refined_gap_idx_size++] = gap_idx_z_divid[z_s][i];
+                }
             }
         }
-        sub_idx0[3] = sub_idx0[target_i];
-        sub_idx0[4] = sub_idx0[target_i+1];
-        sub_idx0[5] = sub_idx0[target_i+2];
-        sub_idx0.resize(6);
+        //gap_idx.resize(valid_idx_cnt);
     }
-    if(sub_idx1.size() > 6){
-        size_t max_dist = 0, target_i;
-        for(size_t i = 3; i < sub_idx1.size(); i+=3){
-            dy = sub_idx1[i+1]-sub_idx1[1];
-            dx = sub_idx1[i+2]-sub_idx1[2];
-            d = dy*dy + dx*dx;
-            if(d > max_dist){
-                max_dist = d;
-                target_i = i;
-            }
-        }
-        sub_idx1[3] = sub_idx1[target_i];
-        sub_idx1[4] = sub_idx1[target_i+1];
-        sub_idx1[5] = sub_idx1[target_i+2];
-        sub_idx1.resize(6);
-    }
-    // trim points that outside the quadrilateral
-    // 1. get the two lines
-    float k_b0[2], k_b1[2];
-    if(sub_idx1[5] == sub_idx0[5]) k_b0[0] = (float)(sub_idx1[4] - sub_idx0[4]);
-    else k_b0[0] = ((float)sub_idx1[4] - sub_idx0[4]) / (sub_idx1[5] - sub_idx0[5]);
-    k_b0[1] = sub_idx1[4] -  k_b0[0] * sub_idx1[5];
-
-    if(sub_idx1[2] == sub_idx0[2]) k_b1[0] = (float)(sub_idx1[1] - sub_idx0[1]);
-    else k_b1[0] = ((float)sub_idx1[1] - sub_idx0[1]) / (sub_idx1[2] - sub_idx0[2]);
-    k_b1[1] = sub_idx1[1] -  k_b1[0] * sub_idx1[2];
-
-    float intersect_x;
-    if(k_b0[0] == k_b1[0]) intersect_x = INFINITY;
-    else intersect_x = ((k_b1[1] - k_b0[1]))/(k_b0[0] - k_b1[0]);
-    //float intersect_y = k_b1[1] * intersect_x + k_b1[0];
-    if(intersect_x <= MAX(sub_idx0[5], sub_idx1[5]) && intersect_x >= MIN(sub_idx0[5], sub_idx1[5])){
-            //intersect_y <= MAX(sub_idx0[4], sub_idx1[4]) && intersect_x >= MIN(sub_idx0[4], sub_idx1[4]) ){
-        size_t tmp = sub_idx0[0];
-        sub_idx0[0] = sub_idx0[3];
-        sub_idx0[3] = tmp;
-        tmp = sub_idx0[1];
-        sub_idx0[1] = sub_idx0[4];
-        sub_idx0[4] = tmp;
-        tmp = sub_idx0[2];
-        sub_idx0[2] = sub_idx0[5];
-        sub_idx0[5] = tmp;
-
-//        if(sub_idx1[5] == sub_idx0[5]) k_b0[0] = (sub_idx1[4] - sub_idx0[4]);
-//        else k_b0[0] = (sub_idx1[4] - sub_idx0[4]) / (sub_idx1[5] - sub_idx0[5]);
-//        k_b0[1] = sub_idx1[4] -  k_b0[0] * sub_idx1[5];
-
-//        if(sub_idx1[2] == sub_idx0[2]) k_b1[0] = (sub_idx1[1] - sub_idx0[1]);
-//        else k_b1[0] = (sub_idx1[1] - sub_idx0[1]) / (sub_idx1[2] - sub_idx0[2]);
-//        k_b1[1] = sub_idx1[1] -  k_b1[0] * sub_idx1[2];
-    }
-    // remove pionts outside the quadrilateral
-    vector<Point> contour(4);
-    contour[0].y = sub_idx0[1];
-    contour[0].x = sub_idx0[2];
-    contour[1].y = sub_idx0[4];
-    contour[1].x = sub_idx0[5];
-    contour[2].y = sub_idx1[4];
-    contour[2].x = sub_idx1[5];
-    contour[3].y = sub_idx1[1];
-    contour[3].x = sub_idx1[2];
-    size_t valid_idx_cnt = 0;
-
-    FOREACH_i(gap_idx){
-        if (label_map->at<int>(gap_idx[i]) == target_label0 ||
-                label_map->at<int>(gap_idx[i]) == target_label1){
-            gap_idx[valid_idx_cnt] = gap_idx[i];
-            valid_idx_cnt ++;
-        }else{
-            z = gap_idx[i] / page_sz;
-            remain = gap_idx[i] - (z*page_sz);
-            y = remain / im_sz[1];
-            x = remain - x * im_sz[1];
-            if(pointPolygonTest(contour, Point2f((float)y, (float)x), false)>=0){
-                gap_idx[valid_idx_cnt] = gap_idx[i];
-                valid_idx_cnt ++;
-            }
-        }
-    }
-    gap_idx.resize(valid_idx_cnt);
+    refined_gap_idx.resize(refined_gap_idx_size);
+    gap_idx.resize(0);
+    gap_idx.insert(gap_idx.begin(), refined_gap_idx.begin(), refined_gap_idx.end());
 }
 /**
  * @brief extractGapVoxel: 2d gap test
@@ -1705,7 +1821,7 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
  * @param gap_voxIdx
  */
 void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
-                     vector<vector<size_t>> &gap_voxIdx, vector<bool> tested_flag){
+                     vector<vector<size_t>> &gap_voxIdx, vector<int> tested_flag){
     gap_voxIdx.resize(numCC*numCC);
     vector<size_t> valid_fg_idx = fgMapIdx(fgMap, CV_8U, 0);
     int im_sz[] = {label_map->size[0], label_map->size[1]};
@@ -1717,7 +1833,7 @@ void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
         z = valid_fg_idx[i] / page_sz;
         remain = valid_fg_idx[i] - (z*page_sz);
         y = remain / im_sz[1];
-        x = remain - x * im_sz[1];
+        x = remain - y * im_sz[1];
         nei_seed_cnt = 0;
         for(int n_x = -gap_radius; n_x <= gap_radius; n_x++){
             for(int n_y = -gap_radius; n_y <= gap_radius; n_y++){
@@ -1738,7 +1854,7 @@ void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
             if(nei_seed_cnt > 2) break; // do not consider gap pixels among 3 or more regions
         }
         if (nei_seed_cnt == 2){
-            size_t tmp_idx = (MIN(nei_seed_ids[0], nei_seed_ids[1])-1) * numCC + (MAX(nei_seed_ids[0], nei_seed_ids[1])-1);
+            int tmp_idx = (MIN(nei_seed_ids[0]-1, nei_seed_ids[1]-1)) * numCC + (MAX(nei_seed_ids[0]-1, nei_seed_ids[1]-1));
             //if(tested_flag[tmp_idx] == false){
             gap_voxIdx[tmp_idx].push_back(valid_fg_idx[i]);
             //}
@@ -1746,7 +1862,7 @@ void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
     }
     FOREACH_i(gap_voxIdx){
         if(gap_voxIdx[i].size() > 0){
-            if (tested_flag[i]){ // this gap does not need to test
+            if (tested_flag[i] > 0){ // this gap does not need to test
                 gap_voxIdx[i].resize(0);
             }else{
                 gapRefine(label_map, i / numCC + 1, i % numCC + 1, gap_voxIdx[i]);
@@ -1782,16 +1898,16 @@ void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &nei
             curr_idx = neighbor_idx_list[i-1];
         }
         FOREACH_j(curr_idx){
-            z = curr_idx[i] / page_sz;
-            remain = curr_idx[i] - (z*page_sz);
+            z = curr_idx[j] / page_sz;
+            remain = curr_idx[j] - (z*page_sz);
             y = remain / im_sz[1];
             x = remain - y * im_sz[1];
             for(int k = 0; k < 8; k++){
                 if(inField(y+n_y[k], x+n_x[k], im_sz)){
-                    vol_sub2ind(tmp_idx, y+n_y[k], x+n_x[k], z, fgMap->size);
-                    if(fgMap->at<unsigned char>(tmp_idx) > 0){
+                    vol_sub2ind(tmp_idx, y+n_y[k], x+n_x[k], z, curr_fg.size);
+                    if(curr_fg.at<unsigned char>(tmp_idx) > 0){
                         neighbor_idx_list[i].push_back(tmp_idx);
-                        fgMap->at<unsigned char>(tmp_idx) = 0;
+                        curr_fg.at<unsigned char>(tmp_idx) = 0;
                     }
                 }
             }
@@ -1992,17 +2108,15 @@ void label2rgb3d(Mat &src, Mat &dst)
 //        }
 //    }
 }
-
 /**
- * @brief label2rgb3d
- * @param src: CV_32S
- * @param dst: CV_8UC3, RGB data
+ * @brief colorMapGen
+ * @param src
+ * @param colorMap
  */
-void label2rgb2d(Mat1i &src, Mat3b &dst)
-{
+void colorMapGen(Mat *src, Mat3b &colormap){
     // Create JET colormap
     double m;
-    minMaxLoc(src, nullptr, &m);
+    minMaxIdx(*src, nullptr, &m); // for 3 or more dims; for 2d, use minMaxLoc
     m++;
 
     int n = ceil(m / 4);
@@ -2034,8 +2148,52 @@ void label2rgb2d(Mat1i &src, Mat3b &dst)
 
     Mat3d cmap3 = cmap.reshape(3);
 
-    Mat3b colormap;
+    //Mat3b colormap;
     cmap3.convertTo(colormap, CV_8U, 255.0);
+}
+/**
+ * @brief label2rgb3d
+ * @param src: CV_32S
+ * @param dst: CV_8UC3, RGB data
+ */
+void label2rgb2d(Mat1i &src, Mat3b &colormap, Mat3b &dst)
+{
+//    // Create JET colormap
+//    double m;
+//    minMaxLoc(src, nullptr, &m);
+//    m++;
+
+//    int n = ceil(m / 4);
+//    Mat1d u(n*3-1, 1, double(1.0));
+
+//    for (int i = 1; i <= n; ++i) {
+//        u(i-1) = double(i) / n;
+//        u((n*3-1) - i) = double(i) / n;
+//    }
+
+//    vector<double> g(n * 3 - 1, 1);
+//    vector<double> r(n * 3 - 1, 1);
+//    vector<double> b(n * 3 - 1, 1);
+//    for (int i = 0; i < g.size(); ++i)
+//    {
+//        g[i] = ceil(double(n) / 2) - (int(m)%4 == 1 ? 1 : 0) + i + 1;
+//        r[i] = g[i] + n;
+//        b[i] = g[i] - n;
+//    }
+
+//    g.erase(remove_if(g.begin(), g.end(), [m](double v){ return v > m;}), g.end());
+//    r.erase(remove_if(r.begin(), r.end(), [m](double v){ return v > m; }), r.end());
+//    b.erase(remove_if(b.begin(), b.end(), [](double v){ return v < 1.0; }), b.end());
+
+//    Mat1d cmap(m, 3, double(0.0));
+//    for (int i = 0; i < r.size(); ++i) { cmap(int(r[i])-1, 2) = u(i); }
+//    for (int i = 0; i < g.size(); ++i) { cmap(int(g[i])-1, 1) = u(i); }
+//    for (int i = 0; i < b.size(); ++i) { cmap(int(b[i])-1, 0) = u(u.rows - b.size() + i); }
+
+//    Mat3d cmap3 = cmap.reshape(3);
+
+//    Mat3b colormap;
+//    cmap3.convertTo(colormap, CV_8U, 255.0);
 
 
     // Apply color mapping
@@ -2050,7 +2208,8 @@ void label2rgb2d(Mat1i &src, Mat3b &dst)
 }
 
 void ccShowSliceLabelMat(Mat *src3d, int slice){
-
+    Mat3b colormap;
+    colorMapGen(src3d, colormap);
     while (true){
         int sz_single_frame = src3d->size[1] * src3d->size[0];
         int *ind = (int*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
@@ -2075,7 +2234,7 @@ void ccShowSliceLabelMat(Mat *src3d, int slice){
         int i = rand();
         title += to_string(i);
         Mat3b mat2display;
-        label2rgb2d(mat2show, mat2display);
+        label2rgb2d(mat2show, colormap, mat2display);
         string folder = "/home/ccw/Desktop/embryo_res_folder/crop_embryo_data_500x500x30x40/imgs/";
         //imwrite(folder + title + ".png", mat2show);
 //        imshow(title, single_slice>0);

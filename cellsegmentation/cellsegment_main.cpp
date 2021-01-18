@@ -148,8 +148,8 @@ void boundaryTouchedTest(Mat *label_map, Mat *fgMap, bool &xy_touched, bool &z_t
         if(label_map->at<int>(i) > 0){
             z_id = i / page_sz;
             remain = i - z_id * page_sz;
-            x = remain / label_map->size[0];
-            y = remain - x * label_map->size[0];
+            y = remain / label_map->size[1];
+            x = remain - y * label_map->size[1];
             for(int i=0; i < 8; i++){
                 if(inField(y + n_y[i], x + n_x[i], im_sz)
                         && fgMap->at<unsigned char>(y + n_y[i], x + n_x[i], z_id) == 0){
@@ -185,6 +185,7 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 
     int cell_cnt = 0;
     FOREACH_i(seed_intensity_order){
+        qInfo("------------------start %ld seed process---------------------", i);
         int seed_id = seed_intensity_order[i] + 1;
         singleCellSeed seed;
         cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap,
@@ -353,16 +354,19 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         // we have alreay have some idea what is the best intensity level
         // we use thresholding to get this.fgMap
         bitwise_and(seed.validSearchAreaMap, seed.volUint8 >= seed.bestFgThreshold, cellSegFromSynQuant.fgMap);
-        // fgMap from simple thresholding may cover >1 cell seeds.
-        removeOtherSeedsInfgMap(cellSegFromSynQuant, seed, p4segVol);
     }
-    ccShowSlice3Dmat(&cellSegFromSynQuant.fgMap, CV_8U);
+    //ccShowSlice3Dmat(&cellSegFromSynQuant.fgMap, CV_8U);
     refineCellTerritoryWithSeedRegion(cellSegFromSynQuant, seed, p4segVol);
 
     //// 2. update seed's score map based on idMap (fg)
     normalize(seed.eigMap2d, seed.score2d, 0.001, 1, NORM_MINMAX, CV_32F, cellSegFromSynQuant.fgMap);
     normalize(seed.eigMap3d, seed.score3d, 0.001, 1, NORM_MINMAX, CV_32F, cellSegFromSynQuant.fgMap);
     seed.scoreMap = seed.score2d + seed.score3d;
+    //// 2.1 append step for simple thresholding step
+    if(seed.bestFgThreshold < 0){
+        // fgMap from simple thresholding may cover >1 cell seeds.
+        removeOtherSeedsInfgMap(cellSegFromSynQuant, seed, p4segVol);
+    }
     //// 3. segment fgMap into idMap based on gaps from principal curvature
     gapBasedRegionSegment(cellSegFromSynQuant, seed, p4segVol, p4odStats);
     //// 4. refine the idMap from step 3 based on size and other prior knowledge
@@ -459,6 +463,7 @@ void cellSegmentMain::cellShrinkTest(synQuantSimple &cellSegFromSynQuant, single
         Mat cur_cell = *cellSegFromSynQuant.idMap == i;
         Mat shrinked_cell, label_shrinked_cell;
         volumeErode(&cur_cell, shrinked_cell, p4segVol.shrink_scale_yxz, MORPH_ELLIPSE);
+        //ccShowSlice3Dmat(&shrinked_cell, CV_8U);
         int n = connectedComponents3d(&shrinked_cell, label_shrinked_cell, p4segVol.growConnectInRefine);
 
         if(n > 1){
@@ -566,36 +571,42 @@ void cellSegmentMain::gapBasedRegionSegment(synQuantSimple &cellSegFromSynQuant,
 void cellSegmentMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQuant, Mat* seeds_Map /*CV_32S*/, int n,
                                                 singleCellSeed &seed, segParameter &p4segVol,
                                                 odStatsParameter &p4odStats){
+    double maxId;
+    minMaxIdx(*seeds_Map, nullptr, &maxId);
     // 1. first grow all seeds until they touch with each other
     Mat grown_seedMap;
     //Mat scoreMap = seed.score2d + seed.score3d;
     bool link_bg2sink = false; // this can force seeds to grow as much as they can
     regionGrow(seeds_Map, n, grown_seedMap, &seed.scoreMap, &cellSegFromSynQuant.fgMap,
                p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
+    //ccShowSliceLabelMat(seeds_Map);
+    //ccShowSliceLabelMat(&grown_seedMap);
+
 
     // 2. for the connected seeds, test if the gap among them are true
     // the gap are choosen by dilating the seed regions
-    vector<bool> gap_tested_true(n*n, false);
+    vector<int> gap_tested_true(n*n, 0); // 0 not tested, -1 tested but merge, 1 tested split
     float p_treshold = p4odStats.gapTestThreshold / (p4segVol.gapTestMinMaxRadius[1] - p4segVol.gapTestMinMaxRadius[0]);
     vector<size_t> real_gap_idx;
     for(int r = p4segVol.gapTestMinMaxRadius[0]; r <= p4segVol.gapTestMinMaxRadius[1]; r++){
         vector<vector<size_t>> gap_idx_list;
         extractGapVoxel(&grown_seedMap, &cellSegFromSynQuant.fgMap, n, r, gap_idx_list, gap_tested_true);
         FOREACH_i(gap_idx_list){
-            if(gap_idx_list[i].size() > 0){
+            if(gap_tested_true[i] != 1 && gap_idx_list[i].size() > 0){
                 int id0 = i / n + 1;
                 int id1 = i % n + 1;
                 vector<vector<size_t>> nei_list0, nei_list1;
                 Mat cur_fg = grown_seedMap == id0;
-                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list0, 2*r+1);
+                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list0, 2*r+2);
                 cur_fg = grown_seedMap == id1;
-                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list1, 2*r+1);
+                neighbor_idx_2d(gap_idx_list[i], &cur_fg, nei_list1, 2*r+2);
 
                 double var_sum = 0;
                 size_t var_idx_num = 0;
                 vector<float> r0, r1, skipped, gap;
 
                 gap = extractValsGivenIdx(&seed.volStblizedFloat, gap_idx_list[i], CV_32F);
+                //ccShowSlice3Dmat(&seed.volStblizedFloat, CV_32F);
                 var_sum += extractSumGivenIdx(&seed.stblizedVarMap, gap_idx_list[i], CV_32F);
                 var_idx_num += gap_idx_list[i].size();
                 for(size_t j = p4odStats.gapTestSkippedBandWidth; j < nei_list0.size(); j++){
@@ -616,7 +627,7 @@ void cellSegmentMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQ
                 if(p4odStats.gapTestMethod == GAP_LOCALORDERSTATS){
                     float sum_stats0 = vec_mean(r0) - vec_mean(gap);
                     float sum_stats1 = vec_mean(r1) - vec_mean(gap);
-                    gap.resize(0);
+                    //gap.resize(0);
                     for(size_t j = 0; j < p4odStats.gapTestSkippedBandWidth; j++){
                         vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list0[j], CV_32F);
                         skipped.insert(skipped.end(), curr_vals.begin(), curr_vals.end());
@@ -625,11 +636,13 @@ void cellSegmentMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQ
                         vector<float> curr_vals = extractValsGivenIdx(&seed.volStblizedFloat, nei_list1[j], CV_32F);
                         skipped.insert(skipped.end(), curr_vals.begin(), curr_vals.end());
                     }
-                    orderStatsKSection(r0, gap, skipped, mu, sigma);
+                    vector<float> bg(0);
+                    orderStatsKSection(gap, bg, skipped, mu, sigma);
                     mu *= cur_std;
                     sigma *= cur_std;
                     p0 = zscore2pvalue((sum_stats0 - mu) / sigma);
                     p1 = zscore2pvalue((sum_stats1 - mu) / sigma);
+                    //qInfo("p0:%.2f and p1:%.2f", p0, p1);
                 }else if(p4odStats.gapTestMethod == GAP_ORDERSTATS){
                     float sum_stats0 = vec_mean(r0) - vec_mean(gap);
                     float sum_stats1 = vec_mean(r1) - vec_mean(gap);
@@ -650,57 +663,78 @@ void cellSegmentMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQ
                 }
 
                 if (p0 <= p_treshold && p1 <= p_treshold){ // gap is true
-                    gap_tested_true[i] = true;
+                    qInfo("!!!--->We find a real Gap!!!");
+                    gap_tested_true[i] = 1;
                     real_gap_idx.insert(real_gap_idx.end(), gap_idx_list[i].begin(), gap_idx_list[i].end());
+                }else{
+                    gap_tested_true[i] = -1;
                 }
             }
         }
         gap_idx_list.clear();
     }
-    vector<vector<int>> groups;
-    FOREACH_i(gap_tested_true){
-        if(gap_tested_true[i]){
-            int target0 = i / n + 1;
-            int target1 = i % n + 1;
-            bool found_group = false;
-            for(size_t j = 0; j < groups.size(); j++){
-                for(size_t k = 0; k < groups[j].size(); k++){
-                    if(target0 == groups[j][k]){
-                        groups[j].push_back(target1);
-                        found_group = true;
-                        break;
-                    }else if(target1 == groups[j][k]){
-                        groups[j].push_back(target0);
-                        found_group = true;
-                        break;
+    if (real_gap_idx.size() > 0){
+        vector<vector<int>> groups;
+        FOREACH_i(gap_tested_true){
+            if(gap_tested_true[i] == -1){
+                int target0 = i / n + 1;
+                int target1 = i % n + 1;
+                bool found_group = false;
+                for(size_t j = 0; j < groups.size(); j++){
+                    for(size_t k = 0; k < groups[j].size(); k++){
+                        if(target0 == groups[j][k]){
+                            groups[j].push_back(target1);
+                            found_group = true;
+                            break;
+                        }else if(target1 == groups[j][k]){
+                            groups[j].push_back(target0);
+                            found_group = true;
+                            break;
+                        }
                     }
+                    if(found_group) break;
                 }
-                if(found_group) break;
+                if(!found_group){
+                    groups.push_back({target0, target1});
+                }
             }
-            if(!found_group){
-                groups.push_back({target0, target1});
+        }
+        vector<int> label_map (n);
+        FOREACH_i(label_map){
+            label_map[i] = i + 1;
+        }
+        FOREACH_i(groups){
+            //vec_unique(groups[i]); //sorted also
+            for(size_t j = 1; j < groups[i].size(); j++){
+                assert(label_map[groups[i][j] - 1] == groups[i][j] || label_map[groups[i][j] - 1] == groups[i][0]);// "Duplicated Regions in two groups");
+                label_map[groups[i][j] - 1] = groups[i][0];
             }
         }
-    }
-    vector<int> label_map (n);
-    FOREACH_i(label_map){
-        label_map[i] = i + 1;
-    }
-    FOREACH_i(groups){
-        //vec_unique(groups[i]); //sorted also
-        for(size_t j = 1; j < groups[i].size(); j++){
-            assert(label_map[groups[i][j] - 1] == groups[i][j] || label_map[groups[i][j] - 1] == groups[i][0]);// "Duplicated Regions in two groups");
-            label_map[groups[i][j] - 1] = groups[i][0];
+
+        FOREACH_i_MAT(grown_seedMap){
+            if(grown_seedMap.at<int>(i) > 0){
+                grown_seedMap.at<int>(i) = label_map[grown_seedMap.at<int>(i) - 1];
+            }
         }
-    }
-    FOREACH_i_MAT(grown_seedMap){
-        if(grown_seedMap.at<int>(i) > 0){
-            grown_seedMap.at<int>(i) = label_map[grown_seedMap.at<int>(i) - 1];
+        ccShowSliceLabelMat(&grown_seedMap);
+        vector<size_t> non_used;
+        cellSegFromSynQuant.cell_num = rearrangeIdMap(&grown_seedMap, *cellSegFromSynQuant.idMap, non_used);
+
+        FOREACH_i(real_gap_idx){ // remove the real gaps
+            cellSegFromSynQuant.idMap->at<int>(real_gap_idx[i]) = 0;
         }
-    }
-    vector<size_t> non_used;
-    cellSegFromSynQuant.cell_num = rearrangeIdMap(&grown_seedMap, *cellSegFromSynQuant.idMap, non_used);
-    FOREACH_i(real_gap_idx){ // remove the real gaps
-        cellSegFromSynQuant.idMap->at<int>(real_gap_idx[i]) = 0;
+    }else{
+        if(cellSegFromSynQuant.idMap->empty()){
+            cellSegFromSynQuant.idMap->create(cellSegFromSynQuant.fgMap.dims,
+                                              cellSegFromSynQuant.fgMap.size,
+                                              CV_32S);
+        }
+        FOREACH_i_MAT(cellSegFromSynQuant.fgMap){
+            if (cellSegFromSynQuant.fgMap.at<unsigned char>(i) > 0){
+                cellSegFromSynQuant.idMap->at<int>(i) = 1;
+            }
+        }
+
+        cellSegFromSynQuant.cell_num = 1;
     }
 }

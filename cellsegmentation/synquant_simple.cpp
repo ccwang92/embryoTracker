@@ -57,6 +57,9 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed){
     imArray = (unsigned char*)srcVolumeUint8->data;
     vector<float> var_vals_in_fg = extractValsGivenMask(&seed.varMap, CV_32F, &seed.validSearchAreaMap, 0);
     src_var = (float)vec_mean(var_vals_in_fg);
+
+    idMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32S, Scalar(0));
+    cell_num = 0;
     //// the following 5 steps are moved into class cellsegment_main.refineSeed2Region()
 //    //// 1. find best threshold to get fgMap and apply some basic morphlogical operation (ordstat4fg.m)
 //    // PS: the region from this step will has no overlap with other cell's terriotory
@@ -141,7 +144,7 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
             continue;
         }
         float cur_zscore = debiasedFgBgBandCompare(&cur_reg, &cur_valid_nei, &seed, p4odStats);
-        qInfo("threshold:%d, zscore:%.2f", ub-i, cur_zscore);
+        //qInfo("threshold:%d, zscore:%.2f", ub-i, cur_zscore);
         if (max_exist_zscore < cur_zscore){
             maxZ_intensity_level = (ub-i);
             max_exist_zscore = cur_zscore;
@@ -150,7 +153,7 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
     if (max_exist_zscore > 0){
         bitwise_and(seed.volUint8 >= maxZ_intensity_level, valid_cell_territory, fgMap);
         validSingleRegionExtract(fgMap, &seed.seedMap, p4odStats.connectInSeedRefine);
-
+        qInfo("threshold:%d, zscore:%.2f", maxZ_intensity_level, max_exist_zscore);
     }else{
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
         qInfo("No valid fg can be found.");
@@ -822,7 +825,7 @@ float synQuantSimple::debiasedFgBgBandCompare(Mat *cur_reg, Mat *validNei, singl
     if (p4odStats.fgSignificanceTestWay == KSEC){
         //fg_center_vals.resize(3000);
         orderStatsKSection(fg_band_vals, bg_band_vals, fg_center_vals, mu, sigma);
-        qInfo("mu:%.4f, sigma:%.4f", mu, sigma);
+        //qInfo("mu:%.4f, sigma:%.4f", mu, sigma);
         float sum_stats = vec_mean(fg_band_vals) - vec_mean(bg_band_vals);
         zscore = (sum_stats - mu*sqrt(src_var))/(sigma*sqrt(src_var));
     }else{

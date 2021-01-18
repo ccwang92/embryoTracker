@@ -70,9 +70,9 @@ public:
         p4segVol.shift_yxz[1] = 20;
         p4segVol.shift_yxz[2] = 4;
         p4segVol.shrink_flag = true;
-        p4segVol.shrink_scale_yxz[0] = 4;
-        p4segVol.shrink_scale_yxz[1] = 4;
-        p4segVol.shrink_scale_yxz[2] = 4;
+        p4segVol.shrink_scale_yxz[0] = 2;
+        p4segVol.shrink_scale_yxz[1] = 2;
+        p4segVol.shrink_scale_yxz[2] = 1;
         p4segVol.fgBoundaryHandle = LEAVEALONEFIRST;
         p4segVol.gapTestMinMaxRadius[0] = 2;
         p4segVol.gapTestMinMaxRadius[1] = 4;

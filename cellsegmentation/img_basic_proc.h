@@ -594,6 +594,9 @@ template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size){
     size_t nPixels_slice = size[0]*size[1];
     T rmder;
+    y.resize(idx.size());
+    x.resize(idx.size());
+    z.resize(idx.size());
     FOREACH_i(idx){
         z[i] = idx[i] / nPixels_slice;
         rmder = idx[i]  - z[i] * nPixels_slice;
@@ -683,6 +686,18 @@ template <typename T> void vec_unique(vector<T> & v){
     typename vector<T>::iterator it;
     it = unique(v.begin(), v.end());
     v.resize(distance(v.begin(),it));
+}
+
+template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2){
+    size_t l_m = v1.size();
+    size_t l_n = v2.size();
+    vector<vector<T>> out(l_m);
+    for(size_t i=0; i< l_m; i++){
+        for(size_t j=0; j< l_n; j++){
+            if(v1[i]>v2[j]) out[i][j] = v1[i]-v2[j];
+            else out[i][j] = v2[j] - v1[i];
+        }
+    }
 }
 
 
