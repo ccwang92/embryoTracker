@@ -100,9 +100,9 @@ bool inField( int r, int c, int z, int *sz );
 bool inField( int r, int c, int *sz );
 bool isOnBoundary2d(Mat *fgMap, size_t idx);
 bool isOnBoundary2d(Mat *fgMap, int r, int c, int z);
-void subVolExtract(Mat *src, int datatype, Mat &subVol, Range xyz_range[3]);
-
-
+void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]);
+void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3]);
+void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_range[3]);
 // fucntions for display
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
 void ccShowSliceLabelMat(Mat *src3d, int slice = 0 /*default 2d*/);

@@ -1018,15 +1018,17 @@ void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
     //Mat org_src3d;
     //if(dst3d.empty()) dst3d = Mat(src3d->dims, src3d->size, CV_8U);
     src3d->copyTo(dst3d);
+    //ccShowSlice3Dmat(&dst3d, CV_8U);
     Mat element = getStructuringElement( dilation_type,
                            Size( 2*radiusValues[0] + 1, 2*radiusValues[1]+1 ),
                            Point( radiusValues[0], radiusValues[1] ) );
     for (int z = 0; z < z_size; z++)
     {
-        float *ind = (float*)dst3d.data + z * xy_size; // sub-matrix pointer
+        unsigned char *ind = (unsigned char*)dst3d.data + z * xy_size; // sub-matrix pointer
         Mat subMatrix(2, dst3d.size, CV_8U, ind);
         erode(subMatrix, subMatrix, element);
     }
+    //ccShowSlice3Dmat(&dst3d, CV_8U);
     unsigned char min_val;
     if (radiusValues[2] > 0){
         for (int i = 0; i < x_size; i++){
@@ -1047,6 +1049,7 @@ void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type){
             }
         }
     }
+    //ccShowSlice3Dmat(&dst3d, CV_8U);
 }
 
 void volumeWrite(Mat *src3d, string filename){
@@ -1521,6 +1524,9 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
             }
         }
         sink_ids.resize(sink_ids_cnt);
+        if(sink_ids_cnt > 0 || label_voxIdx[i-1].size() > 0){
+            qInfo("Fatal error: no sink node.");
+        }
         assert (sink_ids_cnt > 0 && label_voxIdx[i-1].size() > 0);
         // max-flow the get the grown region
         g = new GraphType(label_map->total(), (int)arc_head_in_fg.size());
@@ -1971,8 +1977,127 @@ void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]){
         }
     }
 }
+/**
+ * @brief subVolReplace: replace the data in src by the subVol
+ * @param src
+ * @param datatype
+ * @param subVol
+ * @param xyz_range
+ */
+void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3]){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    int size[3] = {yxz_range[0].end - yxz_range[0].start,
+                  yxz_range[1].end - yxz_range[1].start,
+                  yxz_range[2].end - yxz_range[2].start};
 
+    size_t src_pgsz = src.size[0] * src.size[1];
+    size_t sub_pgsz = size[0] * size[1];
+    size_t src_page_shift, sub_page_shift, src_row_shift, sub_row_shift;
+    if (datatype == CV_8U){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src.size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    src.at<unsigned char>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                     = subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i);
+                }
+            }
+        }
+    }else if(datatype == CV_32F){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src.size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    src.at<float>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                             = subVol.at<float>(sub_page_shift + sub_row_shift + i);
+                }
+            }
+        }
+    }else if(datatype == CV_32S){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src.size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    src.at<int>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                            = subVol.at<int>(sub_page_shift + sub_row_shift + i);
+                }
+            }
+        }
+    }
+}
 
+/**
+ * @brief subVolReplace: replace the data in src by a unique val with mask defined in subVol
+ * @param src
+ * @param datatype
+ * @param subVol
+ * @param xyz_range
+ */
+void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_range[3]){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    int size[3] = {yxz_range[0].end - yxz_range[0].start,
+                  yxz_range[1].end - yxz_range[1].start,
+                  yxz_range[2].end - yxz_range[2].start};
+
+    size_t src_pgsz = src.size[0] * src.size[1];
+    size_t sub_pgsz = size[0] * size[1];
+    size_t src_page_shift, sub_page_shift, src_row_shift, sub_row_shift;
+    if (datatype == CV_8U){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src.size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    if (subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i) > 0){
+                        src.at<unsigned char>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                         = (unsigned char) val;
+                    }
+                }
+            }
+        }
+    }else if(datatype == CV_32F){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src.size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    if(subVol.at<float>(sub_page_shift + sub_row_shift + i) > 0){
+                        src.at<float>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                                 = val;
+                    }
+                }
+            }
+        }
+    }else if(datatype == CV_32S){
+        for(int k = 0; k < size[2]; k++){
+            src_page_shift = (k + yxz_range[2].start) * src_pgsz;
+            sub_page_shift = k * sub_pgsz;
+            for(int j = 0; j < size[0]; j++){
+                src_row_shift = (j + yxz_range[0].start) * src.size[1];
+                sub_row_shift = j * size[1];
+                for(int i = 0; i < size[1]; i++){
+                    if(subVol.at<int>(sub_page_shift + sub_row_shift + i)>0){
+                        src.at<int>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                                = (int)val;
+                    }
+                }
+            }
+        }
+    }
+}
 /**************************Functions for debug*******************************/
 
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
