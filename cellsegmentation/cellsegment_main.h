@@ -54,7 +54,7 @@ public:
 
         p4segVol.min_intensity = 0.0;
         p4segVol.fdr = .05;
-        p4segVol.min_cell_sz =100;
+        p4segVol.min_cell_sz = 100;
         p4segVol.max_cell_sz = 3000;
         p4segVol.min_fill = 0.0001;
         p4segVol.max_WHRatio = 100;

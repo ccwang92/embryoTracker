@@ -1125,7 +1125,7 @@ int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask){
         }
     }else{
         FOREACH_i_ptrMAT(label_map){
-            if(label_map->at<int>(i) > 0 && mask->at<int>(i) > 0){
+            if(label_map->at<int>(i) > 0 && mask->at<unsigned char>(i) > 0){
                 cc_sz[label_map->at<int>(i) - 1] ++;
             }
         }
@@ -1133,7 +1133,7 @@ int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask){
     size_t largest_id;
     vec_max(cc_sz, largest_id);
 
-    return (int)largest_id;
+    return (int)largest_id + 1;
 }
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
@@ -1158,6 +1158,9 @@ size_t fgMapSize(Mat *src3d, int datatype, float threshold_in){
         }
     }
     return fg_sz;
+}
+bool isempty(Mat src3d, int datatype, float threshold_in){
+    return isempty(&src3d, datatype, threshold_in);
 }
 bool isempty(Mat *src3d, int datatype, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
@@ -1339,9 +1342,12 @@ bool isOnBoundary2d(Mat *fgMap, size_t idx){
 bool isOnBoundary2d(Mat *fgMap, int y, int x, int z){
     int im_sz[] = {fgMap->size[0], fgMap->size[1]};
     int page_sz = im_sz[0] * im_sz[1];
+    vector<int> n_y(8), n_x(8);
+    n_y = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+    n_x = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
     for(int i=0; i < 8; i++){
-        if(inField(y + n8_y[i], x + n8_x[i], im_sz)
-                && fgMap->at<unsigned char>(vol_sub2ind(y + n8_y[i], x + n8_x[i], z, im_sz[1], page_sz)) == 0){
+        if(inField(y + n_y[i], x + n_x[i], im_sz)
+                && fgMap->at<unsigned char>(vol_sub2ind(y + n_y[i], x + n_x[i], z, im_sz[1], page_sz)) == 0){
             return true;
         }
     }
@@ -1473,85 +1479,193 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
     outLabelMap = Mat::zeros(label_map->dims, label_map->size, CV_32S);
     // for each connected component, run max-flow
 
-    vector<size_t> arc_head_in_fg, arc_tail;
+    vector<size_t> arc_tail_in_fg, arc_head;
     int mat_sz[] = {label_map->size[0], label_map->size[1], label_map->size[2]};
     vector<size_t> valid_fg_idx = fgMapIdx(fgMap, CV_8U, 0);
-    neighbor_idx(valid_fg_idx, arc_head_in_fg, arc_tail, mat_sz, connect);
-    vector<int> arc_capacity (arc_head_in_fg.size()); //BK algorithm accept only integer capacity
+    //// undirected neighbor extraction, for each neighboring pair, they only appear once in
+    /// the output.
+    neighbor_idx(valid_fg_idx, arc_tail_in_fg, arc_head, mat_sz, connect);
+    vector<int> arc_capacity (arc_tail_in_fg.size()); //BK algorithm accept only integer capacity
     float p1, p2;
-    FOREACH_i(arc_head_in_fg){
-        p1 = scoreMap->at<float>(arc_head_in_fg[i]);
-        p2 = scoreMap->at<float>(arc_tail[i]);
+    double cost;
+    FOREACH_i(arc_tail_in_fg){
+        p1 = scoreMap->at<float>(arc_tail_in_fg[i]);
+        p2 = scoreMap->at<float>(arc_head[i]);
         if(p1+p2 == 0 || p1==0){
-            arc_capacity[i] = INFINITY;
+            arc_capacity[i] = numeric_limits<int>::max();
         }else{
             if (cost_design[0]==ARITHMETIC_AVERAGE){
-                arc_capacity[i] = (int)(pow((2/(p1+p2)), cost_design[1]) * 10000);// we keep 1/1000 accuracy
+                cost = pow((2/(p1+p2)), cost_design[1]) * 10000;
+
             }else if (cost_design[0]==GEOMETRIC_AVERAGE){
                 if (p2==0) p2 = p1; // there should be no non-negative score, so this line should never be used
-                arc_capacity[i] = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 10000); // we keep 1/1000 accuracy
+                cost = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 10000);
             }
-            if(arc_capacity[i] < 0){
+            if(cost < 0){
                 qFatal("Wrong cap value!");
+            }{
+                if (cost > numeric_limits<int>::max()) arc_capacity[i] = numeric_limits<int>::max();
+                else arc_capacity[i] = (int)(cost);// we keep 1/1000 accuracy
             }
         }
     }
     vector<vector<int>> label_voxIdx;
     extractVoxIdxList(label_map, label_voxIdx, numCC, false /*no_bk*/);
-    typedef Graph<int,int,int> GraphType;
-    GraphType *g;
-    for(int i = 1; i <= numCC; i++){
-        // build sink_ids
-        vector<size_t> sink_ids (arc_tail.size()); //valid sink nodes will not be larger than tail size
-        //fill(sink_ids.begin(), sink_ids.end(), -1);
-        size_t sink_ids_cnt = 0;
-        if (bg2sink){
-            FOREACH_j(arc_tail){
-                if (fgMap->at<unsigned char>(arc_tail[j])==0 ||
-                        (label_map->at<int>(arc_tail[j])>0 &&
-                        label_map->at<int>(arc_tail[j]) != i)){
-                    sink_ids[sink_ids_cnt] = arc_tail[j];
-                    sink_ids_cnt++;
-                }
-            }
-        }else{
-            FOREACH_j(arc_tail){
-                if (label_map->at<int>(arc_tail[j])>0 &&
-                        label_map->at<int>(arc_tail[j]) != i){
-                    sink_ids[sink_ids_cnt] = arc_tail[j];
-                    sink_ids_cnt++;
-                }
-            }
-        }
-        sink_ids.resize(sink_ids_cnt);
-        if(sink_ids_cnt > 0 || label_voxIdx[i-1].size() > 0){
-            qInfo("Fatal error: no sink node.");
-        }
-        assert (sink_ids_cnt > 0 && label_voxIdx[i-1].size() > 0);
-        // max-flow the get the grown region
-        g = new GraphType(label_map->total(), (int)arc_head_in_fg.size());
-        g -> add_node(label_map->total());
-        FOREACH_j(label_voxIdx[i-1]){
-            g -> add_tweights( label_voxIdx[i-1][j],  INFINITY, 0);
-        }
-        FOREACH_i(sink_ids){
-            g -> add_tweights( sink_ids[i],  0, INFINITY);
-        }
-        FOREACH_i(arc_head_in_fg){
-            g -> add_edge( arc_head_in_fg[i], arc_tail[i],   arc_capacity[i],   arc_capacity[i] );
-        }
+    vector<size_t> label_voxIdx_sz(label_voxIdx.size());
+    FOREACH_i(label_voxIdx) label_voxIdx_sz[i] = label_voxIdx[i].size();
+    size_t overall_seed_vox_num = accumulate(label_voxIdx_sz.begin(), label_voxIdx_sz.end(), 0);
 
-        int flow = g -> maxflow();
-        FOREACH_j(valid_fg_idx){
-            if (g->what_segment(valid_fg_idx[j]) == GraphType::SOURCE){
-                if (outLabelMap.at<int>(valid_fg_idx[j]) > 0){
-                    qInfo("error occured");
-                }
-                outLabelMap.at<int>(valid_fg_idx[j]) = i;
+    typedef Graph<int,int,int> GraphType;
+
+//    if(bg2sink == false){
+//        ccShowSlice3Dmat(fgMap, CV_8U);
+//        ccShowSliceLabelMat(label_map);
+//    }
+    set<int> bgsinkIds;
+    if(bg2sink){
+        FOREACH_j(arc_head){
+            if (fgMap->at<unsigned char>(arc_head[j])==0 &&
+                    label_map->at<int>(arc_head[j]) == 0){
+                bgsinkIds.insert(arc_head[j]);
             }
         }
     }
-    delete g;
+    for(int region_id = 1; region_id <= numCC; region_id++){
+        //// build sink_ids: valid sink nodes will not be larger than node size
+        /// but may duplicate in the vector of sink_ids, which should be OK
+//        vector<size_t> sink_ids (2*arc_head.size());
+        //fill(sink_ids.begin(), sink_ids.end(), -1);
+//        size_t sink_ids_cnt = 0;
+
+//        if(bg2sink){//(true) {//
+//            FOREACH_j(arc_head){
+//                if (fgMap->at<unsigned char>(arc_head[j])==0 ||
+//                        (label_map->at<int>(arc_head[j])>0 &&
+//                        label_map->at<int>(arc_head[j]) != region_id)){
+//                    sink_ids[sink_ids_cnt] = arc_head[j];
+//                    sink_ids_cnt++;
+//                }
+//                if (fgMap->at<unsigned char>(arc_tail_in_fg[j])==0 ||
+//                        (label_map->at<int>(arc_tail_in_fg[j])>0 &&
+//                        label_map->at<int>(arc_tail_in_fg[j]) != region_id)){
+//                    sink_ids[sink_ids_cnt] = arc_tail_in_fg[j];
+//                    sink_ids_cnt++;
+//                }
+//            }
+//        }
+//        else{
+//            FOREACH_j(arc_head){
+//                if (fgMap->at<unsigned char>(arc_head[j])>0 &&
+//                        label_map->at<int>(arc_head[j])>0 &&
+//                        label_map->at<int>(arc_head[j]) != region_id){
+//                    sink_ids[sink_ids_cnt] = arc_head[j];
+//                    sink_ids_cnt++;
+//                }
+//                if (fgMap->at<unsigned char>(arc_tail_in_fg[j])>0 &&
+//                        label_map->at<int>(arc_tail_in_fg[j])>0 &&
+//                        label_map->at<int>(arc_tail_in_fg[j]) != region_id){
+//                    sink_ids[sink_ids_cnt] = arc_tail_in_fg[j];
+//                    sink_ids_cnt++;
+//                }
+//            }
+//        }
+//        sink_ids.resize(sink_ids_cnt);
+//        if(sink_ids_cnt == 0 || label_voxIdx[i-1].size() == 0){
+//            if(isempty(*label_map == 1, CV_8U)){
+//                qInfo("Fatal error: no label 1.");
+//            }
+//            if(isempty(*label_map == 2, CV_8U)){
+//                qInfo("Fatal error: no label 2.");
+//            }
+//            if(isempty(*label_map == 3, CV_8U)){
+//                qInfo("Fatal error: no label 3.");
+//            }
+//            ccShowSlice3Dmat(*label_map == 1, CV_8U);
+//            ccShowSlice3Dmat(*label_map == 2, CV_8U);
+//            ccShowSlice3Dmat(*label_map == 3, CV_8U);
+//            ccShowSliceLabelMat(label_map);
+//            qInfo("Fatal error: no sink node.");
+//        }
+//        assert (sink_ids_cnt > 0 && label_voxIdx[region_id-1].size() > 0);
+        // max-flow the get the grown region
+        GraphType *g = new GraphType(label_map->total(),
+                          (int)(arc_tail_in_fg.size() + overall_seed_vox_num + bgsinkIds.size())*2);
+        g -> add_node(label_map->total());
+
+        FOREACH_i(label_voxIdx){
+            if((int)i == (region_id - 1)){
+                FOREACH_j(label_voxIdx[i]){
+                    g -> add_tweights( label_voxIdx[i][j],  numeric_limits<int>::max(), 0);
+                }
+            }else{
+                FOREACH_j(label_voxIdx[i]){
+                    g -> add_tweights( label_voxIdx[i][j], 0,  numeric_limits<int>::max());
+                }
+            }
+        }
+        if(bgsinkIds.size() > 0){
+            for(auto it : bgsinkIds){
+                g -> add_tweights( it, 0,  numeric_limits<int>::max());
+            }
+        }
+        FOREACH_j(arc_tail_in_fg){
+            g -> add_edge( arc_tail_in_fg[j], arc_head[j],   arc_capacity[j],   arc_capacity[j] );
+        }
+//        if (bg2sink){
+//            FOREACH_j(label_voxIdx[region_id-1]){
+//                g -> add_tweights( label_voxIdx[region_id-1][j],  numeric_limits<int>::max(), 0);
+//            }
+//            FOREACH_j(sink_ids){
+//                g -> add_tweights( sink_ids[j],  0, numeric_limits<int>::max());
+//            }
+//            FOREACH_j(arc_tail_in_fg){
+//                g -> add_edge( arc_tail_in_fg[j], arc_head[j],   arc_capacity[j],   arc_capacity[j] );
+//            }
+//        }else{
+//            FOREACH_j(label_voxIdx[region_id-1]){
+//                g -> add_tweights( label_voxIdx[region_id-1][j],  numeric_limits<int>::max(), 0);
+//            }
+//            g -> add_edge( label_voxIdx[region_id-1][0], sink_ids[0],   10000,   10000);
+//            FOREACH_j(sink_ids){
+//                g -> add_tweights( sink_ids[j],  0, numeric_limits<int>::max());
+//                int f = g -> maxflow();
+//                qInfo("Node problem? %ld, %d", j, f);
+//            }
+////            FOREACH_j(arc_tail_in_fg){
+////                g -> add_edge( arc_tail_in_fg[j], arc_head[j],   arc_capacity[j],   arc_capacity[j] );
+////            }
+//            //g -> add_tweights( label_voxIdx[region_id-1][0],  numeric_limits<int>::max(), 0);
+//            //g -> add_tweights( sink_ids[0],  0, numeric_limits<int>::max());
+
+////            FOREACH_j(arc_tail_in_fg){
+////                if(fgMap->at<unsigned char>(arc_head[j])>0){
+////                    //g -> add_edge( arc_tail_in_fg[j], arc_head[j],   arc_capacity[j],   arc_capacity[j]);
+////                    g -> add_edge( arc_tail_in_fg[j], arc_head[j],   0,   0);
+////                }
+////            }
+//            //g -> add_edge( label_voxIdx[region_id-1][0], sink_ids[0],   10000,   10000);
+//        }
+//        qInfo("sink:%ld, src:%ld, arc:%ld", sink_ids_cnt,
+//              label_voxIdx[region_id-1].size(), arc_tail_in_fg.size());
+        int flow = g -> maxflow();
+        if(flow < 0){
+            qFatal("The flow number may be wrong!");
+        }
+        size_t region_sz = 0;
+        FOREACH_j(valid_fg_idx){
+            if (g->what_segment(valid_fg_idx[j]) == GraphType::SOURCE){
+//                if (outLabelMap.at<int>(valid_fg_idx[j]) > 0){
+//                    qInfo("error occured");
+//                }
+                outLabelMap.at<int>(valid_fg_idx[j]) = region_id;
+                region_sz ++;
+            }
+        }
+        qInfo("%ld out of %ld voxel in region %d.", region_sz, valid_fg_idx.size(),
+              region_id);
+        delete g;
+    }
+
 }
 
 void setValMat(Mat &vol3d, int datatype, vector<size_t> idx, float v){
@@ -1681,7 +1795,7 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
                 refined_gap_idx[refined_gap_idx_size++] = sub_idx0[z_s][i];
             }
             for(size_t i = 0; i < sub_idx1[z_s].size(); i+=3){
-                refined_gap_idx[refined_gap_idx_size++] = sub_idx0[z_s][i];
+                refined_gap_idx[refined_gap_idx_size++] = sub_idx1[z_s][i];
             }
             continue;
         }
@@ -1812,10 +1926,16 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
                     refined_gap_idx[refined_gap_idx_size++] = gap_idx_z_divid[z_s][i];
                 }
             }
+//            if(refined_gap_idx_size == 108){
+//                qInfo("Degug!");
+//            }
         }
         //gap_idx.resize(valid_idx_cnt);
     }
     refined_gap_idx.resize(refined_gap_idx_size);
+    if(refined_gap_idx[refined_gap_idx_size - 1] > label_map->total()){
+        qInfo("mem allocate error");
+    }
     gap_idx.resize(0);
     gap_idx.insert(gap_idx.begin(), refined_gap_idx.begin(), refined_gap_idx.end());
 }
@@ -1868,7 +1988,7 @@ void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
     }
     FOREACH_i(gap_voxIdx){
         if(gap_voxIdx[i].size() > 0){
-            if (tested_flag[i] > 0){ // this gap does not need to test
+            if (tested_flag[i] > 0){ // this gap is alreay true, does not need to test
                 gap_voxIdx[i].resize(0);
             }else{
                 gapRefine(label_map, i / numCC + 1, i % numCC + 1, gap_voxIdx[i]);
@@ -1984,7 +2104,7 @@ void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]){
  * @param subVol
  * @param xyz_range
  */
-void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3]){
+void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3], int start){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     int size[3] = {yxz_range[0].end - yxz_range[0].start,
                   yxz_range[1].end - yxz_range[1].start,
@@ -2001,8 +2121,10 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3]){
                 src_row_shift = (j + yxz_range[0].start) * src.size[1];
                 sub_row_shift = j * size[1];
                 for(int i = 0; i < size[1]; i++){
-                    src.at<unsigned char>(src_page_shift + src_row_shift + i + yxz_range[1].start)
-                     = subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i);
+                    if(subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i) > 0){
+                        src.at<unsigned char>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                         = subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i) + (unsigned char)start;
+                    }
                 }
             }
         }
@@ -2014,8 +2136,10 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3]){
                 src_row_shift = (j + yxz_range[0].start) * src.size[1];
                 sub_row_shift = j * size[1];
                 for(int i = 0; i < size[1]; i++){
-                    src.at<float>(src_page_shift + src_row_shift + i + yxz_range[1].start)
-                             = subVol.at<float>(sub_page_shift + sub_row_shift + i);
+                    if(subVol.at<float>(sub_page_shift + sub_row_shift + i) > 0){
+                        src.at<float>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                                 = subVol.at<float>(sub_page_shift + sub_row_shift + i) + (float)start;
+                    }
                 }
             }
         }
@@ -2027,8 +2151,10 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3]){
                 src_row_shift = (j + yxz_range[0].start) * src.size[1];
                 sub_row_shift = j * size[1];
                 for(int i = 0; i < size[1]; i++){
-                    src.at<int>(src_page_shift + src_row_shift + i + yxz_range[1].start)
-                            = subVol.at<int>(sub_page_shift + sub_row_shift + i);
+                    if(subVol.at<int>(sub_page_shift + sub_row_shift + i) > 0){
+                        src.at<int>(src_page_shift + src_row_shift + i + yxz_range[1].start)
+                                = subVol.at<int>(sub_page_shift + sub_row_shift + i) + start;
+                    }
                 }
             }
         }
@@ -2099,7 +2225,9 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
     }
 }
 /**************************Functions for debug*******************************/
-
+void ccShowSlice3Dmat(Mat src3d, int datatype, int slice, bool binary){
+    ccShowSlice3Dmat(&src3d, datatype, slice, binary);
+}
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
     assert(datatype == CV_8U || datatype == CV_16U || datatype == CV_32F || datatype == CV_32S);
     int sz_single_frame = src3d->size[1] * src3d->size[0];
@@ -2331,7 +2459,9 @@ void label2rgb2d(Mat1i &src, Mat3b &colormap, Mat3b &dst)
         }
     }
 }
-
+void ccShowSliceLabelMat(Mat src3d, int slice){
+    ccShowSliceLabelMat(&src3d, slice);
+};
 void ccShowSliceLabelMat(Mat *src3d, int slice){
     Mat3b colormap;
     colorMapGen(src3d, colormap);

@@ -307,7 +307,7 @@ template <typename captype, typename tcaptype, typename flowtype>
 	}
 
 
-	flow += bottleneck;
+    flow += bottleneck;
 }
 
 /***********************************************************************/
@@ -572,7 +572,7 @@ template <typename captype, typename tcaptype, typename flowtype>
 			/* adoption */
 			while ((np=orphan_first))
 			{
-				np_next = np -> next;
+                np_next = np -> next;
 				np -> next = NULL;
 
 				while ((np=orphan_first))

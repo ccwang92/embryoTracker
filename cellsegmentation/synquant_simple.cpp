@@ -60,6 +60,9 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed){
 
     idMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32S, Scalar(0));
     cell_num = 0;
+    if(seed.bestFgThreshold > 0){
+        maxZ_intensity_level = seed.bestFgThreshold;
+    }
     //// the following 5 steps are moved into class cellsegment_main.refineSeed2Region()
 //    //// 1. find best threshold to get fgMap and apply some basic morphlogical operation (ordstat4fg.m)
 //    // PS: the region from this step will has no overlap with other cell's terriotory

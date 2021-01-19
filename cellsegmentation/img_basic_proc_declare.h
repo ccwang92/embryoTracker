@@ -19,7 +19,7 @@
 #include <numeric>
 #include <algorithm>
 #include <iomanip>      // std::setprecision
-
+#include <set>
 #include "maxflow_bk/graph.h" //max-flow BK algorithm
 
 #include "cc3d.hpp" //connected component
@@ -81,6 +81,7 @@ void volumeWrite(Mat *src3d, string filename);
 void validSingleRegionExtract(Mat &vol3d, Mat *binary_mask, int connect);
 int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask);
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in = 0);
+bool isempty(Mat src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
 vector<float> extractValsGivenMask(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
@@ -101,11 +102,13 @@ bool inField( int r, int c, int *sz );
 bool isOnBoundary2d(Mat *fgMap, size_t idx);
 bool isOnBoundary2d(Mat *fgMap, int r, int c, int z);
 void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]);
-void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3]);
+void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3], int start = 0);
 void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_range[3]);
 // fucntions for display
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
 void ccShowSliceLabelMat(Mat *src3d, int slice = 0 /*default 2d*/);
+void ccShowSlice3Dmat(Mat src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
+void ccShowSliceLabelMat(Mat src3d, int slice = 0 /*default 2d*/);
 void label2rgb3d(Mat &src, Mat &dst);
 void label2rgb2d(Mat1i &src, Mat3b &dst);
 // Function to find t-test of

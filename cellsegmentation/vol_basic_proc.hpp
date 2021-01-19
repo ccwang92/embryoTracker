@@ -2192,10 +2192,10 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
         g = new GraphType(label_map->total(), (int)arc_head_in_fg.size());
         g -> add_node(label_map->total());
         FOREACH_j(label_voxIdx[i-1]){
-            g -> add_tweights( label_voxIdx[i-1][j],  INFINITY, 0);
+            g -> add_tweights( label_voxIdx[i-1][j],  numeric_limits<int>::max(), 0);
         }
         FOREACH_i(sink_ids){
-            g -> add_tweights( sink_ids[i],  0, INFINITY);
+            g -> add_tweights( sink_ids[i],  0, numeric_limits<int>::max());
         }
         FOREACH_i(arc_head_in_fg){
             g -> add_edge( arc_head_in_fg[i], arc_tail[i],   arc_capacity[i],   arc_capacity[i] );
