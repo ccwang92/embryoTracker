@@ -1495,11 +1495,11 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
             arc_capacity[i] = numeric_limits<int>::max();
         }else{
             if (cost_design[0]==ARITHMETIC_AVERAGE){
-                cost = pow((2/(p1+p2)), cost_design[1]) * 10000;
+                cost = pow((2/(p1+p2)), cost_design[1]) * 100;
 
             }else if (cost_design[0]==GEOMETRIC_AVERAGE){
                 if (p2==0) p2 = p1; // there should be no non-negative score, so this line should never be used
-                cost = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 10000);
+                cost = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 100);
             }
             if(cost < 0){
                 qFatal("Wrong cap value!");
@@ -1589,7 +1589,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
 //        assert (sink_ids_cnt > 0 && label_voxIdx[region_id-1].size() > 0);
         // max-flow the get the grown region
         GraphType *g = new GraphType(label_map->total(),
-                          (int)(arc_tail_in_fg.size() + overall_seed_vox_num + bgsinkIds.size())*2);
+                          (arc_tail_in_fg.size() + overall_seed_vox_num + bgsinkIds.size())*2);
         g -> add_node(label_map->total());
 
         FOREACH_i(label_voxIdx){
@@ -1647,7 +1647,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
 //        }
 //        qInfo("sink:%ld, src:%ld, arc:%ld", sink_ids_cnt,
 //              label_voxIdx[region_id-1].size(), arc_tail_in_fg.size());
-        int flow = g -> maxflow();
+        double flow = g -> maxflow();
         if(flow < 0){
             qFatal("The flow number may be wrong!");
         }
@@ -1731,6 +1731,21 @@ void findGapGatePoints(Mat* label_map, int target_label0, vector<size_t> &gap_id
             }
         }
     }
+
+    if(max_dist == 0){
+        max_dist = 0;
+        for(int i = 0 ; i < gap_idx_y_x.size(); i += 3){
+            for (int j = i + 3; j < gap_idx_y_x.size(); j+= 3){
+                curr_dist = pow((gap_idx_y_x[i+1] - gap_idx_y_x[j+1]),2) +
+                        pow((gap_idx_y_x[i+2] - gap_idx_y_x[j+2]),2);
+                if(curr_dist > max_dist){
+                    max_dist = curr_dist;
+                    target_i = i * 3;
+                    target_j = j * 3;
+                }
+            }
+        }
+    }
 //    qInfo("%ld element and %ld element is the best pair out of %ld ",
 //          target_i, target_j, gap_idx_y_x.size());
     gap_idx_y_x[0] = gap_idx_y_x[target_i];
@@ -1799,65 +1814,7 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
             }
             continue;
         }
-        // find the two nodes far away
-//        float dy, dx, d;
-//        vector<size_t> target_voxIdx0;
-//        vector<int> y, x, z;
-//        extractVoxIdxGivenId(label_map, target_voxIdx0, target_label0);
-//        vec_ind2sub(target_voxIdx0, y, x, z, label_map->size);
-//        float y_center = vec_mean(y);
-//        float x_center = vec_mean(x);
-//        float min_dist2center = INFINITY;
-//        vector<float> dist2center(sub_idx0[z_s].size()/3);
-//        for(size_t i = 0; i < sub_idx0[z_s].size(); i+=3){
-//            dy = sub_idx0[z_s][i+1]-y_center;
-//            dx = sub_idx0[z_s][i+2]-x_center;
-//            dist2center[i/3] = sqrt(dy*dy + dx*dx);
-//            if(dist2center[i/3] < min_dist2center){
-//                min_dist2center = dist2center[i/3];
-//            }
-//        }
-//        //update y and x
-//        vector<float> scaled_y(sub_idx0[z_s].size()/3), scaled_x(sub_idx0[z_s].size()/3);
-//        for(size_t i = 0; i < sub_idx0[z_s].size(); i+=3){
-//            dy = sub_idx0[z_s][i+1]-y_center;
-//            dx = sub_idx0[z_s][i+2]-x_center;
-//            scaled_y[i/3] = y_center + dy * (min_dist2center / dist2center[i/3]);
-//            scaled_x[i/3] = x_center + dx * (min_dist2center / dist2center[i/3]);
-//        }
-//        float max_dist = 0, curr_dist;
-//        size_t target_i, target_j;
-//        for(int i = 0 ; i < scaled_y.size(); i ++){
-//            for (int j = i + 1; j < scaled_x.size(); j++){
-//                curr_dist = pow((scaled_y[i] - scaled_y[j]),2) +
-//                        pow((scaled_x[i] - scaled_x[j]),2);
-//                if(curr_dist > max_dist){
-//                    max_dist = curr_dist;
-//                    target_i = i * 3;
-//                    target_j = j * 3;
-//                }
-//            }
-//        }
-//        sub_idx0[z_s][0] = sub_idx0[z_s][target_i];
-//        sub_idx0[z_s][1] = sub_idx0[z_s][target_i+1];
-//        sub_idx0[z_s][2] = sub_idx0[z_s][target_i+2];
-//        sub_idx0[z_s][3] = sub_idx0[z_s][target_i];
-//        sub_idx0[z_s][4] = sub_idx0[z_s][target_i+1];
-//        sub_idx0[z_s][5] = sub_idx0[z_s][target_i+2];
-//        sub_idx0[z_s].resize(6);
-//        for(size_t i = 3; i < sub_idx1.size(); i+=3){
-//            dy = sub_idx1[i+1]-sub_idx1[1];
-//            dx = sub_idx1[i+2]-sub_idx1[2];
-//            d = dy*dy + dx*dx;
-//            if(d > max_dist){
-//                max_dist = d;
-//                target_i = i;
-//            }
-//        }
-//        sub_idx1[3] = sub_idx1[target_i];
-//        sub_idx1[4] = sub_idx1[target_i+1];
-//        sub_idx1[5] = sub_idx1[target_i+2];
-//        sub_idx1.resize(6);
+        //// find the two nodes far away (with respect to the region)
         findGapGatePoints(label_map, target_label0, sub_idx0[z_s]);
         findGapGatePoints(label_map, target_label1, sub_idx1[z_s]);
 
@@ -1933,11 +1890,13 @@ void gapRefine(Mat *label_map, int target_label0, int target_label1, vector<size
         //gap_idx.resize(valid_idx_cnt);
     }
     refined_gap_idx.resize(refined_gap_idx_size);
-    if(refined_gap_idx[refined_gap_idx_size - 1] > label_map->total()){
-        qInfo("mem allocate error");
+    if(refined_gap_idx_size < 1 || refined_gap_idx[refined_gap_idx_size - 1] > label_map->total()){
+        qInfo("no valid gap is found");
+        gap_idx.resize(0);
+    }else{
+        gap_idx.resize(0);
+        gap_idx.insert(gap_idx.begin(), refined_gap_idx.begin(), refined_gap_idx.end());
     }
-    gap_idx.resize(0);
-    gap_idx.insert(gap_idx.begin(), refined_gap_idx.begin(), refined_gap_idx.end());
 }
 /**
  * @brief extractGapVoxel: 2d gap test
@@ -1987,10 +1946,13 @@ void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius,
         }
     }
     FOREACH_i(gap_voxIdx){
-        if(gap_voxIdx[i].size() > 0){
+        if(gap_voxIdx[i].size() > 10){
             if (tested_flag[i] > 0){ // this gap is alreay true, does not need to test
                 gap_voxIdx[i].resize(0);
             }else{
+//                if(gap_voxIdx[i].size() <= 4){
+//                    qInfo("too small size of gap");
+//                }
                 gapRefine(label_map, i / numCC + 1, i % numCC + 1, gap_voxIdx[i]);
             }
         }
@@ -2052,7 +2014,7 @@ void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]){
     int size[3] = {yxz_range[0].end - yxz_range[0].start,
                   yxz_range[1].end - yxz_range[1].start,
                   yxz_range[2].end - yxz_range[2].start};
-    subVol.create(3, size, datatype);
+    subVol = Mat(3, size, datatype);
     size_t src_pgsz = src->size[0] * src->size[1];
     size_t sub_pgsz = size[0] * size[1];
     size_t src_page_shift, sub_page_shift, src_row_shift, sub_row_shift;
@@ -2170,6 +2132,7 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3], int 
  */
 void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_range[3]){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    assert(subVol.type() == CV_8U);
     int size[3] = {yxz_range[0].end - yxz_range[0].start,
                   yxz_range[1].end - yxz_range[1].start,
                   yxz_range[2].end - yxz_range[2].start};
@@ -2200,7 +2163,7 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
                 src_row_shift = (j + yxz_range[0].start) * src.size[1];
                 sub_row_shift = j * size[1];
                 for(int i = 0; i < size[1]; i++){
-                    if(subVol.at<float>(sub_page_shift + sub_row_shift + i) > 0){
+                    if(subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i) > 0){
                         src.at<float>(src_page_shift + src_row_shift + i + yxz_range[1].start)
                                  = val;
                     }
@@ -2215,7 +2178,7 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
                 src_row_shift = (j + yxz_range[0].start) * src.size[1];
                 sub_row_shift = j * size[1];
                 for(int i = 0; i < size[1]; i++){
-                    if(subVol.at<int>(sub_page_shift + sub_row_shift + i)>0){
+                    if(subVol.at<unsigned char>(sub_page_shift + sub_row_shift + i)>0){
                         src.at<int>(src_page_shift + src_row_shift + i + yxz_range[1].start)
                                 = (int)val;
                     }

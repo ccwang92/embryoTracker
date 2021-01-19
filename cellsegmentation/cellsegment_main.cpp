@@ -231,7 +231,8 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
         subVolReplace(cell_label_maps[curr_time_point], CV_32S, seed.outputIdMap, seed.crop_range_yxz, cell_cnt);
         cell_cnt += seed.outCell_num;
 
-        subVolReplace(threshold_maps[curr_time_point], CV_32S, seed.outputIdMap, (float)seed.bestFgThreshold, seed.crop_range_yxz);
+        Mat valid_threshold_map = seed.outputIdMap > 0;
+        subVolReplace(threshold_maps[curr_time_point], CV_8U, valid_threshold_map, (float)seed.bestFgThreshold, seed.crop_range_yxz);
 //        Mat cropThresholdMap = threshold_maps[curr_time_point](seed.crop_range_yxz);
 //        FOREACH_i_MAT(seed.outputIdMap){
 //            if(seed.outputIdMap.at<int>(i) > 0){
@@ -632,7 +633,7 @@ void cellSegmentMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQ
         vector<vector<size_t>> gap_idx_list;
         extractGapVoxel(&grown_seedMap, &cellSegFromSynQuant.fgMap, n, r, gap_idx_list, gap_tested_true);
         FOREACH_i(gap_idx_list){
-            if(gap_tested_true[i] != 1 && gap_idx_list[i].size() > 0){
+            if(gap_tested_true[i] != 1 && gap_idx_list[i].size() > 10){
                 int id0 = i / n + 1;
                 int id1 = i % n + 1;
                 vector<vector<size_t>> nei_list0, nei_list1;
@@ -719,26 +720,10 @@ void cellSegmentMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQ
             if(gap_tested_true[i] == -1){
                 int target0 = i / n + 1;
                 int target1 = i % n + 1;
-                bool found_group = false;
-                for(size_t j = 0; j < groups.size(); j++){
-                    for(size_t k = 0; k < groups[j].size(); k++){
-                        if(target0 == groups[j][k]){
-                            groups[j].push_back(target1);
-                            found_group = true;
-                            break;
-                        }else if(target1 == groups[j][k]){
-                            groups[j].push_back(target0);
-                            found_group = true;
-                            break;
-                        }
-                    }
-                    if(found_group) break;
-                }
-                if(!found_group){
-                    groups.push_back({target0, target1});
-                }
+                groups.push_back({target0, target1});
             }
         }
+        mergeIntersectGroups(groups);
         vector<int> label_map (n);
         FOREACH_i(label_map){
             label_map[i] = i + 1;

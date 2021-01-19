@@ -699,5 +699,34 @@ template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2)
         }
     }
 }
-
+template <typename T> bool group_inersect(vector<T> g1, vector<T> g2){
+    FOREACH_i(g1){
+        FOREACH_j(g2){
+            if (g1[i] == g2[j]){
+                return true;
+            }
+        }
+    }
+    return false;
+}
+/** merge intersected groups
+ *
+ */
+template <typename T> void mergeIntersectGroups(vector<vector<T>> &groups){
+    FOREACH_i(groups){
+        if(groups[i].size() == 0){
+            continue;
+        }
+        while(true){
+            size_t init_distance = groups[i].size();
+            for(int j = i+1; j < groups.size(); j++){
+                if(group_inersect(groups[i], groups[j])){
+                    groups[i].insert(groups[i].end(), groups[j].begin(), groups[j].end());
+                    groups[j].resize(0);
+                }
+            }
+            if(init_distance == groups[i].size()) break;
+        }
+    }
+}
 

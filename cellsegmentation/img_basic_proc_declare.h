@@ -177,6 +177,8 @@ template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float i
 
 template <typename T> void vec_unique(vector<T> & v);
 template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2);
+
+template <typename T> void mergeIntersectGroups(vector<vector<T>> &groups);
 #endif // IMG_BASIC_PROC_H
 
 
