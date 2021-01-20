@@ -115,7 +115,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     //ccShowSlice3Dmat(&stblizedVarMaps[curr_frame], CV_32F, 3);
     // first use synQuant to get 1-tier seed regions
     synQuantSimple seeds_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
-    //ccShowSliceLabelMat(seeds_from_synQuant.idMap, 3);
+    ccShowSliceLabelMat(seeds_from_synQuant.idMap);
     // second refine the seed regions
     vector<int> test_ids(0);
     regionWiseAnalysis4d(data_grayim3d, dataVolFloat, stblizedVol, seeds_from_synQuant.idMap/*int*/,
@@ -252,7 +252,7 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
         //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     }
     ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
-    ccShowSlice3Dmat(threshold_maps[curr_time_point], CV_8U);
+    //ccShowSlice3Dmat(threshold_maps[curr_time_point], CV_8U);
     number_cells[curr_time_point] = cell_cnt;
 }
 

@@ -59,6 +59,7 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed){
     src_var = (float)vec_mean(var_vals_in_fg);
 
     idMap = new Mat(srcVolumeUint8->dims, srcVolumeUint8->size, CV_32S, Scalar(0));
+    zMap = nullptr; // zmap will not be used if input a seed
     cell_num = 0;
     if(seed.bestFgThreshold > 0){
         maxZ_intensity_level = seed.bestFgThreshold;
@@ -482,7 +483,9 @@ void synQuantSimple::componentTree3d(segParameter p4segVol, odStatsParameter p4o
             valid_zscore_idx.push_back(i);
         }
     }
-    // label the object
+//    Mat tmp = Mat(3, srcVolumeUint8->size, CV_32F, zscore_list.data());
+//    ccShowSlice3Dmat(tmp, CV_32F);
+    // label the objects
     objLabel_descending();
 }
 

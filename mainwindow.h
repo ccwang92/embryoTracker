@@ -69,7 +69,7 @@ public:
     void connectSignal();
 public:
     bool algorithmDebug = false;
-    QString debugDataPath = QString("/home/ccw/Desktop/test_ims/cropped_16bit4speed/embryo_TM481.tif");
+    QString debugDataPath = QString("/home/ccw/Desktop/test_ims/16bit/embryo_TM481.tif");
     QAction * debugButton;
     cellSegmentMain *cellSegmenter;
 public slots:

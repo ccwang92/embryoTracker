@@ -2349,6 +2349,9 @@ void colorMapGen(Mat *src, Mat3b &colormap){
         r[i] = g[i] + n;
         b[i] = g[i] - n;
     }
+    random_shuffle(g.begin(), g.end());
+    random_shuffle(r.begin(), r.end());
+    random_shuffle(b.begin(), b.end());
 
     g.erase(remove_if(g.begin(), g.end(), [m](double v){ return v > m;}), g.end());
     r.erase(remove_if(r.begin(), r.end(), [m](double v){ return v > m; }), r.end());

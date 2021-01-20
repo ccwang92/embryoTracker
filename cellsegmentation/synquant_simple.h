@@ -20,7 +20,14 @@ class synQuantSimple
 public:
     synQuantSimple(cv::Mat *_srcVolume, float _src_var, segParameter &p4segVol, odStatsParameter &p4odStats);
     synQuantSimple(singleCellSeed &seed);
-    //~synQuantSimple(){} //TODO: delete the pointers
+    ~synQuantSimple(){
+        if(idMap){
+            delete idMap;
+        }
+        if(zMap) {
+            delete zMap;
+        }
+    }
 public:
     void processVoxLabel(std::size_t j);
     void componentTree3d(segParameter p4segVol, odStatsParameter p4odStats);
@@ -55,7 +62,7 @@ public:
     float max_exist_zscore;
     std::size_t maxZ_intensity_level;
 protected:
-    cv::Mat *srcVolumeUint8;
+    cv::Mat *srcVolumeUint8;//point to the same address as srcVolume
     float src_var;
     unsigned char* imArray;//point to the same address as srcVolume
     std::vector<std::size_t> sortedIndex, parNode;
