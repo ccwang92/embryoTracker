@@ -1485,7 +1485,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
     //// undirected neighbor extraction, for each neighboring pair, they only appear once in
     /// the output.
     neighbor_idx(valid_fg_idx, arc_tail_in_fg, arc_head, mat_sz, connect);
-    vector<int> arc_capacity (arc_tail_in_fg.size()); //BK algorithm accept only integer capacity
+    vector<double> arc_capacity (arc_tail_in_fg.size()); //BK algorithm accept only integer capacity
     float p1, p2;
     double cost;
     FOREACH_i(arc_tail_in_fg){
@@ -1495,17 +1495,17 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
             arc_capacity[i] = numeric_limits<int>::max();
         }else{
             if (cost_design[0]==ARITHMETIC_AVERAGE){
-                cost = pow((2/(p1+p2)), cost_design[1]) * 100;
+                cost = pow((2/(p1+p2)), cost_design[1]);
 
             }else if (cost_design[0]==GEOMETRIC_AVERAGE){
                 if (p2==0) p2 = p1; // there should be no non-negative score, so this line should never be used
-                cost = (int)(pow((1/sqrt(p1*p2)), cost_design[1]) * 100);
+                cost = pow((1/sqrt(p1*p2)), cost_design[1]);
             }
             if(cost < 0){
                 qFatal("Wrong cap value!");
             }{
-                if (cost > numeric_limits<int>::max()) arc_capacity[i] = numeric_limits<int>::max();
-                else arc_capacity[i] = (int)(cost);// we keep 1/1000 accuracy
+                if (cost > INFINITY) arc_capacity[i] = INFINITY; //float infinity is enough
+                else arc_capacity[i] = cost;//
             }
         }
     }
@@ -1515,12 +1515,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
     FOREACH_i(label_voxIdx) label_voxIdx_sz[i] = label_voxIdx[i].size();
     size_t overall_seed_vox_num = accumulate(label_voxIdx_sz.begin(), label_voxIdx_sz.end(), 0);
 
-    typedef Graph<int,int,int> GraphType;
-
-//    if(bg2sink == false){
-//        ccShowSlice3Dmat(fgMap, CV_8U);
-//        ccShowSliceLabelMat(label_map);
-//    }
+    typedef Graph<double,double,double> GraphType; // the three types are forced to be the same: kind of wired
     set<int> bgsinkIds;
     if(bg2sink){
         FOREACH_j(arc_head){
@@ -1530,6 +1525,8 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
             }
         }
     }
+    GraphType *g = new GraphType(label_map->total(),
+                      (arc_tail_in_fg.size() + overall_seed_vox_num + bgsinkIds.size())*2);
     for(int region_id = 1; region_id <= numCC; region_id++){
         //// build sink_ids: valid sink nodes will not be larger than node size
         /// but may duplicate in the vector of sink_ids, which should be OK
@@ -1587,25 +1584,25 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
 //            qInfo("Fatal error: no sink node.");
 //        }
 //        assert (sink_ids_cnt > 0 && label_voxIdx[region_id-1].size() > 0);
-        // max-flow the get the grown region
-        GraphType *g = new GraphType(label_map->total(),
-                          (arc_tail_in_fg.size() + overall_seed_vox_num + bgsinkIds.size())*2);
-        g -> add_node(label_map->total());
 
+        /////////////////////////////////////////////
+        //     max-flow the get the grown region   //
+        /////////////////////////////////////////////
+        g -> add_node(label_map->total());
         FOREACH_i(label_voxIdx){
             if((int)i == (region_id - 1)){
                 FOREACH_j(label_voxIdx[i]){
-                    g -> add_tweights( label_voxIdx[i][j],  numeric_limits<int>::max(), 0);
+                    g -> add_tweights( label_voxIdx[i][j],  INFINITY, 0);
                 }
             }else{
                 FOREACH_j(label_voxIdx[i]){
-                    g -> add_tweights( label_voxIdx[i][j], 0,  numeric_limits<int>::max());
+                    g -> add_tweights( label_voxIdx[i][j], 0,  INFINITY);
                 }
             }
         }
         if(bgsinkIds.size() > 0){
             for(auto it : bgsinkIds){
-                g -> add_tweights( it, 0,  numeric_limits<int>::max());
+                g -> add_tweights( it, 0,  INFINITY);
             }
         }
         FOREACH_j(arc_tail_in_fg){
@@ -1649,7 +1646,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
 //              label_voxIdx[region_id-1].size(), arc_tail_in_fg.size());
         double flow = g -> maxflow();
         if(flow < 0){
-            qFatal("The flow number may be wrong!");
+            qFatal("The flow number is wrong!");
         }
         size_t region_sz = 0;
         FOREACH_j(valid_fg_idx){
@@ -1663,9 +1660,9 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
         }
         qInfo("%ld out of %ld voxel in region %d.", region_sz, valid_fg_idx.size(),
               region_id);
-        delete g;
+        g->reset();
     }
-
+    delete g;
 }
 
 void setValMat(Mat &vol3d, int datatype, vector<size_t> idx, float v){
@@ -1674,16 +1671,16 @@ void setValMat(Mat &vol3d, int datatype, vector<size_t> idx, float v){
     if (datatype == CV_8U){
         unsigned char v0 = (unsigned char)v;
         FOREACH_i(idx){
-            vol3d.at<unsigned char>(i) = v0;
+            vol3d.at<unsigned char>(idx[i]) = v0;
         }
     }else if (datatype == CV_32F){
         FOREACH_i(idx){
-            vol3d.at<float>(i) = v;
+            vol3d.at<float>(idx[i]) = v;
         }
     }else if (datatype == CV_32S){
         int v0 = (int)v;
         FOREACH_i(idx){
-            vol3d.at<int>(i) = v0;
+            vol3d.at<int>(idx[i]) = v0;
         }
     }
 }

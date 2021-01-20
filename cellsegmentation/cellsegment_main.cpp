@@ -184,18 +184,17 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
     extractVoxIdxList(idMap, voxIdxList, seed_num);
 
     int cell_cnt = 0;
+    int debug_cell_id = 2;
     FOREACH_i(seed_intensity_order){
         int seed_id = seed_intensity_order[i] + 1;
         qInfo("------------------#%ld, start %d seed process, size: %ld---------------------", i, seed_id,
               voxIdxList[seed_id-1].size());
-        if(i == 1){
-            qInfo("may not correct");
-        }
+
         singleCellSeed seed;
         cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap,
                 curr_frame, seed, p4segVol);
-        //ccShowSliceLabelMat(seed.idMap);
         int touchBnd = refineSeed2Region(seed, p4odStats, p4segVol);
+
         if(touchBnd != NO_TOUCH){ // region too small
             if(touchBnd == XY_TOUCH || touchBnd == XYZ_TOUCH){
                 p4segVol.shift_yxz[0] *=2;
@@ -214,7 +213,15 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 
                 cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap,
                         curr_frame, seed, p4segVol);
+//                if(debug_cell_id == i){
+//                    qInfo("may not correct");
+//                    ccShowSliceLabelMat(seed.idMap);
+//                }
                 refineSeed2Region(seed, p4odStats, p4segVol);
+//                if(debug_cell_id == i){
+//                    qInfo("may not correct");
+//                    ccShowSliceLabelMat(seed.outputIdMap);
+//                }
             }
             reset_shift();
         }
@@ -228,6 +235,9 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 //                cropLabelMap.at<int>(i) = cell_cnt + seed.outputIdMap.at<int>(i);
 //            }
 //        }
+//        if(debug_cell_id == i){
+//            ccShowSliceLabelMat(seed.outputIdMap);
+//        }
         subVolReplace(cell_label_maps[curr_time_point], CV_32S, seed.outputIdMap, seed.crop_range_yxz, cell_cnt);
         cell_cnt += seed.outCell_num;
 
@@ -239,7 +249,10 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 //                cropThresholdMap.at<int>(i) = seed.bestFgThreshold;
 //            }
 //        }
+        //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     }
+    ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
+    ccShowSlice3Dmat(threshold_maps[curr_time_point], CV_8U);
     number_cells[curr_time_point] = cell_cnt;
 }
 
@@ -366,9 +379,9 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         bitwise_and(seed.validSearchAreaMap, seed.volUint8 >= seed.bestFgThreshold, cellSegFromSynQuant.fgMap);
         //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
     }
-    //ccShowSlice3Dmat(&cellSegFromSynQuant.fgMap, CV_8U);
     refineCellTerritoryWithSeedRegion(cellSegFromSynQuant, seed, p4segVol);
     qInfo("after refine, fgmap is empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
+
     //// 2. update seed's score map based on idMap (fg)
     normalize(seed.eigMap2d, seed.score2d, 0.001, 1, NORM_MINMAX, CV_32F, cellSegFromSynQuant.fgMap);
     normalize(seed.eigMap3d, seed.score3d, 0.001, 1, NORM_MINMAX, CV_32F, cellSegFromSynQuant.fgMap);
@@ -380,13 +393,13 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
         removeOtherSeedsInfgMap(cellSegFromSynQuant, seed, p4segVol);
         qInfo("after remove other seeds, fgmap empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
-        //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
+
     }
     //// 3. segment fgMap into idMap based on gaps from principal curvature
     //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
     //ccShowSlice3Dmat(seed.seedMap, CV_8U);
     gapBasedRegionSegment(cellSegFromSynQuant, seed, p4segVol, p4odStats);
-    //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
+
     //// 4. refine the idMap from step 3 based on size and other prior knowledge
     if(cellSegFromSynQuant.cell_num > 1){
         bool link_bg2sink = false; // this can force seeds to grow as much as they can
@@ -409,6 +422,7 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
     }else{
         qFatal("We did not find any cell from this seed.");
     }
+
     if(cellSegFromSynQuant.cell_num > 0){ // shrink test
         cellShrinkTest(cellSegFromSynQuant, seed, p4segVol);
     }
@@ -496,23 +510,28 @@ void cellSegmentMain::cellShrinkTest(synQuantSimple &cellSegFromSynQuant, single
     for(int i = 1; i <= cellSegFromSynQuant.cell_num; i++){
         Mat cur_cell = seed.outputIdMap == i;
         Mat shrinked_cell, label_shrinked_cell;
-        //ccShowSlice3Dmat(&cur_cell, CV_8U);
         volumeErode(&cur_cell, shrinked_cell, p4segVol.shrink_scale_yxz, MORPH_ELLIPSE);
-        //ccShowSlice3Dmat(&shrinked_cell, CV_8U);
+//        if(seed.crop_range_yxz[0].end == 94 && seed.crop_range_yxz[1].end == 123){
+//            ccShowSlice3Dmat(&shrinked_cell, CV_8U);
+//        }
         int n = connectedComponents3d(&shrinked_cell, label_shrinked_cell, p4segVol.growConnectInRefine);
 
         if(n > 1){
-            Mat grown_shrinked_cells;
-            bool link_bg2sink = false;
-            regionGrow(&label_shrinked_cell, n, grown_shrinked_cells, &seed.scoreMap, &cur_cell,
-                       p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
-            setValMat(seed.outputIdMap, CV_32S, &cur_cell, 0.0);
-            Mat sub_cell_mask = grown_shrinked_cells == 1;
-            setValMat(seed.outputIdMap, CV_32S, &sub_cell_mask, (float)i);
-            for(int j=2; j<=n; j++){
-                sub_cell_mask = grown_shrinked_cells == j;
-                extra_cell ++;
-                setValMat(seed.outputIdMap, CV_32S, &sub_cell_mask, (float)(extra_cell + cellSegFromSynQuant.cell_num));
+            removeSmallCC(label_shrinked_cell, n, p4segVol.min_seed_size, true);
+            if(n > 1){
+                Mat grown_shrinked_cells;
+                bool link_bg2sink = false;
+                regionGrow(&label_shrinked_cell, n, grown_shrinked_cells, &seed.scoreMap, &cur_cell,
+                           p4segVol.growConnectInRefine, p4segVol.graph_cost_design, link_bg2sink);
+                setValMat(seed.outputIdMap, CV_32S, &cur_cell, 0.0);
+                Mat sub_cell_mask = grown_shrinked_cells == 1;
+                setValMat(seed.outputIdMap, CV_32S, &sub_cell_mask, (float)i);
+
+                for(int j=2; j<=n; j++){
+                    sub_cell_mask = grown_shrinked_cells == j;
+                    extra_cell ++;
+                    setValMat(seed.outputIdMap, CV_32S, &sub_cell_mask, (float)(extra_cell + cellSegFromSynQuant.cell_num));
+                }
             }
         }
     }
