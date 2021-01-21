@@ -1,5 +1,5 @@
 # A unified cell segmentation, tracking and visualization platform
-This is an on-going project to build an one-for-all platform for cell tracking using Qt with C++ and OpenGL. It is designed to support 3D+time (colorful or gray) image data visualization, cell segmentation, cell tracking and results curation. 
+This is an on-going project aiming to build a platform that supports 3D+time (colorful or gray) imaging data visualization, cell segmentation, cell tracking and results curation. It is built using Qt with C++ and OpenGL.
 
 ## Current interface and visualization quality
 <p align="center">
