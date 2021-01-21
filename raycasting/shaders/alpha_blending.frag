@@ -90,6 +90,14 @@ vec4 colour_transfer(float intensity)
     float alpha = (exp(intensity) - 1.0) / (exp(1.0) - 1.0);
     return vec4(intensity * high + (1.0 - intensity) * low, alpha);
 }
+//vec4 colour_transfer4(vec4 intensity)
+//{
+//    vec4 high = vec4(1.0, 1.0, 1.0, 1.0);
+//    vec4 low = vec4(0.0, 0.0, 0.0, 0.0);
+//    //float avg_intensity = (intensity.r + intensity.b + intensity.b)/3;
+//    //float alpha = intensity.a;//(exp(avg_intensity) - 1.0) / (exp(1.0) - 1.0);
+//    return intensity.rgba * high + (1.0 - intensity.rgba) * low;
+//}
 
 void main()
 {
@@ -119,11 +127,9 @@ void main()
 
     // Ray march until reaching the end of the volume, or colour saturation
     while (ray_length > 0 && colour.a < 1.0) {
-
         float intensity = texture(volume, position).r;
-
         vec4 c = colour_transfer(intensity);
-
+        //vec4 c = colour_transfer4(texture(volume, position));
         // Alpha-blending
         colour.rgb = c.a * c.rgb + (1 - c.a) * colour.a * colour.rgb;
         colour.a = c.a + (1 - c.a) * colour.a;
@@ -139,6 +145,6 @@ void main()
     }
 
     // Gamma correction
-    a_colour.rgb = pow(colour.rgb, vec3(1.0 / gamma));
+    a_colour.rgb = pow(colour.rgb, vec3(2.0 / gamma));
     a_colour.a = colour.a;
 }

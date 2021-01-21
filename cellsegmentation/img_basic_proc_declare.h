@@ -27,6 +27,7 @@
 using namespace cv;
 using namespace std;
 
+//enum volDataTypes{UINT8C1 = 0, UINT8RGB = 1, UINT16C1 = 2, UINT16RGB = 3, UINT8RGBA = 4,  UINT16RGBA = 5};
 enum filterDirection{DIRECTION_X = 0, DIRECTION_Y, DIRECTION_Z};
 enum debiasMethods{TTEST2 = 0, TTEST2_VAR_KNOWN, NON_OV_TRUNCATED_NORMAL, OV_TRUNCATED_NORMAL, KSEC, APPROX3SEC};
 enum cost_design_method{ARITHMETIC_AVERAGE = 1, GEOMETRIC_AVERAGE};
@@ -105,12 +106,14 @@ void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]);
 void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3], int start = 0);
 void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_range[3]);
 // fucntions for display
+void colorMapGen(Mat *src, Mat3b &colormap);
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
 void ccShowSliceLabelMat(Mat *src3d, int slice = 0 /*default 2d*/);
 void ccShowSlice3Dmat(Mat src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
 void ccShowSliceLabelMat(Mat src3d, int slice = 0 /*default 2d*/);
-void label2rgb3d(Mat &src, Mat &dst);
+void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat4b &dst);
 void label2rgb2d(Mat1i &src, Mat3b &dst);
+
 // Function to find t-test of
 // two set of statistical data.
 

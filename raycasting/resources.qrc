@@ -6,5 +6,6 @@
         <file>shaders/alpha_blending.vert</file>
         <file>shaders/maximum_intensity_projection.vert</file>
         <file>shaders/maximum_intensity_projection.frag</file>
+        <file>shaders/alpha_blending_rgba.frag</file>
     </qresource>
 </RCC>

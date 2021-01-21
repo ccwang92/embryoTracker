@@ -14,7 +14,7 @@
 #include "trackball.h"
 //#include "vtkvolume.h"
 #include "../data_importer.h"
-
+//#include <opencv2/core.hpp> //image type defines
 // if error then close
 // clean memory before MessageBox, otherwise MessageBox maybe could not be created correctly
 #define ERROR_MessageBox(title, type, what) { \
@@ -75,12 +75,17 @@ public:
         m_active_mode = mode;
         update();
     }
-
+    void resetMode(void){
+        m_active_mode = m_init_mode;
+        update();
+    }
     void setBackground(const QColor& colour) {
         m_background = colour;
         update();
     }
-
+    QString getMode(void) {
+        return m_active_mode;
+    }
     std::vector<QString> getModes(void) {
         std::vector<QString> modes;
         for (const auto& [key, val] : m_modes) {
@@ -98,7 +103,7 @@ public:
     }
 
     DataImporter* getDataImporter(){return data_importer;}
-
+    RayCastVolume* getRenderer() {return m_raycasting_volume;}
     void handleKeyPressEvent(QKeyEvent * event); //for hook to MainWindow
     void handleKeyReleaseEvent(QKeyEvent * event); //for hook to MainWindow
 
@@ -129,7 +134,7 @@ public:
     //V3DLONG size1, size2, size3, size4, size5;
     //V3DLONG dim1, dim2, dim3, dim4, dim5;
     V3DLONG bufSize[5]; //(x,y,z,c,t) 090731: add time dim
-
+    long curr_timePoint_in_canvas;
 private:
     DataImporter *data_importer {0};
     QMatrix4x4 m_viewMatrix;
@@ -157,7 +162,7 @@ private:
     //QPainter *canvas_painter;
     std::map<QString, QOpenGLShaderProgram*> m_shaders;
     std::map<QString, std::function<void(void)>> m_modes;
-    QString m_active_mode;
+    QString m_active_mode, m_init_mode;
 
     TrackBall m_trackBall {};       /*!< Trackball holding the model rotation. */
     TrackBall m_scene_trackBall {}; /*!< Trackball holding the scene rotation. */

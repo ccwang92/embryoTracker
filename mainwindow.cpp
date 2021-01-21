@@ -233,7 +233,9 @@ void MainWindow::sendData4Segment()
     }
     cellSegmenter = new cellSegmentMain((void *)data4test->image4d->getRawData(),
                                         data4test->image4d->getDatatype(),
-                                        glWidget_raycast->bufSize);
+                                        glWidget_raycast->bufSize, glWidget_raycast);
+
+
 }
 
 void MainWindow::sendData4Track()

@@ -97,6 +97,10 @@ void RayCastVolume::transfer_volume(void*data, double p_min, double p_max, long 
     {
         glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA, m_size.x(), m_size.y(), m_size.z(),
                      0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    }else if(sc == 3)
+    {
+        glTexImage3D(GL_TEXTURE_3D, 0, GL_RGB, m_size.x(), m_size.y(), m_size.z(),
+                     0, GL_RGB, GL_UNSIGNED_BYTE, data);
     }
     glBindTexture(GL_TEXTURE_3D, 0);// 0 means reset the binding pointer from current m_volume_texture to default to avoid errorly manipulation
 

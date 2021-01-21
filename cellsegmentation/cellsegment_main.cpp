@@ -7,10 +7,11 @@ using namespace cv;
 using namespace std;
 //using namespace volproc;
 enum boundary_touched { NO_TOUCH = 0, XY_TOUCH = 1, Z_TOUCH = 2, XYZ_TOUCH = 3};
-cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/)
+cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/,
+RayCastCanvas *glWidget)
 {
     init_parameter();
-    data_rows_cols_slices = new int[3];
+    data_rows_cols_slices.resize(3);
 
     if (bufSize[0] > INT_MAX || bufSize[1] > INT_MAX || bufSize[2] > INT_MAX){
         qDebug("Data is too large to process: %d!", INT_MAX);
@@ -23,6 +24,8 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
         Q_ASSERT(bufSize[3] != 1);
     }
     time_points = bufSize[4];
+    time_points_processed.resize(time_points);
+    fill(time_points_processed.begin(), time_points_processed.end(), false);
     data_type = _data_type;
     cell_label_maps.resize(time_points);
     threshold_maps.resize(time_points);
@@ -41,15 +44,6 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
                       data_rows_cols_slices[2], (int)time_points};
     if (data_type == V3D_UINT16) {
         data4d = new Mat(4, data_sz, CV_16U, data_grayim4d);
-//        int test_time = 1;
-//        int sz_single_slice = data4d->size[1] * data4d->size[0];
-//        for(int i = 0; i < data_sz[2]; i++){
-//            unsigned short *ind = (unsigned short *)data4d->data
-//                   + sz_single_slice * i + sz_single_frame*test_time; // sub-matrix pointer
-//            Mat *single_slice = new Mat(2, data4d->size, CV_16U, ind);
-//            imshow(to_string(i), *single_slice);
-//            waitKey(0);
-//        }
     }
     else if(data_type == V3D_UINT8){
         data4d = new Mat(4, data_sz, CV_8U, data_grayim4d);
@@ -67,15 +61,23 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
-    for (int i = 0; i < time_points; i++){
-        curr_time_point = i;
-        unsigned char *ind = (unsigned char*)normalized_data4d.data + sz_single_frame*i; // sub-matrix pointer
-        Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
-        cell_label_maps[i] = Mat::zeros(3, normalized_data4d.size, CV_32S); // int label
-        threshold_maps[i] = Mat::zeros(3, normalized_data4d.size, CV_8U);
 
-        cellSegmentSingleFrame(single_frame , i);
+    curr_time_point = glWidget->curr_timePoint_in_canvas;
+    unsigned char *ind = (unsigned char*)normalized_data4d.data + sz_single_frame*curr_time_point; // sub-matrix pointer
+    Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
+    if(!time_points_processed[curr_time_point]){
+        cell_label_maps[curr_time_point] = Mat::zeros(3, normalized_data4d.size, CV_32S); // int label
+        threshold_maps[curr_time_point] = Mat::zeros(3, normalized_data4d.size, CV_8U);
+
+        cellSegmentSingleFrame(single_frame, curr_time_point);
+        time_points_processed[curr_time_point] = true;
     }
+    //// display volume in canvas
+    Mat4b rgb_mat4display;
+    label2rgb3d(cell_label_maps[curr_time_point], *single_frame, rgb_mat4display);
+    glWidget->setMode("Alpha blending rgba");
+    glWidget->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, data_rows_cols_slices[1],
+            data_rows_cols_slices[0], data_rows_cols_slices[2], 4);
 }
 
 /**
@@ -115,7 +117,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     //ccShowSlice3Dmat(&stblizedVarMaps[curr_frame], CV_32F, 3);
     // first use synQuant to get 1-tier seed regions
     synQuantSimple seeds_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
-    ccShowSliceLabelMat(seeds_from_synQuant.idMap);
+    //ccShowSliceLabelMat(seeds_from_synQuant.idMap);
     // second refine the seed regions
     vector<int> test_ids(0);
     regionWiseAnalysis4d(data_grayim3d, dataVolFloat, stblizedVol, seeds_from_synQuant.idMap/*int*/,
@@ -249,9 +251,9 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 //                cropThresholdMap.at<int>(i) = seed.bestFgThreshold;
 //            }
 //        }
-        //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
+        //break; // !!!! just for debug
     }
-    ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
+    //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     //ccShowSlice3Dmat(threshold_maps[curr_time_point], CV_8U);
     number_cells[curr_time_point] = cell_cnt;
 }

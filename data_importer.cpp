@@ -183,7 +183,6 @@ QStringList DataImporter::importSeriesFileList_addnumbersort(const QString & ind
 {
     QStringList myList;
     myList.clear();
-
     //Get the image files namelist in the directory
 
     QFileInfo fileInfo(individualFileName);

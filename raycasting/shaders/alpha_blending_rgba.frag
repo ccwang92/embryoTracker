@@ -59,12 +59,12 @@ struct AABB {
 };
 
 // Estimate normal from a finite difference approximation of the gradient
-vec3 normal(vec3 position, float intensity)
+vec3 normal(vec3 position, vec3 intensity)
 {
     float d = step_length;
-    float dx = texture(volume, position + vec3(d,0,0)).r - intensity;
-    float dy = texture(volume, position + vec3(0,d,0)).r - intensity;
-    float dz = texture(volume, position + vec3(0,0,d)).r - intensity;
+    float dx = texture(volume, position + vec3(d,0,0)).r - intensity.r;
+    float dy = texture(volume, position + vec3(0,d,0)).g - intensity.g;
+    float dz = texture(volume, position + vec3(0,0,d)).b - intensity.b;
     return -normalize(NormalMatrix * vec3(dx, dy, dz));
 }
 
@@ -90,6 +90,14 @@ vec4 colour_transfer(float intensity)
     float alpha = (exp(intensity) - 1.0) / (exp(1.0) - 1.0);
     return vec4(intensity * high + (1.0 - intensity) * low, alpha);
 }
+//vec4 colour_transfer4(vec4 intensity)
+//{
+//    vec4 high = vec4(1.0, 1.0, 1.0, 1.0);
+//    vec4 low = vec4(0.0, 0.0, 0.0, 0.0);
+//    //float avg_intensity = (intensity.r + intensity.b + intensity.b)/3;
+//    //float alpha = intensity.a;//(exp(avg_intensity) - 1.0) / (exp(1.0) - 1.0);
+//    return intensity.rgba * high + (1.0 - intensity.rgba) * low;
+//}
 
 void main()
 {
@@ -112,28 +120,25 @@ void main()
     vec3 step_vector = step_length * ray / ray_length;
 
     // Random jitter
-    ray_start += step_vector * texture(jitter, gl_FragCoord.xy / viewport_size).r;
+    ray_start += step_vector * texture(jitter, gl_FragCoord.xy / viewport_size).rgb;
 
     vec3 position = ray_start;
+    vec4 colour = vec4(0.0);
 
-    float maximum_intensity = 0.0;
+    // Ray march until reaching the end of the volume, or colour saturation
+    while (ray_length > 0 && colour.a < 1.0) {
+//        float intensity = texture(volume, position).r;
+//        vec4 c = colour_transfer(intensity);
+        vec4 c = texture(volume, position);
+        // Alpha-blending
+        colour.rgb = c.a * c.rgb + (1 - c.a) * colour.a * colour.rgb;
+        colour.a = c.a + (1 - c.a) * colour.a;
 
-    // Ray march until reaching the end of the volume
-    while (ray_length > 0) {
-
-        float intensity = texture(volume, position).r;
-
-        if (intensity > maximum_intensity) {
-            maximum_intensity = intensity;
-        }
-        //colorAcum.rgb = colorAcum.rgb*colorAcum.a + (1 - colorAcum.a)*bgColor.rgb;
         ray_length -= step_length;
         position += step_vector;
     }
 
-    vec4 colour = colour_transfer(maximum_intensity);
-
-    // Blend background : nullify
+    // Blend background
     if (consider_transparency){
         colour.rgb = colour.a * colour.rgb + (1 - colour.a) * pow(background_colour, vec3(gamma)).rgb;
         colour.a = 1.0;

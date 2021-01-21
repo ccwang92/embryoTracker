@@ -4,14 +4,19 @@
 #include <opencv2/imgcodecs.hpp> // image io
 #include <opencv2/highgui.hpp> //image display
 #include "synquant_simple.h"
+#include "../raycasting/raycastcanvas.h"
 //#include "vol_basic_proc.hpp"
 //#define VOLUME_WH_MAX 100000
 
 class cellSegmentMain
 {
 public:
-    cellSegmentMain(void *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/);
-    ~cellSegmentMain(){delete data_rows_cols_slices;};
+    cellSegmentMain(void *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/,
+    RayCastCanvas *glWidget);
+    ~cellSegmentMain(){
+        //if(data_rows_cols_slices) delete data_rows_cols_slices;
+        //if(time_points_processed) delete time_points_processed;
+    };
     void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
     void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,
                               cv::Mat *idMap /*int*/, int seed_num, int frame, std::vector<int> test_ids);
@@ -31,7 +36,8 @@ protected:
     string debug_folder;
     string default_name;
     int data_type;
-    int * data_rows_cols_slices;
+    vector<int> data_rows_cols_slices;
+    vector<bool> time_points_processed;
     long time_points = 0;
     long curr_time_point;
     segParameter p4segVol;

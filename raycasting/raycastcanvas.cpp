@@ -31,8 +31,10 @@ RayCastCanvas::RayCastCanvas(QWidget *parent)
     // Register the rendering modes here, so they are available to the UI when it is initialised
     m_modes["Isosurface"] = [&]() { RayCastCanvas::raycasting("Isosurface"); };
     m_modes["Alpha blending"] = [&]() { RayCastCanvas::raycasting("Alpha blending"); };
+    m_modes["Alpha blending rgba"] = [&]() { RayCastCanvas::raycasting("Alpha blending rgba"); };
     m_modes["MIP"] = [&]() { RayCastCanvas::raycasting("MIP"); };
 
+    m_init_mode = m_active_mode;
     // set focus policy to accept key press events
     this->setFocusPolicy(Qt::StrongFocus);
 }
@@ -64,8 +66,8 @@ void RayCastCanvas::initializeGL()
 
     add_shader("Isosurface", ":/shaders/isosurface.vert", ":/shaders/isosurface.frag");
     add_shader("Alpha blending", ":/shaders/alpha_blending.vert", ":/shaders/alpha_blending.frag");
+    add_shader("Alpha blending rgba", ":/shaders/alpha_blending.vert", ":/shaders/alpha_blending_rgba.frag");
     add_shader("MIP", ":/shaders/maximum_intensity_projection.vert", ":/shaders/maximum_intensity_projection.frag");
-    //glClearColor(1.f, 1.f, 1.f, 1.f);
 
 }
 
@@ -239,7 +241,7 @@ void RayCastCanvas::setVolume(long frame4display) {
     if (!data_importer->p_vmin){// if max min value not defined
         data_importer->updateminmaxvalues();
     }
-
+    curr_timePoint_in_canvas = frame4display; // default is 0
     try
     {
         if (data_importer->image4d && data_importer->image4d->getCDim()>0)
@@ -301,6 +303,7 @@ void RayCastCanvas::setVolume(long frame4display) {
                                              p_min, p_max, bufSize[0],
                                             bufSize[1], bufSize[2], 1);
     }
+    resetMode(); // reset the renderering to gray-scale
     update();
 }
 
