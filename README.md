@@ -12,7 +12,7 @@ This is an on-going project to build an one-for-all platform for cell tracking u
 </p>
 
 # Other resources
-[synQuant](https://github.com/yu-lab-vt/SynQuant), [muSSP](https://github.com/yu-lab-vt/muSSP), [CINDA](https://github.com/yu-lab-vt/CINDA), [Vaa3d project.](https://github.com/Vaa3D), and [RayCasting volume rendering.](https://martinopilia.com/posts/2018/09/17/volume-raycasting.html)
+[synQuant](https://github.com/yu-lab-vt/SynQuant), [muSSP](https://github.com/yu-lab-vt/muSSP), [CINDA](https://github.com/yu-lab-vt/CINDA), [Vaa3d project.](https://github.com/Vaa3D), [RayCasting volume rendering](https://martinopilia.com/posts/2018/09/17/volume-raycasting.html) and [QDarkStyleSheet.](https://github.com/ColinDuquesnoy/QDarkStyleSheet)
 
 # Reference
 
