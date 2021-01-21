@@ -1,5 +1,5 @@
 # A unified cell segmentation, tracking and visualization platform
-This is an on-going project. It is designed to support 3D+time (colorful or gray) image data visualization, cell segmentation, cell tracking and results curation. 
+This is an on-going project to build an one-for-all platform for cell tracking using Qt with C++ and OpenGL. It is designed to support 3D+time (colorful or gray) image data visualization, cell segmentation, cell tracking and results curation. 
 
 ## Current interface and visualization quality
 <p align="center">
@@ -11,6 +11,8 @@ This is an on-going project. It is designed to support 3D+time (colorful or gray
   <img height="400" src="imgs/seg_res.png">
 </p>
 
+# Other resources
+[synQuant](https://github.com/yu-lab-vt/SynQuant), [muSSP](https://github.com/yu-lab-vt/muSSP), [CINDA](https://github.com/yu-lab-vt/CINDA), [Vaa3d project.](https://github.com/Vaa3D), and [RayCasting volume rendering.](https://martinopilia.com/posts/2018/09/17/volume-raycasting.html)
 
 # Reference
 
@@ -21,3 +23,5 @@ This is an on-going project. It is designed to support 3D+time (colorful or gray
 [3] Yizhi Wang*, Congchao Wang*, Petter Ranefall, Gerard Joey Broussard, Yinxue Wang, Guilai Shi, Boyu Lyu, Chiung-Ting Wu, Yue Wang, Lin Tian, Guoqiang Yu. (2020). SynQuant: An Automatic Tool to Quantify Synapses from Microscopy Images, Bioinformatics, 36(5), 1599–1606.
 
 [4] Peng, H., Ruan, Z., Long, F., Simpson, J.H., and Myers, E.W. (2010) “V3D enables real-time 3D visualization and quantitative analysis of large-scale biological image data sets,” Nature Biotechnology, Vol. 28, No. 4, pp. 348-353.
+
+[5] Peng, H, Ruan, Z., Atasoy, D., and Sternson, S. (2010) “Automatic reconstruction of 3D neuron structures using a graph-augmented deformable model,” Bioinformatics, Vol. 26, pp. i38-i46, 2010.
