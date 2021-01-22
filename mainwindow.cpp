@@ -17,6 +17,7 @@ MainWindow::MainWindow()
     //layout->addWidget(rightSideControlLayout);
     //setLayout(mainLayout);
     connectSignal();
+    cellSegmenter = 0;
 }
 void MainWindow::initControlWidgetValues(){
     //timeSlider no need
@@ -231,10 +232,13 @@ void MainWindow::sendData4Segment()
         QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
         return;
     }
-    cellSegmenter = new cellSegmentMain((void *)data4test->image4d->getRawData(),
-                                        data4test->image4d->getDatatype(),
-                                        glWidget_raycast->bufSize, glWidget_raycast);
+    if(!cellSegmenter){
+        cellSegmenter = new cellSegmentMain((void *)data4test->image4d->getRawData(),
+                                            data4test->image4d->getDatatype(),
+                                            glWidget_raycast->bufSize);
+    }
 
+    cellSegmenter->processSingleFrameAndReturn(glWidget_raycast);
 
 }
 

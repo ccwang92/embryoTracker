@@ -67,7 +67,8 @@ int connectedComponents3d(Mat* src3d, Mat &dst3d, int connect);
 int floatMap2idMap(Mat* src3d, Mat &dst3d, int connect);
 int rearrangeIdMap(Mat* src3d, Mat &dst3d, vector<size_t> &idMap);
 void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range);
-void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities);
+void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, int numCC, vector<float> &avgIntensities);
+void regionAvgIntensity(Mat* src3dFloatData, vector<vector<size_t>> &voxList, vector<float> &avgIntensities);
 
 void extractVoxIdxList(Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract = false);
 void extractVoxIdxGivenId(Mat *label3d, vector<size_t> &voxList, int id);

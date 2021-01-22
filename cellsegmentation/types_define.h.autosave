@@ -95,7 +95,7 @@ struct singleCellSeed{
 };
 
 struct movieInfo{
-
+    
 };
 
 #endif // TYPES_DEFINE_H

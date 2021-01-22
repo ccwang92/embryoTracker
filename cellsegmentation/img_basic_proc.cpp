@@ -90,7 +90,7 @@ void principalCv2d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
 void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
     src3d->copyTo(dst3d);
     gaussianSmooth3Ddata(dst3d, sigma);
-
+    //ccShowSlice3Dmat(dst3d, CV_32F);
     int x_size  = dst3d.size[0];
     int y_size  = dst3d.size[1];
     int z_size  = dst3d.size[2];
@@ -118,7 +118,7 @@ void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
         filter2D(subMatrix, lx, -1, kernelx);
         filter2D(subMatrix, ly, -1, kernely);
         filter2D(lx, lxx, -1, kernelx);
-        filter2D(ly, lyy, -1, kernelx);
+        filter2D(ly, lyy, -1, kernely);
         filter2D(lx, lxy, -1, kernely);
 
         Mat lz(2, dst3d.size, CV_32F, (float*)Dz.data + z * xy_size);
@@ -146,7 +146,6 @@ void principalCv3d(Mat* src3d, Mat &dst3d, float sigma[], int minIntensity = 0){
 
                 mat3x3.at<float>(1,2) = lzy.at<float>(r,c);
                 mat3x3.at<float>(2,1) = lzy.at<float>(r,c);
-
 
                 eigen(mat3x3, eigen_values);
                 dst3d.at<float>(idx) = eigen_values.at<float>(0); // the largest eigen value
@@ -179,6 +178,8 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[])
         Mat subMatrix(2, data4smooth.size, CV_32F, ind);
         sepFilter2D(subMatrix, subMatrix, CV_32F, kernel_row.t(), kernel_col, Point(-1,-1), 0.0, BORDER_REPLICATE);
     }
+    //volumeWrite(&data4smooth, "/home/ccw/Desktop/1.tiff");
+    //ccShowSlice3Dmat(data4smooth, CV_32F);
     if (sigma[2] > 0){
         kernDimension = ceil(2*sigma[2])+1;
         Mat kernel_z = getGaussianKernel(kernDimension, sigma[2], CV_32F);
@@ -186,6 +187,8 @@ void gaussianSmooth3Ddata(Mat &data4smooth, const float sigma[])
         Mat copyMat;
         data4smooth.copyTo(copyMat);
         filterZdirection(&copyMat, data4smooth, kernel_z);
+
+        //ccShowSlice3Dmat(data4smooth, CV_32F);
 //        float* kernGauss = (float *)kernel_z.data;
 //        unsigned kernSize = kernel_z.total();
 //        int kernMargin = (kernSize - 1)/2;
@@ -278,7 +281,7 @@ void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernel_z){
         for (int x = 0; x < x_size; x++)
         {
             // Copy along Z dimension into a line buffer
-            float* z_ptr = (float*)src3d->data + y * x_size + x;//same as data4smooth.ptr<float>(0, y, x)
+            float* z_ptr = (float*)src3d->data + x * y_size + y;//same as data4smooth.ptr<float>(0, y, x)
             for (int z = 0; z < z_size; z++, z_ptr += xy_size)
             {
                 lineBuffer[z + kernMargin] = *z_ptr;
@@ -292,7 +295,7 @@ void filterZdirection(Mat* src3d, Mat &dst3d, Mat kernel_z){
             }
 
             // Filter line buffer 1D - convolution
-            z_ptr = (float*)dst3d.data + y * x_size + x;
+            z_ptr = (float*)dst3d.data + x * y_size + y;
             for (int z = 0; z < z_size; z++, z_ptr += xy_size)
             {
                 *z_ptr = 0.0f;
@@ -795,9 +798,11 @@ void getRange(vector<int> idx_sub, int shift, int bound, Range &out_range){
     int max_v = min(bound, *max_element(idx_sub.begin(), idx_sub.end()) + shift+1);
     out_range = Range(min_v, max_v);
 }
-void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avgIntensities){
-    vector<size_t> region_sz(avgIntensities.size());
+void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, int numCC, vector<float> &avgIntensities){
+    vector<size_t> region_sz(numCC);
+    avgIntensities.resize(numCC);
     fill(region_sz.begin(), region_sz.end(), 0);
+    fill(avgIntensities.begin(), avgIntensities.end(), 0);
     for(size_t i=0; i<src3dFloatData->total(); i++){
         if (src3dIdMap->at<int>(i)>0){
             avgIntensities[src3dIdMap->at<int>(i)-1] += src3dFloatData->at<float>(i);
@@ -808,6 +813,18 @@ void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avg
         avgIntensities[i] /= region_sz[i];
     }
 }
+void regionAvgIntensity(Mat* src3dFloatData, vector<vector<size_t>> &voxList, vector<float> &avgIntensities){
+    avgIntensities.resize(voxList.size());
+    fill(avgIntensities.begin(), avgIntensities.end(), 0);
+    for(size_t i = 0; i<voxList.size(); i++){
+        for(size_t j = 0; j<voxList[i].size(); j++){
+            avgIntensities[i] += src3dFloatData->at<float>(voxList[i][j]);
+        }
+    }
+    FOREACH_i(voxList){
+        avgIntensities[i] /= voxList[i].size();
+    }
+}
 /**
  * @brief extractVoxList: return the voxel idx of all connected component
  * @param label3d
@@ -816,6 +833,7 @@ void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, vector<float> &avg
  * @param bk_extract: background also count as a region
  */
 void extractVoxIdxList(Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract){
+    voxList.resize(numCC);
     if (bk_extract){
         voxList.resize(numCC+1);
         for (size_t i = 0; i < label3d->total(); i++){
@@ -2192,6 +2210,7 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
     assert(datatype == CV_8U || datatype == CV_16U || datatype == CV_32F || datatype == CV_32S);
     int sz_single_frame = src3d->size[1] * src3d->size[0];
     Mat *single_slice;
+    Mat slice4display;
     double min_v, max_v;
     while (true){
         if (binary){
@@ -2218,23 +2237,27 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
             if(datatype == CV_8U){
                 unsigned char *ind = (unsigned char*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
                 single_slice = new Mat(2, src3d->size, CV_8U, ind);
-                minMaxIdx(*single_slice, &min_v, &max_v);
+                single_slice->copyTo(slice4display);
+                minMaxIdx(slice4display, &min_v, &max_v);
             }else if(datatype == CV_16U){
                 unsigned short *ind = (unsigned short*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
                 single_slice = new Mat(2, src3d->size, CV_16U, ind);
                 minMaxIdx(*single_slice, &min_v, &max_v);
-                *single_slice *= 10;
+                single_slice->copyTo(slice4display);
+                slice4display *= 10;
                 //normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX, CV_32F);
             }else if(datatype == CV_32S){
                 int *ind = (int*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
                 single_slice = new Mat(2, src3d->size, CV_32S, ind);
                 minMaxIdx(*single_slice, &min_v, &max_v);
-                //normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX, CV_32F);
+                single_slice->copyTo(slice4display);
+                //normalize(slice4display, slice4display, 1, 0, NORM_MINMAX, CV_32F);
             }else if(datatype == CV_32F){
                 float *ind = (float*)src3d->data + sz_single_frame*slice; // sub-matrix pointer
                 single_slice = new Mat(2, src3d->size, CV_32F, ind);
                 minMaxIdx(*single_slice, &min_v, &max_v);
-                normalize(*single_slice, *single_slice, 1, 0, NORM_MINMAX);
+                single_slice->copyTo(slice4display);
+                normalize(slice4display, slice4display, 1, 0, NORM_MINMAX);
             }else{
                 single_slice = nullptr;
                 qFatal("Unsupported data type!");
@@ -2244,7 +2267,7 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
             s_min << fixed << setprecision(2) << min_v;
             s_max << fixed << setprecision(2) << max_v;
             string title = "Slice:"+to_string(slice) + ", min:" + s_min.str() + ", max:" + s_max.str();
-            imshow(title, *single_slice);
+            imshow(title, slice4display);
             int key = waitKeyEx(0);
             if(src3d->dims <3) break;
             if(key == 65361) {
@@ -2263,7 +2286,7 @@ void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice, bool binary){
             //destroyAllWindows();
         }
     }
-    delete single_slice;
+    //delete single_slice;
 }
 
 /**

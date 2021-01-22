@@ -129,7 +129,7 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
         return;
     }
     vector<float> zscore (ub-lb+1);
-    qInfo("%d thresholds totally.", ub-lb+1);
+    qInfo("%d thresholds totally: ub:%d, lb:%d.", ub-lb+1, ub, lb);
     Mat otherCellTerritory, valid_cell_territory, cur_reg, cur_valid_nei; // uint8
     int shift_othercell[] = {3,3,1};
     volumeDilate(&seed.otherIdMap, otherCellTerritory, shift_othercell, MORPH_ELLIPSE);

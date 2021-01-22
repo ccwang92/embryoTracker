@@ -15,6 +15,7 @@ SOURCES += data_importer.cpp \
     cellsegmentation/maxflow_bk/graph.cpp \
     cellsegmentation/maxflow_bk/maxflow.cpp \
     cellsegmentation/synquant_simple.cpp \
+    celltracking/celltracking_main.cpp \
     main.cpp \
     mainwindow.cpp \
     my4dimage.cpp \
@@ -49,6 +50,7 @@ HEADERS += data_importer.h \
     cellsegmentation/synquant_simple.h \
     cellsegmentation/types_define.h \
     cellsegmentation/vol_basic_proc.hpp \
+    celltracking/celltracking_main.h \
     dialog_import_im_sequence.h \
     mainwindow.h \
     my4dimage.h \

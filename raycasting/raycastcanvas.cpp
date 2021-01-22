@@ -585,7 +585,7 @@ inline void draw_tri(const XYZ P1, const XYZ P2, const XYZ P3, const XYZ offst)
  */
 void RayCastCanvas::draw_axes() {
         float exceed_extent = 1.2;
-        qDebug ("drawInstructions has been called \n"); //this->paintText();
+        //qDebug ("drawInstructions has been called \n"); //this->paintText();
         QPainter painter(this);
         QVector3D originPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, 1);
         // x-axis

@@ -2,13 +2,12 @@
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_basicdatatype.h"
 #include <string>
-
+#include <chrono> // time elapsed
 using namespace cv;
 using namespace std;
 //using namespace volproc;
 enum boundary_touched { NO_TOUCH = 0, XY_TOUCH = 1, Z_TOUCH = 2, XYZ_TOUCH = 3};
-cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/,
-RayCastCanvas *glWidget)
+cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/)
 {
     init_parameter();
     data_rows_cols_slices.resize(3);
@@ -37,7 +36,6 @@ RayCastCanvas *glWidget)
     stblizedVarTrends.resize(time_points);
     variances.resize(time_points);
     number_cells.resize(time_points);
-    long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
 
     Mat *data4d;
     int data_sz[4] = {data_rows_cols_slices[0], data_rows_cols_slices[1],
@@ -57,20 +55,26 @@ RayCastCanvas *glWidget)
 //    qInfo("%d - %d - %d - %d \n", data4d->size[0], data4d->size[1],
 //            data4d->size[2], data4d->size[3]);
 //    normalize(tmp, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
-    Mat normalized_data4d;
+    //Mat normalized_data4d;
     normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
 
+}
+
+void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget){
+    long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
     curr_time_point = glWidget->curr_timePoint_in_canvas;
     unsigned char *ind = (unsigned char*)normalized_data4d.data + sz_single_frame*curr_time_point; // sub-matrix pointer
     Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
     if(!time_points_processed[curr_time_point]){
         cell_label_maps[curr_time_point] = Mat::zeros(3, normalized_data4d.size, CV_32S); // int label
         threshold_maps[curr_time_point] = Mat::zeros(3, normalized_data4d.size, CV_8U);
-
+        chrono::steady_clock::time_point begin = chrono::steady_clock::now();
         cellSegmentSingleFrame(single_frame, curr_time_point);
         time_points_processed[curr_time_point] = true;
+        chrono::steady_clock::time_point end = chrono::steady_clock::now();
+        qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
     }
     //// display volume in canvas
     Mat4b rgb_mat4display;
@@ -79,7 +83,6 @@ RayCastCanvas *glWidget)
     glWidget->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, data_rows_cols_slices[1],
             data_rows_cols_slices[0], data_rows_cols_slices[2], 4);
 }
-
 /**
  * @brief cellSegmentMain::cellSegmentSingleFrame
  * @param data_grayim3d: The data is mirrored by the y-direction, this is because
@@ -98,8 +101,9 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     //ccShowSlice3Dmat(&principalCurv2d[curr_frame], CV_32F, 3);
     float sigma3d[3] = {5.0, 5.0, 1.0};
     principalCv3d(dataVolFloat, principalCurv3d[curr_frame], sigma3d, p4segVol.min_intensity);
-    //ccShowSlice3Dmat(&principalCurv3d[curr_frame], CV_32F, 3);
-
+    //ccShowSlice3Dmat(&principalCurv3d[curr_frame], CV_32F);
+    //Mat tmp = principalCurv3d[curr_frame]>0.01;
+    //ccShowSlice3Dmat(tmp, CV_8U);
     double tmp_min, tmp_max;
     minMaxIdx(principalCurv2d[curr_frame], &tmp_min, &tmp_max);
     //ccShowSlice3Dmat(&principalCurv3d[curr_frame], CV_32F);
@@ -115,20 +119,111 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     float stb_var = calVarianceStablization(stblizedVol, stblizedVarMaps[curr_frame], stblizedVarTrends[curr_frame],
                                                        p4odStats.varAtRatio, p4odStats.gap4varTrendEst);
     //ccShowSlice3Dmat(&stblizedVarMaps[curr_frame], CV_32F, 3);
-    // first use synQuant to get 1-tier seed regions
-    synQuantSimple seeds_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
+
+    //////////////////////////////////////////////////////////////////
+    //        first use synQuant to get 1-tier seed regions         //
+    //////////////////////////////////////////////////////////////////
+    Mat smoothed_VolFloat, smoothed_grayim3d;
+    dataVolFloat->copyTo(smoothed_VolFloat);
+    float smooth4seedExtract[3] = {1.0, 1.0, 1.0};
+    gaussianSmooth3Ddata(smoothed_VolFloat, smooth4seedExtract);
+    smoothed_VolFloat.convertTo(smoothed_grayim3d, CV_8U);
+    //ccShowSlice3Dmat(smoothed_grayim3d, CV_8U);
+    synQuantSimple seeds_from_synQuant(&smoothed_grayim3d, variances[curr_frame], p4segVol, p4odStats);
     //ccShowSliceLabelMat(seeds_from_synQuant.idMap);
-    // second refine the seed regions
-    vector<int> test_ids(0);
+    //if directly use non-smoothed data
+    //synQuantSimple seeds_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
+
+    //////////////////////////////////////////////////////////////////
+    //               second refine the seed regions                 //
+    //////////////////////////////////////////////////////////////////
+    bool RoundOne = true;
     regionWiseAnalysis4d(data_grayim3d, dataVolFloat, stblizedVol, seeds_from_synQuant.idMap/*int*/,
-                         seeds_from_synQuant.cell_num, curr_frame, test_ids);
-    // third get 2-tier seed regions
-    //seed_from_synQuant.retrieve_seeds();
-    // fourth refine 2-tier seed regions
+                         seeds_from_synQuant.cell_num, curr_frame, RoundOne);
+    //ccShowSliceLabelMat(cell_label_maps[curr_frame]);
+    //////////////////////////////////////////////////////////////////
+    //               third get 2-tier seed regions                  //
+    //////////////////////////////////////////////////////////////////
+    Mat cellGapMap = principalCurv3d[curr_frame] > 0.001;
+    Mat label_map_2ndRound;
+    int seed_num_2ndRound;
+    retrieve_seeds(&smoothed_VolFloat, &cell_label_maps[curr_frame], number_cells[curr_frame],
+                   &cellGapMap, label_map_2ndRound, seed_num_2ndRound);
 
-    // Finally, return
+    //////////////////////////////////////////////////////////////////
+    //             fourth refine 2-tier seed regions                //
+    //////////////////////////////////////////////////////////////////
+    if(seed_num_2ndRound > 0){
+        RoundOne = false;
+        regionWiseAnalysis4d(data_grayim3d, dataVolFloat, stblizedVol, &label_map_2ndRound/*int*/,
+                             seed_num_2ndRound, curr_frame, RoundOne);
+    }
+
 }
+/**
+ * @brief retrieve_seeds: retrieve the seeds of cells lost in the first round of synQuant
+ * @param smoothed_VolFloat: 0-255 but in float format
+ * @param label_map_1stRound
+ * @param cell_num_1stRound
+ * @param test_ids
+ */
+void cellSegmentMain::retrieve_seeds(Mat *smoothed_VolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
+                                     Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound){
+    // 1. extract the cell size and intensity
+    vector<vector<size_t>> voxList_exist_cells;
+    extractVoxIdxList(label_map_1stRound, voxList_exist_cells, cell_num_1stRound);
+    vector<float> cell_mean_intensity;
+    regionAvgIntensity(smoothed_VolFloat, voxList_exist_cells, cell_mean_intensity);
+    vector<size_t> exist_cell_size (voxList_exist_cells.size());
+    FOREACH_i(voxList_exist_cells) exist_cell_size[i] = voxList_exist_cells[i].size();
 
+    size_t min_exist_cell_size = *min_element(exist_cell_size.begin(), exist_cell_size.end());
+    size_t max_exist_cell_size = *max_element(exist_cell_size.begin(), exist_cell_size.end());
+    float min_cell_intensity = *min_element(cell_mean_intensity.begin(), cell_mean_intensity.end());
+
+    // 2. extract the new seed map if it satisifies the constraints from existing cells
+    Mat seed_map;
+    Mat exist_cell_territory, exist_cell_fg;
+    exist_cell_fg = *label_map_1stRound > 0;
+    int dilate_radius[] = {2, 2, 1};
+    volumeDilate(&exist_cell_fg, exist_cell_territory, dilate_radius, MORPH_ELLIPSE);
+    //setValMat(*smoothed_VolFloat, CV_32F, &exist_cell_territory, 0);
+    //ccShowSlice3Dmat(smoothed_VolFloat, CV_32F);
+    //volumeWrite(smoothed_VolFloat, "/home/ccw/Desktop/remain.tif");
+    //ccShowSlice3Dmat(cellGapMap, CV_8U);
+    //volumeWrite(&exist_cell_territory, "/home/ccw/Desktop/cell_territory.tif");
+    bitwise_or(*cellGapMap, exist_cell_territory, exist_cell_territory);
+    //ccShowSlice3Dmat(exist_cell_territory, CV_8U);
+    //setValMat(*smoothed_VolFloat, CV_32F, &exist_cell_territory, 0);
+    //volumeWrite(smoothed_VolFloat, "/home/ccw/Desktop/remain_further.tif");
+    //ccShowSlice3Dmat(smoothed_VolFloat, CV_32F);
+    //volumeWrite(cellGapMap, "/home/ccw/Desktop/gap.tif");
+    //volumeWrite(&exist_cell_territory, "/home/ccw/Desktop/overlap.tif");
+    seed_map = exist_cell_territory == 0;
+    dilate_radius[0] = 1; dilate_radius[1] = 1; dilate_radius[2] = 0;
+    Mat seed_map_dilate;
+    volumeDilate(&seed_map, seed_map_dilate, dilate_radius, MORPH_ELLIPSE);
+    Mat label_map;
+    int numCC;
+    numCC = connectedComponents3d(&seed_map_dilate, label_map, 26);
+    setValMat(label_map, CV_32S, &exist_cell_territory, 0);
+    //ccShowSliceLabelMat(label_map);
+    vector<vector<size_t>> voxList_seeds;
+    extractVoxIdxList(&label_map, voxList_seeds, numCC);
+    vector<float> seeds_mean_intensity;
+    regionAvgIntensity(smoothed_VolFloat, voxList_seeds, seeds_mean_intensity);
+    idMap_2ndRound = Mat::zeros(label_map.dims, label_map.size, CV_32S);
+    seed_num_2ndRound = 0;
+    FOREACH_i(voxList_seeds){
+        if(voxList_seeds[i].size() >= min_exist_cell_size &&
+                voxList_seeds[i].size() <= max_exist_cell_size &&
+                seeds_mean_intensity[i] > min_cell_intensity){
+            seed_num_2ndRound ++;
+            setValMat(idMap_2ndRound, CV_32S, voxList_seeds[i], (float)seed_num_2ndRound);
+        }
+    }
+    //ccShowSliceLabelMat(idMap_2ndRound);
+}
 void boundaryTouchedTest(Mat *label_map, Mat *fgMap, bool &xy_touched, bool &z_touched){
     int n_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
     int n_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
@@ -173,27 +268,42 @@ void boundaryTouchedTest(Mat *label_map, Mat *fgMap, bool &xy_touched, bool &z_t
 //void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat, Mat * volStblizedFloat, Mat *idMap /*int*/, int seed_num, Mat *eigMap2d,
 //                                           Mat *eigMap3d, Mat *varMap, Mat *stblizedVarMap, vector<int> test_ids){
 void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat,
-                                           Mat * volStblizedFloat, Mat *idMap /*int*/, int seed_num,
-                                           int curr_frame, vector<int> test_ids){
+                                           Mat * volStblizedFloat, Mat *idMapIn /*int*/, int seed_num,
+                                           int curr_frame, bool roundOne){
+    Mat idMap;
+    idMapIn->copyTo(idMap);
+    if(roundOne){
+        removeSmallCC(idMap, seed_num, p4segVol.min_seed_size, true);
+    }
     //1. sort the seeds based on intensity levels
-    vector<float> seed_intensity(seed_num);
-    regionAvgIntensity(dataVolFloat, idMap, seed_intensity);
+    vector<float> seed_intensity;
+    regionAvgIntensity(dataVolFloat, &idMap, seed_num, seed_intensity);
     //ccShowSlice3Dmat(dataVolFloat, CV_32F);
     vector<size_t> seed_intensity_order;
     seed_intensity_order = sort_indexes(seed_intensity, false); // false->descending
     //2. for each seed, refine it region
     vector<vector<size_t>> voxIdxList(seed_num);
-    extractVoxIdxList(idMap, voxIdxList, seed_num);
+    extractVoxIdxList(&idMap, voxIdxList, seed_num);
 
     int cell_cnt = 0;
-    int debug_cell_id = 2;
+    if(!roundOne) { // for the second tround
+        //1. cell number start from the second round
+        cell_cnt += number_cells[curr_time_point];
+        //2. idMap needs add other existing cells (label start from seed_num+1)
+        FOREACH_i_MAT(cell_label_maps[curr_time_point]){
+            if(cell_label_maps[curr_time_point].at<int>(i) > 0){
+                idMap.at<int>(i) = seed_num + cell_label_maps[curr_time_point].at<int>(i);
+            }
+        }
+    }
+    //int debug_cell_id = 2;
     FOREACH_i(seed_intensity_order){
         int seed_id = seed_intensity_order[i] + 1;
         qInfo("------------------#%ld, start %d seed process, size: %ld---------------------", i, seed_id,
               voxIdxList[seed_id-1].size());
 
         singleCellSeed seed;
-        cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap,
+        cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, &idMap,
                 curr_frame, seed, p4segVol);
         int touchBnd = refineSeed2Region(seed, p4odStats, p4segVol);
 
@@ -206,14 +316,14 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
                 p4segVol.shift_yxz[2] *=2;
             }
             Range new_range[3];
-            getRange(seed.y, p4segVol.shift_yxz[0], idMap->size[0], new_range[0]);
-            getRange(seed.x, p4segVol.shift_yxz[1], idMap->size[1], new_range[1]);
-            getRange(seed.z, p4segVol.shift_yxz[2], idMap->size[2], new_range[2]);
+            getRange(seed.y, p4segVol.shift_yxz[0], idMap.size[0], new_range[0]);
+            getRange(seed.x, p4segVol.shift_yxz[1], idMap.size[1], new_range[1]);
+            getRange(seed.z, p4segVol.shift_yxz[2], idMap.size[2], new_range[2]);
             if(new_range[0].size() > seed.validSearchAreaMap.size[0] ||
                     new_range[1].size() > seed.validSearchAreaMap.size[1] ||
                     new_range[2].size() > seed.validSearchAreaMap.size[2]){
 
-                cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, idMap,
+                cropSeed(seed_id, voxIdxList[seed_id-1], data_grayim3d, volStblizedFloat, &idMap,
                         curr_frame, seed, p4segVol);
 //                if(debug_cell_id == i){
 //                    qInfo("may not correct");
@@ -282,7 +392,7 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
 //    xyz[2] = Range(0, 3);
 
 //    Mat subMat = tmp(xyz).clone();
-//    int *ind = (int*) tmp.data;
+//    int *ind = (int*) tmp.data;idMap
 //    Mat single_s = Mat(2, tmp.size, CV_8U, ind);
 //    imshow("test_", single_s>0);
 //    waitKey(0);
@@ -381,6 +491,8 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         bitwise_and(seed.validSearchAreaMap, seed.volUint8 >= seed.bestFgThreshold, cellSegFromSynQuant.fgMap);
         //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
     }
+    qInfo("after refine, fgmap is empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
+
     refineCellTerritoryWithSeedRegion(cellSegFromSynQuant, seed, p4segVol);
     qInfo("after refine, fgmap is empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
 

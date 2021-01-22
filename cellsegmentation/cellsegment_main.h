@@ -11,15 +11,15 @@
 class cellSegmentMain
 {
 public:
-    cellSegmentMain(void *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/,
-    RayCastCanvas *glWidget);
+    cellSegmentMain(void *data_grayim4d, int _data_type, long buffSize[5]/*(x,y,z,c,t)*/);
     ~cellSegmentMain(){
         //if(data_rows_cols_slices) delete data_rows_cols_slices;
         //if(time_points_processed) delete time_points_processed;
     };
+    void processSingleFrameAndReturn(RayCastCanvas *glWidget);
     void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
     void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,
-                              cv::Mat *idMap /*int*/, int seed_num, int frame, std::vector<int> test_ids);
+                              cv::Mat *idMapIn /*int*/, int seed_num, int frame, bool roundOne);
     void cropSeed(int seed_id, std::vector<std::size_t> idx_yxz, cv::Mat *data_grayim3d, cv::Mat *data_stbized,
                   cv::Mat *idMap, int frame, singleCellSeed &seed, segParameter p4segVol);
     // the key function to get cell territory
@@ -32,10 +32,14 @@ public:
     void gapBasedRegionSegment(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
     void gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQuant, cv::Mat* seeds_Map /*CV_32S*/, int n, singleCellSeed &seed, segParameter &p4segVol, odStatsParameter &p4odStats);
     void removeOtherSeedsInfgMap(synQuantSimple &cellSegFromSynQuant, singleCellSeed &seed, segParameter &p4segVol);
+
+    void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
+                        Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound);
 protected:
     string debug_folder;
     string default_name;
     int data_type;
+    Mat1b normalized_data4d;
     vector<int> data_rows_cols_slices;
     vector<bool> time_points_processed;
     long time_points = 0;
