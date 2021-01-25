@@ -121,7 +121,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     //ccShowSlice3Dmat(&stblizedVarMaps[curr_frame], CV_32F, 3);
 
     //////////////////////////////////////////////////////////////////
-    //        first use synQuant to get 1-tier seed regions         //
+    //           1. use synQuant to get 1-tier seed regions         //
     //////////////////////////////////////////////////////////////////
     Mat smoothed_VolFloat, smoothed_grayim3d;
     dataVolFloat->copyTo(smoothed_VolFloat);
@@ -135,14 +135,14 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
     //synQuantSimple seeds_from_synQuant(data_grayim3d, variances[curr_frame], p4segVol, p4odStats);
 
     //////////////////////////////////////////////////////////////////
-    //               second refine the seed regions                 //
+    //                 2. refine the seed regions                   //
     //////////////////////////////////////////////////////////////////
     bool RoundOne = true;
     regionWiseAnalysis4d(data_grayim3d, dataVolFloat, stblizedVol, seeds_from_synQuant.idMap/*int*/,
                          seeds_from_synQuant.cell_num, curr_frame, RoundOne);
     //ccShowSliceLabelMat(cell_label_maps[curr_frame]);
     //////////////////////////////////////////////////////////////////
-    //               third get 2-tier seed regions                  //
+    //               3. get 2-tier seed regions                  //
     //////////////////////////////////////////////////////////////////
     Mat cellGapMap = principalCurv3d[curr_frame] > 0.001;
     Mat label_map_2ndRound;
@@ -151,7 +151,7 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
                    &cellGapMap, label_map_2ndRound, seed_num_2ndRound);
 
     //////////////////////////////////////////////////////////////////
-    //             fourth refine 2-tier seed regions                //
+    //              4. refine 2-tier seed regions                   //
     //////////////////////////////////////////////////////////////////
     if(seed_num_2ndRound > 0){
         RoundOne = false;

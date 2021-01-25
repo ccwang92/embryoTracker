@@ -2321,51 +2321,191 @@ void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat4b &dst)
         }
     }
 }
+
+//hsv rgb2hsv(rgb in)
+//{
+//    hsv         out;
+//    double      min, max, delta;
+
+//    min = in.r < in.g ? in.r : in.g;
+//    min = min  < in.b ? min  : in.b;
+
+//    max = in.r > in.g ? in.r : in.g;
+//    max = max  > in.b ? max  : in.b;
+
+//    out.v = max;                                // v
+//    delta = max - min;
+//    if (delta < 0.00001)
+//    {
+//        out.s = 0;
+//        out.h = 0; // undefined, maybe nan?
+//        return out;
+//    }
+//    if( max > 0.0 ) { // NOTE: if Max is == 0, this divide would cause a crash
+//        out.s = (delta / max);                  // s
+//    } else {
+//        // if max is 0, then r = g = b = 0
+//        // s = 0, h is undefined
+//        out.s = 0.0;
+//        out.h = NAN;                            // its now undefined
+//        return out;
+//    }
+//    if( in.r >= max )                           // > is bogus, just keeps compilor happy
+//        out.h = ( in.g - in.b ) / delta;        // between yellow & magenta
+//    else
+//    if( in.g >= max )
+//        out.h = 2.0 + ( in.b - in.r ) / delta;  // between cyan & yellow
+//    else
+//        out.h = 4.0 + ( in.r - in.g ) / delta;  // between magenta & cyan
+
+//    out.h *= 60.0;                              // degrees
+
+//    if( out.h < 0.0 )
+//        out.h += 360.0;
+
+//    return out;
+//}
+
+void HsvToRgb(double h, double s, double v, double &r, double &g, double &b)
+{
+    double      hh, p, q, t, ff;
+    long        i;
+
+    if(s <= 0.0) {       // < is bogus, just shuts up warnings
+        r = v;
+        g = v;
+        b = v;
+        return;
+    }
+    hh = h;
+    if(hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = (long)hh;
+    ff = hh - i;
+    p = v * (1.0 - s);
+    q = v * (1.0 - (s * ff));
+    t = v * (1.0 - (s * (1.0 - ff)));
+
+    switch(i) {
+    case 0:
+        r = v;
+        g = t;
+        b = p;
+        break;
+    case 1:
+        r = q;
+        g = v;
+        b = p;
+        break;
+    case 2:
+        r = p;
+        g = v;
+        b = t;
+        break;
+
+    case 3:
+        r = p;
+        g = q;
+        b = v;
+        break;
+    case 4:
+        r = t;
+        g = p;
+        b = v;
+        break;
+    case 5:
+    default:
+        r = v;
+        g = p;
+        b = q;
+        break;
+    }
+}
 /**
  * @brief colorMapGen
  * @param src
  * @param colorMap
  */
-void colorMapGen(Mat *src, Mat3b &colormap){
-    // Create JET colormap
+void colorMapGen(Mat *src, Mat3b &colormap, String colorType){
     double m;
     minMaxIdx(*src, nullptr, &m); // for 3 or more dims; for 2d, use minMaxLoc
     m++;
 
-    int n = ceil(m / 4);
-    Mat1d u(n*3-1, 1, double(1.0));
+    if (colorType.compare("JET") == 0){
+        int n = ceil(m / 4);
+        Mat1d u(n*3-1, 1, double(1.0));
 
-    for (int i = 1; i <= n; ++i) {
-        u(i-1) = double(i) / n;
-        u((n*3-1) - i) = double(i) / n;
+        for (int i = 1; i <= n; ++i) {
+            u(i-1) = double(i) / n;
+            u((n*3-1) - i) = double(i) / n;
+        }
+
+        vector<double> g(n * 3 - 1, 1);
+        vector<double> r(n * 3 - 1, 1);
+        vector<double> b(n * 3 - 1, 1);
+        for (int i = 0; i < g.size(); ++i)
+        {
+            g[i] = ceil(double(n) / 2) - (int(m)%4 == 1 ? 1 : 0) + i + 1;
+            r[i] = g[i] + n;
+            b[i] = g[i] - n;
+        }
+        srand(time(0));
+        random_shuffle(g.begin() + 1, g.end());
+        random_shuffle(r.begin() + 1, r.end());
+        random_shuffle(b.begin() + 1, b.end());
+
+        g.erase(remove_if(g.begin(), g.end(), [m](double v){ return v > m;}), g.end());
+        r.erase(remove_if(r.begin(), r.end(), [m](double v){ return v > m; }), r.end());
+        b.erase(remove_if(b.begin(), b.end(), [](double v){ return v < 1.0; }), b.end());
+
+        Mat1d cmap(m, 3, double(0.0));
+        int c, l;
+        for (int i = 0; i < r.size(); ++i)
+        {
+            c = int(r[i])-1;
+            cmap(c, 2) = u(i);
+        }
+        for (int i = 0; i < g.size(); ++i)
+        {
+            cmap(int(g[i])-1, 1) = u(i);
+        }
+        for (int i = 0; i < b.size(); ++i)
+        {
+            cmap(int(b[i])-1, 0) = u(u.rows - b.size() + i);
+        }
+
+        Mat3d cmap3 = cmap.reshape(3);
+
+        //Mat3b colormap;
+        cmap3.convertTo(colormap, CV_8U, 255.0);
+    }else{ //"HSV"
+        vector<double> g(m, 1);
+        vector<double> r(m, 1);
+        vector<double> b(m, 1);
+        double h, s, v, rand_val;
+        //float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); // 0-1
+        //float r3 = LO + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(HI-LO))); // LO-HI
+        for (int i = 0; i < m; i++)
+        {
+            h = i * 360.0/m;
+            rand_val = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
+            s = 90.0 + rand_val * 10;
+            rand_val = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
+            v = 80.0 + rand_val * 10;
+            HsvToRgb(h,s/100,v/100, r[i], g[i], b[i]);
+        }
+        Mat1d cmap(m, 3, double(0.0));
+        for (int i = 0; i < m; ++i)
+        {
+            cmap(i, 2) = b[i];
+            cmap(i, 1) = g[i];
+            cmap(i, 0) = r[i];
+        }
+        Mat3d cmap3 = cmap.reshape(3);
+        //Mat3b colormap;
+        cmap3.convertTo(colormap, CV_8U, 255.0);
     }
 
-    vector<double> g(n * 3 - 1, 1);
-    vector<double> r(n * 3 - 1, 1);
-    vector<double> b(n * 3 - 1, 1);
-    for (int i = 0; i < g.size(); ++i)
-    {
-        g[i] = ceil(double(n) / 2) - (int(m)%4 == 1 ? 1 : 0) + i + 1;
-        r[i] = g[i] + n;
-        b[i] = g[i] - n;
-    }
-    random_shuffle(g.begin() + 1, g.end());
-    random_shuffle(r.begin() + 1, r.end());
-    random_shuffle(b.begin() + 1, b.end());
-
-    g.erase(remove_if(g.begin(), g.end(), [m](double v){ return v > m;}), g.end());
-    r.erase(remove_if(r.begin(), r.end(), [m](double v){ return v > m; }), r.end());
-    b.erase(remove_if(b.begin(), b.end(), [](double v){ return v < 1.0; }), b.end());
-
-    Mat1d cmap(m, 3, double(0.0));
-    for (int i = 0; i < r.size(); ++i) { cmap(int(r[i])-1, 2) = u(i); }
-    for (int i = 0; i < g.size(); ++i) { cmap(int(g[i])-1, 1) = u(i); }
-    for (int i = 0; i < b.size(); ++i) { cmap(int(b[i])-1, 0) = u(u.rows - b.size() + i); }
-
-    Mat3d cmap3 = cmap.reshape(3);
-
-    //Mat3b colormap;
-    cmap3.convertTo(colormap, CV_8U, 255.0);
 }
 /**
  * @brief label2rgb3d

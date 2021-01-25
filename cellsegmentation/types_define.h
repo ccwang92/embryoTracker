@@ -94,8 +94,16 @@ struct singleCellSeed{
     int bestFgThreshold = -1;
 };
 
-struct movieInfo{
-
+struct cellCensus{
+    std::vector<int> xCoord, yCoord, zCoord;
+    std::vector<int> frames;
+    std::vector<int> labelInMap; //label
+    std::vector<std::vector<size_t>> voxIdx;
+    std::vector<std::vector<int>> vox_x, vox_y, vox_z;
+    std::vector<std::vector<size_t>> tracks; //a set of node_ids
+    std::vector<size_t> nodeID2trackID; //particle2track in matlab
+    std::vector<int> nodeLocInTrack; //particle2track in matlab
+    std::vector<size_t> parents, kids; // neighboring relationship
 };
 
 #endif // TYPES_DEFINE_H

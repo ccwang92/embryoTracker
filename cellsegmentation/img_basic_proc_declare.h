@@ -107,7 +107,7 @@ void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]);
 void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3], int start = 0);
 void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_range[3]);
 // fucntions for display
-void colorMapGen(Mat *src, Mat3b &colormap);
+void colorMapGen(Mat *src, Mat3b &colormap, String colorType = "HSV");
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
 void ccShowSliceLabelMat(Mat *src3d, int slice = 0 /*default 2d*/);
 void ccShowSlice3Dmat(Mat src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);

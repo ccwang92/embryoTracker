@@ -1,4 +1,5 @@
-# The basic references
+# A raycasting-based volume renderer
+## references
 
 [blog post](https://martinopilia.com/posts/2018/09/17/volume-raycasting.html)
 
@@ -12,7 +13,3 @@
 
 [maximum intensity projection](https://en.wikipedia.org/wiki/Maximum_intensity_projection)
 
-
-# License
-
-The software is distributed under the MIT license.
