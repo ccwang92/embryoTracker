@@ -17,6 +17,7 @@ public:
         //if(time_points_processed) delete time_points_processed;
     };
     void processSingleFrameAndReturn(RayCastCanvas *glWidget);
+    //void processAllFramesAndReturn(RayCastCanvas *glWidget);
     void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
     void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,
                               cv::Mat *idMapIn /*int*/, int seed_num, int frame, bool roundOne);

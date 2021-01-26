@@ -2505,7 +2505,6 @@ void colorMapGen(Mat *src, Mat3b &colormap, String colorType){
         //Mat3b colormap;
         cmap3.convertTo(colormap, CV_8U, 255.0);
     }
-
 }
 /**
  * @brief label2rgb3d

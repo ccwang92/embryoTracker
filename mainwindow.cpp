@@ -224,7 +224,13 @@ void MainWindow::debugAlgorithm()
     algorithmDebug = true;
     this->data4test->debugMode = true;
     this->importImageSeries();
-    this->sendData4Segment();
+    //// send data to do segmentation on all frames
+    for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
+        glWidget_raycast->setVolumeTimePoint(i);
+        this->sendData4Segment();
+    }
+    //// send segmentation results for cell linking
+
 }
 void MainWindow::sendData4Segment()
 {
