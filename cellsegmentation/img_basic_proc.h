@@ -282,6 +282,43 @@ template <typename T> T normInv(T p, T mu, T sigma)
 
     return mu + sigma * val;
 }
+
+template <typename T> T chi2inv(T p, int df){
+    return (T)2*boost::math::gamma_p_inv(((float)df)/2, p);
+}
+template <typename T> T gammacdf(T x, T a, T b, bool upper){
+    T k = a;
+    T theta = 1/b;
+    return (T)boost::math::gamma_p(k, x/theta);
+}
+// a super quick way for gamma fitting; reference: https://tminka.github.io/papers/minka-gamma.pdf
+template <typename T> void gammafit(vector<T> data, T &a, T &b){
+    T mean_val = vec_mean(data);
+    vector<T> log_vals = vec_log(data);
+    T mean_log = vec_mean(log_vals);
+    a = 0.5 * (log(mean_val) - mean_log);
+    T d, a_new;
+    for(int i = 0 ; i < 10; i++){ // generally 5 iterations is enough
+        d = boost::math::digamma(a + 0.0001) - boost::math::digamma(a + 0.0001);
+        d /= 0.0002;
+        a_new = 1/(1/a + (mean_log - log(mean_val) + log(a) - boost::math::digamma(a)) / (a*a*(1/a - d)));
+        if (abs(a_new - a) < 0.001){
+            break;
+        }
+        a = a_new;
+    }
+    b = mean_val / a;
+}
+
+template <typename T> vector<T> vec_log(vector<T> data){
+    vector<T> log_v(data.size());
+    FOREACH_i(data) {
+        if (data[i] <= 0){
+            qFatal("Taking a logarithm on negative value!");
+        }
+        log_v[i] = log(data[i]);
+    }
+}
 template <typename T> T vec_stddev(vector<T> const & func)
 {
     return sqrt(vec_variance(func));

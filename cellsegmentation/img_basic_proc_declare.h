@@ -5,6 +5,9 @@
 #include <opencv2/imgcodecs.hpp> // image io
 #include <opencv2/highgui.hpp> //image display
 #include <opencv2/imgproc.hpp> // image process
+#include <boost/math/distributions/chi_squared.hpp>
+#include <boost/math/distributions/gamma.hpp>
+#include <boost/math/special_functions/digamma.hpp>
 //#include "itkImage.h"
 //#include "itkImageFileReader.h"
 //#include "itkImageFileWriter.h"
@@ -34,6 +37,10 @@ enum cost_design_method{ARITHMETIC_AVERAGE = 1, GEOMETRIC_AVERAGE};
 enum fgBoundaryHandleMethod {LEAVEALONEFIRST = 0, COMPETE, REPEAT};
 enum gapTestMethods {GAP_TTEST = 0, GAP_ORDERSTATS, GAP_LOCALORDERSTATS};
 
+enum trackingVarEstMethod {tve_INDEPENDENT = 0, tve_MEDIAN};
+enum costCalMethod {ccm_CHI1SQUARE = 0, ccm_FISHER, ccm_ZSCORE};
+enum priorDistrType {pri_GAUSS = 0, pri_WEIGHTEDAVG, pri_GAMMA};
+enum slitMergeHandleMethods {NOJUMPALL = 0, NOJUMP, NOT_DECIDE};
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)
@@ -115,6 +122,7 @@ void ccShowSliceLabelMat(Mat src3d, int slice = 0 /*default 2d*/);
 void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat4b &dst);
 void label2rgb2d(Mat1i &src, Mat3b &dst);
 
+
 // Function to find t-test of
 // two set of statistical data.
 
@@ -159,6 +167,11 @@ template <typename T> T normalPDF(T x, T m = 0, T s = 1);
 template <typename T> T zscore2pvalue(T z);
 template <typename T> T pvalue2zscore(T p);
 template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
+
+template <typename T> T chi2inv(T p, int df = 1);
+template <typename T> T gammacdf(T x, T a, T b, bool upper = true);
+template <typename T> void gammafit(vector<T> data, T &a, T &b);
+template <typename T> vector<T> vec_log(vector<T> data);
 
 template <typename T> T vec_stddev(vector<T> const & func);
 template <typename T> T vec_variance(vector<T> const & func);

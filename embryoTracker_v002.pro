@@ -114,6 +114,9 @@ HEADERS += data_importer.h \
 INCLUDEPATH += /usr/local/include/opencv4
 LIBS += -L/usr/local/lib -lopencv_imgproc -lopencv_core -lopencv_highgui -lopencv_imgcodecs
 
+# include(boost.qrc)
+#INCLUDEPATH += /usr/include/
+#LIBS += -L/usr/include/boost/bin.v2/libs/ -lboost_system -lboost_filesystem -lboost_asio
 #include(VTK.qrc)
 #INCLUDEPATH += /usr/local/include/ITK-5.1
 #DEPENDPATH += /usr/local/include/ITK-5.1

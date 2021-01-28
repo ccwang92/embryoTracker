@@ -221,6 +221,7 @@ MainWindow::~MainWindow()
 }
 void MainWindow::debugAlgorithm()
 {
+    //float kk = chi2inv(0.5, 2);
     algorithmDebug = true;
     this->data4test->debugMode = true;
     this->importImageSeries();
