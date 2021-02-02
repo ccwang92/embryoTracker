@@ -1,0 +1,21 @@
+profile on;
+for i=1:1000
+    a = rand(1,65534)>0.5;
+    kk = find(a);
+    d1 = edt_1dMex(uint16(kk), zeros(size(kk),'single'), single(1:length(a)));
+    d1 = sqrt(d1);
+    
+    d2 = bwdist(a);
+    
+    if max(abs(d1-d2))>0.01
+        disp(i);
+    end
+end
+profile viewer;
+
+profile off;
+
+c1 = edt_3d_regFixed(b, a, [0 0 0]);
+c2 = edt_3dMex(b, a, [0 0 0]);
+
+disp(max(abs(c1(:)-c2'));

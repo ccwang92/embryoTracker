@@ -132,19 +132,59 @@ struct trackParameter{
     bool considerBrokenCellOnly;// for linking allowing split/merge, does not consider nodes that has another good linkage already
     bool addCellMissingPart;// if a cell missed part, we want to detect it, otherwise we can remove seeds that highly overlapped with an existing cell
     bool splitMergeCost;// if cost of a+b->c is 20, then cost of a->c and b->c are set to 10 if true; otherwise both 20
-
 };
 
-struct cellCensus{
-    std::vector<int> xCoord, yCoord, zCoord;
+// structures to save the detection infor
+struct nodeRelation{
+    size_t node_id;
+    float dist_p2k, dist_k2p; // current to neighbor in next frames or in counter direction
+    long overlap_size;
+    float link_cost;
+};
+//struct directFamily{ // for each node, it has at most two parents or two kids
+//    simpleCell parents[2];
+//    int parent_num = 0;
+//    simpleCell kids[2];
+//    int kid_num = 0;
+//};
+struct nodeInfo{
+    size_t node_id;
+    //directFamily family_members; // neighboring relationship, at most two kids or parents
+    size_t parents[2];
+    int parent_num = 0;
+    size_t kids[2];
+    int kid_num = 0;
+    size_t nodeId2trackId, nodeLocInTrack;
+    std::vector<nodeRelation> neighbors; // candidate kids
+};
+//struct nodeInfoInTrack{
+//    size_t nodeId2trackId, nodeLocInTrack;
+//};
+struct singleCellCensus{
+    nodeInfo node_info; //
+    float xCoord, yCoord, zCoord;
+    int frames;
+    int labelInMap; //read id in label_maps
+    std::vector<size_t> voxIdx;
+    std::vector<int> vox_x, vox_y, vox_z;
+//    std::vector<nodeRelation> neighbors; // candidate kids
+//    nodeInfoInTrack particle2track; //particle2track in matlab
+    //directFamily family_members; // neighboring relationship, at most two kids or parents
+};
+
+
+struct allCellsCensus{
+    std::vector<float> xCoord, yCoord, zCoord;
     std::vector<int> frames;
-    std::vector<int> labelInMap; //label
+    std::vector<int> labelInMap; //read id in label_maps
     std::vector<std::vector<size_t>> voxIdx;
     std::vector<std::vector<int>> vox_x, vox_y, vox_z;
+//    std::vector<std::vector<nodeRelation>> neighbors; // candidate kids
+//    std::vector<singleCellCensus> cells;
+    std::vector<nodeInfo> nodes;
     std::vector<std::vector<size_t>> tracks; //a set of node_ids
-    std::vector<size_t> nodeID2trackID; //particle2track in matlab
-    std::vector<int> nodeLocInTrack; //particle2track in matlab
-    std::vector<size_t> parents, kids; // neighboring relationship
+//    std::vector<nodeInfoInTrack> particle2track; //particle2track in matlab
+//    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents
 };
 
 #endif // TYPES_DEFINE_H

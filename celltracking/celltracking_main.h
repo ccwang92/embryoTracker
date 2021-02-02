@@ -7,10 +7,17 @@ class cellTrackingMain
 {
 public:
     cellTrackingMain(cellSegmentMain &cellSegment);
+    void cellInfoAccumuate(cellSegmentMain &cellSegment);
+    void initTransitionCost(cellSegmentMain &cellSegment);
+    void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
+    void cellInfo2graph();
     ~cellTrackingMain(){};
-protected:
-    cellCensus movieInfo;
+
+private:
+    allCellsCensus movieInfo;
     trackParameter p4tracking;
+    vector<size_t> cumulative_cell_nums;
+    //friend class cellSegmentMain;
 public:
     void init_parameter(segParameter &p4seg, long cell_num){
         p4tracking.cycle_track = true; // true: circulation framework to solve tracking problem
@@ -57,6 +64,20 @@ public:
         p4tracking.considerBrokenCellOnly = true; // for linking allowing split/merge, does not consider nodes that has another good linkage already
         p4tracking.addCellMissingPart = false; // if a cell missed part, we want to detect it, otherwise we can remove seeds that highly overlapped with an existing cell
         p4tracking.splitMergeCost = true;// if cost of a+b->c is 20, then cost of a->c and b->c are set to 10 if true; otherwise both 20
+
+        ////update cost of p4seg
+        p4seg.validTrackLength = 0; // the shortest path we want, cells in other tracks will be removed
+        p4seg.removeSamllRegion = false; // though we have threshold, we did not
+        p4seg.fgBoundaryHandle = LEAVEALONEFIRST;
+        p4seg.growSeedTimes = 2;
+        p4seg.growSeedInTracking = true;
+        p4seg.multi_frames_flag = false; // we did not consider multiple frames. Otherwise
+        // there may be results dominated by other bright cells
+        p4seg.multiSeedProcess = true; // did we add multiple cells simultaneously or one by one
+        p4seg.splitRegionInTracking = true;
+
+        p4seg.updateCellsAdjMissingCell = false;// when add missing cell, do we need to update other regions nearby
+        p4seg.sqrtDistance = false; // euclidian distance or squared euclidian distance
 
     }
 };

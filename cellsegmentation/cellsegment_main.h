@@ -5,6 +5,7 @@
 #include <opencv2/highgui.hpp> //image display
 #include "synquant_simple.h"
 #include "../raycasting/raycastcanvas.h"
+//#include "../celltracking/celltracking_main.h"
 //#include "vol_basic_proc.hpp"
 //#define VOLUME_WH_MAX 100000
 
@@ -36,7 +37,7 @@ public:
 
     void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
                         Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound);
-protected:
+private:
     string debug_folder;
     string default_name;
     int data_type;
@@ -57,7 +58,9 @@ protected:
     std::vector<std::vector<float>> stblizedVarTrends;
     std::vector<float> variances;
     std::vector<std::size_t> number_cells;
-    std::vector<std::vector<std::size_t>> voxIdxList; // cell voxIdx list
+    //std::vector<std::vector<std::size_t>> voxIdxList; // cell voxIdx list
+
+    friend class cellTrackingMain;
 public:
     void init_parameter(){
         debug_folder = "/home/ccw/Desktop/embryo_res_folder/";

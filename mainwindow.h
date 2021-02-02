@@ -14,7 +14,7 @@
 #include "myglwidget.h"
 #include "raycasting/raycastcanvas.h"
 #include "cellsegmentation/cellsegment_main.h"
-
+#include "celltracking/celltracking_main.h"
 
 enum widget_type_choice {my_simple_test_type = 0, raycast_type = 1, vaa3d_type = 2};
 
@@ -73,6 +73,7 @@ public:
     //QString debugDataPath = QString("/home/ccw/Desktop/test_ims/cropped_16bit4speed/embryo_TM481.tif");
     QAction * debugButton;
     cellSegmentMain *cellSegmenter;
+    cellTrackingMain *cellTracker;
 public slots:
     void debugAlgorithm();
 

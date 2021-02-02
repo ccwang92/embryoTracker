@@ -251,5 +251,5 @@ void MainWindow::sendData4Segment()
 
 void MainWindow::sendData4Track()
 {
-
+    cellTracker = new cellTrackingMain(*cellSegmenter);
 }

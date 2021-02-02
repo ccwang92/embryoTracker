@@ -172,6 +172,7 @@ template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
 template <typename T> double chi2inv(T p, int df = 1);
 template <typename T> double gammacdf(T x, T a, T b, bool upper = true);
 template <typename T> void gammafit(vector<T> data, T &a, T &b);
+template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b);
 template <typename T> vector<T> vec_log(vector<T> data);
 
 template <typename T> T vec_stddev(vector<T> const & func);

@@ -863,7 +863,19 @@ void extractVoxIdxList(Mat *label3d, vector<vector<int>> &voxList, int numCC, bo
         }
     }
 }
-
+void extractVoxIdxList(vector<Mat> &label3d, vector<vector<size_t>> &voxList, vector<size_t> numCC){
+    long total_CC = accumulate(numCC.begin(), numCC.end(), 0);
+    voxList.resize(total_CC);
+    long increment = 0;
+    FOREACH_i(label3d){
+        increment += i > 0 ? numCC[i-1]:0;
+        FOREACH_j_MAT(label3d[i]){
+            if(label3d[i].at<int>(j) > 0){
+                voxList[label3d[i].at<int>(j)-1 + increment].push_back(j);
+            }
+        }
+    }
+}
 void extractVoxIdxGivenId(Mat *label3d, vector<size_t> &voxList, int id){
     for (size_t i = 0; i < label3d->total(); i++){
         if(label3d->at<int>(i) == id){
