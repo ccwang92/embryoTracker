@@ -51,6 +51,7 @@ HEADERS += data_importer.h \
     cellsegmentation/types_define.h \
     cellsegmentation/vol_basic_proc.hpp \
     celltracking/celltracking_main.h \
+    celltracking/dt3d.hpp \
     dialog_import_im_sequence.h \
     mainwindow.h \
     my4dimage.h \

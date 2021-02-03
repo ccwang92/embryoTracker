@@ -2214,6 +2214,64 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
         }
     }
 }
+
+
+/** distanceTransRegion2Region: distance transform between two regions
+ *
+ */
+float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
+                                                       bool *bw_mov_cell, vector<int> mov_range_xyz,
+                                                       vector<float> shift_xyz, vector<float> dist){
+    dist.resize(2);//distance from r1 to r2 and counter direction
+    // use the slightly edited mex-version previously designed for matlab
+    // for matlab, the matrix is saved in column-by-column
+    size_t *ref_sz_yxz = new size_t[3];
+    ref_sz_yxz[0] = ref_range_xyz[1];
+    ref_sz_yxz[1] = ref_range_xyz[0];
+    ref_sz_yxz[2] = ref_range_xyz[2];
+
+    size_t *mov_sz_yxz = new size_t[3];
+    mov_sz_yxz[0] = mov_range_xyz[1];
+    mov_sz_yxz[1] = mov_range_xyz[0];
+    mov_sz_yxz[2] = mov_range_xyz[2];
+
+    float *shift_yxz = new float[3];
+    shift_yxz[0] = shift_xyz[1];
+    shift_yxz[1] = shift_xyz[0];
+    shift_yxz[2] = shift_xyz[2];
+
+    size_t ref_l = sizeof(bw_ref_cell) / sizeof(bw_ref_cell[0]);
+    size_t mov_l = sizeof(bw_mov_cell) / sizeof(bw_mov_cell[0]);
+    // ref cell to mov cell
+    float *dist_voxwise = new float[mov_l];
+    dt3d(bw_ref_cell, ref_sz_yxz, mov_sz_yxz, shift_yxz, dist_voxwise);
+    double dist_sum = 0;
+    size_t valid_n = 0;
+    for(size_t i = 0; i < mov_l; i++){
+        if(bw_mov_cell[i]){
+            dist_sum += dist_voxwise[i];
+            valid_n ++;
+        }
+    }
+    dist[0] = dist_sum / valid_n;
+    // mov cell to ref cell
+    float *dist2_voxwise = new float[ref_l];
+    shift_yxz[0] = -shift_xyz[1];
+    shift_yxz[1] = -shift_xyz[0];
+    shift_yxz[2] = -shift_xyz[2];
+    dt3d(bw_mov_cell, mov_sz_yxz, ref_sz_yxz, shift_yxz, dist2_voxwise);
+    dist_sum = 0;
+    valid_n = 0;
+    for(size_t i = 0; i < ref_l; i++){
+        if(bw_ref_cell[i]){
+            dist_sum += dist_voxwise[i];
+            valid_n ++;
+        }
+    }
+    dist[1] = dist_sum / valid_n;
+
+    return MAX(dist[0], dist[1]);
+}
 /**************************Functions for debug*******************************/
 void ccShowSlice3Dmat(Mat src3d, int datatype, int slice, bool binary){
     ccShowSlice3Dmat(&src3d, datatype, slice, binary);

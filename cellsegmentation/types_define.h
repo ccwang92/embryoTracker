@@ -179,10 +179,13 @@ struct allCellsCensus{
     std::vector<int> labelInMap; //read id in label_maps
     std::vector<std::vector<size_t>> voxIdx;
     std::vector<std::vector<int>> vox_x, vox_y, vox_z;
+    std::vector<std::vector<int>> range_xyz;
+    std::vector<std::vector<int>> start_coord_xyz;
 //    std::vector<std::vector<nodeRelation>> neighbors; // candidate kids
 //    std::vector<singleCellCensus> cells;
     std::vector<nodeInfo> nodes;
     std::vector<std::vector<size_t>> tracks; //a set of node_ids
+    std::vector<std::vector<float>> frame_shift;
 //    std::vector<nodeInfoInTrack> particle2track; //particle2track in matlab
 //    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents
 };

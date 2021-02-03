@@ -26,6 +26,7 @@
 #include "maxflow_bk/graph.h" //max-flow BK algorithm
 
 #include "cc3d.hpp" //connected component
+#include "../celltracking/dt3d.hpp"
 
 using namespace cv;
 using namespace std;
@@ -114,6 +115,11 @@ bool isOnBoundary2d(Mat *fgMap, int r, int c, int z);
 void subVolExtract(Mat *src, int datatype, Mat &subVol, Range yxz_range[3]);
 void subVolReplace(Mat &src, int datatype, Mat &subVol, Range yxz_range[3], int start = 0);
 void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_range[3]);
+
+float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
+                                                       bool *bw_mov_cell, vector<int> mov_range_xyz,
+                                                       vector<float> shift_xyz, vector<float> dist);
+
 // fucntions for display
 void colorMapGen(Mat *src, Mat3b &colormap, String colorType = "HSV");
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
@@ -172,6 +178,7 @@ template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
 template <typename T> double chi2inv(T p, int df = 1);
 template <typename T> double gammacdf(T x, T a, T b, bool upper = true);
 template <typename T> void gammafit(vector<T> data, T &a, T &b);
+template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b);
 template <typename T> vector<T> vec_log(vector<T> data);
 
 template <typename T> T vec_stddev(vector<T> const & func);
@@ -197,6 +204,9 @@ template <typename T> void vec_unique(vector<T> & v);
 template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2);
 
 template <typename T> void mergeIntersectGroups(vector<vector<T>> &groups);
+
+
+
 #endif // IMG_BASIC_PROC_H
 
 

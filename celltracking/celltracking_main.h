@@ -9,6 +9,7 @@ public:
     cellTrackingMain(cellSegmentMain &cellSegment);
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
     void initTransitionCost(cellSegmentMain &cellSegment);
+    float voxelwise_avg_distance(size_t cell_curr, size_t cell_nei, float &c2n, float &n2c);
     void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
     void cellInfo2graph();
     ~cellTrackingMain(){};
