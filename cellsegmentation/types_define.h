@@ -107,7 +107,7 @@ struct trackParameter{
     float c_en;// cost of appearance and disappearance in the scene
     float c_ex;//
     float observationCost;// make sure detections are all included
-    float jumpCost[3];// how much we should punish jump frames
+    std::vector<float> jumpCost;// how much we should punish jump frames
     int varEstMethod; // median and independent
     int costCalMethod; //chi1Square:use 1df chi-squre, fisher: 2df chi-square,zscore: use z-score
     int validtrackLength4var;// tracks with smaller length will not be used to cal variance
@@ -132,12 +132,14 @@ struct trackParameter{
     bool considerBrokenCellOnly;// for linking allowing split/merge, does not consider nodes that has another good linkage already
     bool addCellMissingPart;// if a cell missed part, we want to detect it, otherwise we can remove seeds that highly overlapped with an existing cell
     bool splitMergeCost;// if cost of a+b->c is 20, then cost of a->c and b->c are set to 10 if true; otherwise both 20
+
+    int min_stable_node_cluster_sz; // if in the track, there are consistent low-cost linkages, label them as stable nodes. Such nodes should be correctly segmented.
 };
 
 // structures to save the detection infor
 struct nodeRelation{
     size_t node_id;
-    float dist_p2k, dist_k2p; // current to neighbor in next frames or in counter direction
+    float dist_c2n, dist_n2c; // current to neighbor in next frames or in counter direction
     long overlap_size;
     float link_cost;
 };
@@ -151,11 +153,15 @@ struct nodeInfo{
     size_t node_id;
     //directFamily family_members; // neighboring relationship, at most two kids or parents
     size_t parents[2];
+    float parent_cost[2];
     int parent_num = 0;
     size_t kids[2];
+    float kid_cost[2];
     int kid_num = 0;
     size_t nodeId2trackId, nodeLocInTrack;
+    float in_cost, out_cost, detect_confidence;
     std::vector<nodeRelation> neighbors; // candidate kids
+    std::vector<nodeRelation> preNeighbors; // candidate parents: it will not save dist_c2n and dist_n2c
 };
 //struct nodeInfoInTrack{
 //    size_t nodeId2trackId, nodeLocInTrack;
@@ -184,8 +190,10 @@ struct allCellsCensus{
 //    std::vector<std::vector<nodeRelation>> neighbors; // candidate kids
 //    std::vector<singleCellCensus> cells;
     std::vector<nodeInfo> nodes;
+    float ovGammaParam[2];
     std::vector<std::vector<size_t>> tracks; //a set of node_ids
     std::vector<std::vector<float>> frame_shift;
+    long long overall_neighbor_num;
 //    std::vector<nodeInfoInTrack> particle2track; //particle2track in matlab
 //    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents
 };

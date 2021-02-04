@@ -1,4 +1,5 @@
 #include "celltracking_main.h"
+#include "CINDA/src_c/cinda_funcs.c"
 
 cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment)
 {
@@ -107,23 +108,101 @@ float cellTrackingMain::voxelwise_avg_distance(size_t cell_curr, size_t cell_nei
     vector<float> dist(2);
     vector<float> shift_xyz(3);
     shift_xyz = vec_Minus(movieInfo.frame_shift[movieInfo.frames[cell_curr]], movieInfo.frame_shift[movieInfo.frames[cell_nei]]);
-    distanceTransRegion2Region(ref_cell, movieInfo.range_xyz[cell_curr],
+    float max_dist = distanceTransRegion2Region(ref_cell, movieInfo.range_xyz[cell_curr],
                                mov_cell, movieInfo.range_xyz[cell_nei],
                                shift_xyz, dist);
+    c2n = dist[0];
+    n2c = dist[1];
+    return max_dist;
+}
+/**
+ * @brief updatePreNeighborInfo: update the information of candidate parents of a node
+ */
+void cellTrackingMain::updatePreNeighborInfo(){
+    //// update the preNeighbors information
+    for (nodeInfo n : movieInfo.nodes){
+        for (nodeRelation neighbor : n.neighbors){
+            nodeRelation tmp;
+            tmp.node_id = n.node_id;
+            tmp.link_cost = neighbor.link_cost;
+            tmp.overlap_size = neighbor.overlap_size;
+            movieInfo.nodes[neighbor.node_id].preNeighbors.push_back(tmp); //pre-nei has no dist_c2n or dist_n2c
+        }
+    }
+}
+size_t cellTrackingMain::cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &cellSegment){
+    size_t overlap_sz = 0;
+    int curr_frame = movieInfo.frames[c0];
+    int curr_cell_label = movieInfo.labelInMap[c0];
+    for(size_t k : movieInfo.voxIdx[c1]){
+        if(cellSegment.cell_label_maps[curr_frame].at<int>(k) == curr_cell_label){
+            overlap_sz ++;
+        }
+    }
+    return overlap_sz;
+}
+/**
+ * @brief distance2cost
+ * @param distance
+ * @param alpha
+ * @param beta
+ * @param punish
+ * @return
+ */
+float cellTrackingMain::distance2cost(float distance, float alpha, float beta, float punish = 1){
+    float p = gammacdf(distance, alpha, beta);
+    float cost = normInv(p * punish / 2);
+    return cost*cost;
+}
+/**
+ * @brief calCell2neighborDistance: get the cell-cell voxelwise distance
+ * @return
+ */
+void cellTrackingMain::calCell2neighborDistance(vector<float> &nn_dist){
+    float max_dist;
+    nn_dist.resize(movieInfo.nodes.size());
+    size_t nn_dist_cnt = 0;
+    FOREACH_i(movieInfo.nodes){
+        nn_dist[nn_dist_cnt] = INFINITY;
+        FOREACH_j(movieInfo.nodes[i].neighbors){
+            // cal the distance between two nodes
+            max_dist = voxelwise_avg_distance(i, movieInfo.nodes[i].neighbors[j].node_id,
+                                              movieInfo.nodes[i].neighbors[j].dist_c2n,
+                                            movieInfo.nodes[i].neighbors[j].dist_n2c);
+            if (max_dist < nn_dist[nn_dist_cnt]){
+                nn_dist[nn_dist_cnt] = max_dist;
+            }
+        }
+        nn_dist_cnt ++;
+    }
+    nn_dist.resize(nn_dist_cnt);
 }
 /**
  * @brief initTransitionCost: initialize transition cost
  */
 void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
+    // discover the neighbors for each cell
+    movieInfo.overall_neighbor_num = 0;
     FOREACH_i(movieInfo.nodes){
+        movieInfo.nodes[i].detect_confidence = p4tracking.observationCost;
+        movieInfo.nodes[i].in_cost = p4tracking.c_en;
+        movieInfo.nodes[i].out_cost = p4tracking.c_ex;
         vector<size_t> nei_ids;
         extractNeighborIds(cellSegment.cell_label_maps, i, nei_ids);
+        if (nei_ids.size() < 1){
+            continue;
+        }
+        movieInfo.overall_neighbor_num += nei_ids.size();
         FOREACH_j(nei_ids){
-            // cal the distance between two nodes
-
+            movieInfo.nodes[i].neighbors[j].overlap_size = cellOverlapSize(i, nei_ids[j], cellSegment);
         }
     }
 
+    // calculate the distances between each cell and its neighbors
+    vector<float> nn_dist;
+    calCell2neighborDistance(nn_dist);
+    truncatedGammafit(nn_dist, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+    updateArcCost(); // calculate the link cost from given new gamma parameter
 }
 /**
  * @brief extractNeighborIds: for a given node idx, get its possible neighbors
@@ -132,7 +211,6 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
  * @param nei_idxs
  */
 void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs){
-
     for (size_t i = movieInfo.frames[cell_idx] + 1; i < cell_label_maps.size(); i++){
         unordered_set<int> nei_labels;
         FOREACH_j(movieInfo.voxIdx[cell_idx]){
@@ -148,6 +226,102 @@ void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t c
 /**
  * @brief cellInfo2graph: using the movieInfo to build the graph for CINDA
  */
-void cellTrackingMain::cellInfo2graph(){
+void cellTrackingMain::cellInfo2graph(vector<pair<size_t, float>> merge_node_idx = {}, vector<pair<size_t, float>> split_node_idx = {}){
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //      We directly use the interface I wrote for python with the following function name               //
+    // long long* pyCS2(long *msz, double *mtail, double *mhead, double *mlow, double *macap, double *mcost)//
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    long long m_append = merge_node_idx.size() + split_node_idx.size();
+    // build the graph without split and merge settings
+    long long n = 2*movieInfo.nodes.size() + 1; // # vertices in graph
+    long long m = movieInfo.overall_neighbor_num + 3*movieInfo.nodes.size() + m_append; // # arcs in graph
+    double *mtail = new double[m];
+    double *mhead = new double[m];
+    double *mlow = new double[m]; memset(mlow, 0, m);
+    double *macap = new double[m]; memset(macap, 1, m);
+    double *mcost = new double[m];
+
+    long long arc_cnt = 0;
+    double src_id = 1;
+    int rand_max = 100;
+    for(nodeInfo node : movieInfo.nodes){
+        // in arc
+        mtail[arc_cnt] = src_id;
+        mhead[arc_cnt] =  2 * node.node_id;
+        mcost[arc_cnt] = round(node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        arc_cnt ++;
+        // out arc
+        mhead[arc_cnt] = src_id;
+        mtail[arc_cnt] =  2 * node.node_id;
+        mcost[arc_cnt] = round(node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        arc_cnt ++;
+        // link with neighbors
+        for(nodeRelation neighbor : node.neighbors){
+            mtail[arc_cnt] = 2 * node.node_id;
+            mhead[arc_cnt] =  2 * neighbor.node_id;
+            mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+            arc_cnt ++;
+        }
+    }
+    // add the arcs of splitting and merging
+    if(m_append > 0){
+        for(pair<size_t, float> node_id_cost : merge_node_idx){
+            mtail[arc_cnt] = 2 * node_id_cost.first;
+            mhead[arc_cnt] =  src_id;
+            mcost[arc_cnt] = round(node_id_cost.second * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+            arc_cnt ++;
+        }
+
+        for(pair<size_t, float> node_id_cost : split_node_idx){
+            mtail[arc_cnt] = src_id;
+            mhead[arc_cnt] = 2 * node_id_cost.first + 1;
+            mcost[arc_cnt] = round(node_id_cost.second * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+            arc_cnt ++;
+        }
+    }
+    assert(arc_cnt == m);
+    long *msz = new long[3]; // should be long long, but for our data, long is enough
+    msz[0] = 12;
+    msz[1] = n;
+    msz[2] = m;
+
+    // call pyCS2
+    long long *track_vec = pyCS2(msz, mtail, mhead, mlow, macap, mcost);
+
+    // update movieInfo.tracks
+    vector<long long> cost;
+    vector<size_t> curr_track;
+    for(long long i = 1; i < track_vec[0] + 1; i++){
+        if(track_vec[i] > 0){
+            curr_track.push_back(track_vec[i]);
+        }
+        else{
+            cost.push_back(track_vec[i]);
+            vector<size_t> new_track;
+            for(size_t j = 0; j < curr_track.size(); j+=2){
+                new_track.push_back(size_t(curr_track[j] / 2));
+            }
+            movieInfo.tracks.push_back(new_track);
+        }
+    }
+}
+
+
+// functions to update cost given new gamma fitting results
+void cellTrackingMain::driftCorrection(){
+
+}
+void cellTrackingMain::updateGammaParam(){
+
+}
+void cellTrackingMain::updateArcCost(){
+    for(nodeInfo n : movieInfo.nodes){
+        for(nodeRelation &neighbor : n.neighbors){
+            neighbor.link_cost = distance2cost(MAX(neighbor.dist_c2n, neighbor.dist_n2c),
+                                               movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+        }
+    }
+}
+void cellTrackingMain::stableArcFixed(){
 
 }

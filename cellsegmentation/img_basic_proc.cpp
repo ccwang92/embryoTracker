@@ -2240,8 +2240,8 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
     shift_yxz[1] = shift_xyz[0];
     shift_yxz[2] = shift_xyz[2];
 
-    size_t ref_l = sizeof(bw_ref_cell) / sizeof(bw_ref_cell[0]);
-    size_t mov_l = sizeof(bw_mov_cell) / sizeof(bw_mov_cell[0]);
+    size_t ref_l = ref_range_xyz[0]*ref_range_xyz[1]*ref_range_xyz[2];
+    size_t mov_l = mov_range_xyz[0]*mov_range_xyz[1]*mov_range_xyz[2];
     // ref cell to mov cell
     float *dist_voxwise = new float[mov_l];
     dt3d(bw_ref_cell, ref_sz_yxz, mov_sz_yxz, shift_yxz, dist_voxwise);

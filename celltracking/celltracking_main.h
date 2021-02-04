@@ -10,8 +10,18 @@ public:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
     void initTransitionCost(cellSegmentMain &cellSegment);
     float voxelwise_avg_distance(size_t cell_curr, size_t cell_nei, float &c2n, float &n2c);
+    void updatePreNeighborInfo();
+    size_t cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &cellSegment);
+    void calCell2neighborDistance(vector<float> &nn_dist);
+    float distance2cost(float distance, float alpha, float beta, float punish);
     void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
-    void cellInfo2graph();
+    void cellInfo2graph(vector<pair<size_t, float>> merge_node_idx, vector<pair<size_t, float>> split_node_idx);
+
+    // functions to update cost given new gamma fitting results
+    void driftCorrection();
+    void updateGammaParam();
+    void updateArcCost();
+    void stableArcFixed();
     ~cellTrackingMain(){};
 
 private:
@@ -34,10 +44,11 @@ public:
         //p4tracking.maxEdgeNum = 4; at most check maxEdgeNum following or previous edges
         p4tracking.timeJump = false; // Consier the jump x5 = x4+v*(t5-t4) , t5-t4 may not be 1
         p4tracking.initEnter = 100; // initial enter/exit cost, force every node link to its neighbor
-        //p4tracking.realEnter = chi2inv(1-0.01/cell_num, 1)/2; // 12.3546 is from chi2inv(1-0.01/particleNum) / 2
+        p4tracking.realEnter = chi2inv(1-0.01/cell_num, 1)/2; // 12.3546 is from chi2inv(1-0.01/particleNum) / 2
         p4tracking.c_en = p4tracking.realEnter;// cost of appearance and disappearance in the scene
         p4tracking.c_ex = p4tracking.c_en;
         p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex); // make sure detections are all included
+        p4tracking.jumpCost.resize(p4tracking.k);
         p4tracking.jumpCost[0] = -1;
         p4tracking.jumpCost[1] = -1;
         p4tracking.jumpCost[2] = -1;
@@ -65,6 +76,7 @@ public:
         p4tracking.considerBrokenCellOnly = true; // for linking allowing split/merge, does not consider nodes that has another good linkage already
         p4tracking.addCellMissingPart = false; // if a cell missed part, we want to detect it, otherwise we can remove seeds that highly overlapped with an existing cell
         p4tracking.splitMergeCost = true;// if cost of a+b->c is 20, then cost of a->c and b->c are set to 10 if true; otherwise both 20
+        p4tracking.min_stable_node_cluster_sz = 5;
 
         ////update cost of p4seg
         p4seg.validTrackLength = 0; // the shortest path we want, cells in other tracks will be removed
