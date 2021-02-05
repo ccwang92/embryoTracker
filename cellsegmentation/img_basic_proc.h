@@ -340,6 +340,26 @@ template <typename T> float vec_mean(vector<T> const & func)
 {
     return (float)(accumulate(func.begin(), func.end(), 0.0) / func.size());
 }
+template <typename T> float vec_median(vector<T> const & len){
+    assert(!len.empty());
+    if (len.size() % 2 == 0) {
+        const auto median_it1 = len.begin() + len.size() / 2 - 1;
+        const auto median_it2 = len.begin() + len.size() / 2;
+
+        std::nth_element(len.begin(), median_it1 , len.end());
+        const auto e1 = *median_it1;
+
+        std::nth_element(len.begin(), median_it2 , len.end());
+        const auto e2 = *median_it2;
+
+        return (e1 + e2) / 2;
+
+    } else {
+        const auto median_it = len.begin() + len.size() / 2;
+        std::nth_element(len.begin(), median_it , len.end());
+        return *median_it;
+    }
+}
 template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx){
     auto max_val_it = max_element(func.begin(), func.end());
     max_val_idx = distance(func.begin(), max_val_it);
@@ -350,7 +370,12 @@ template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx){
     min_val_idx = distance(func.begin(), min_val_it);
     return *min_val_it;
 }
-
+template <typename T> T vec_max(vector<T> const &func){
+    return *max_element(func.begin(), func.end());
+}
+template <typename T> T vec_min(vector<T> const &func){
+    return *min_element(func.begin(), func.end());
+}
 template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     double sum = 0.0;

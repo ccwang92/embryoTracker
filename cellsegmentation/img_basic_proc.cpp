@@ -2221,7 +2221,7 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
  */
 float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        bool *bw_mov_cell, vector<int> mov_range_xyz,
-                                                       vector<float> shift_xyz, vector<float> dist){
+                                                       vector<double> shift_xyz, vector<float> dist){
     dist.resize(2);//distance from r1 to r2 and counter direction
     // use the slightly edited mex-version previously designed for matlab
     // for matlab, the matrix is saved in column-by-column

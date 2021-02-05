@@ -162,6 +162,7 @@ struct nodeInfo{
     float in_cost, out_cost, detect_confidence;
     std::vector<nodeRelation> neighbors; // candidate kids
     std::vector<nodeRelation> preNeighbors; // candidate parents: it will not save dist_c2n and dist_n2c
+    int stable_status;
 };
 //struct nodeInfoInTrack{
 //    size_t nodeId2trackId, nodeLocInTrack;
@@ -189,11 +190,12 @@ struct allCellsCensus{
     std::vector<std::vector<int>> start_coord_xyz;
 //    std::vector<std::vector<nodeRelation>> neighbors; // candidate kids
 //    std::vector<singleCellCensus> cells;
-    std::vector<nodeInfo> nodes;
     float ovGammaParam[2];
-    std::vector<std::vector<size_t>> tracks; //a set of node_ids
-    std::vector<std::vector<float>> frame_shift;
+    std::vector<std::vector<double>> frame_shift_xyz;
     long long overall_neighbor_num;
+    std::vector<nodeInfo> nodes;
+    std::vector<std::vector<size_t>> tracks; //a set of node_ids
+    std::vector<float[3]> track_arcs_avg_mid_std;
 //    std::vector<nodeInfoInTrack> particle2track; //particle2track in matlab
 //    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents
 };

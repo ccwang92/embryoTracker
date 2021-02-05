@@ -42,6 +42,8 @@ enum trackingVarEstMethod {tve_INDEPENDENT = 0, tve_MEDIAN};
 enum costCalMethod {ccm_CHI1SQUARE = 0, ccm_FISHER, ccm_ZSCORE};
 enum priorDistrType {pri_GAUSS = 0, pri_WEIGHTEDAVG, pri_GAMMA};
 enum slitMergeHandleMethods {NOJUMPALL = 0, NOJUMP, NOT_DECIDE};
+
+enum segmentStableStatus {NOT_STABLE = -1, STABLE_TRACK_HEAD, STABLE_TRACK_MID, STABLE_TRACK_END};
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)
@@ -118,7 +120,7 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
 
 float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        bool *bw_mov_cell, vector<int> mov_range_xyz,
-                                                       vector<float> shift_xyz, vector<float> dist);
+                                                       vector<double> shift_xyz, vector<float> dist);
 
 // fucntions for display
 void colorMapGen(Mat *src, Mat3b &colormap, String colorType = "HSV");
@@ -175,17 +177,20 @@ template <typename T> T zscore2pvalue(T z);
 template <typename T> T pvalue2zscore(T p);
 template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
 
-template <typename T> double chi2inv(T p, int df = 1);
-template <typename T> double gammacdf(T x, T a, T b, bool upper = true);
-template <typename T> void gammafit(vector<T> data, T &a, T &b);
-template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b);
+template <typename T> double chi2inv(T p, int df = 1); // inverse chi-square distribution
+template <typename T> double gammacdf(T x, T a, T b, bool upper = true); // gamma cdf function
+template <typename T> void gammafit(vector<T> data, T &a, T &b);// gamma fitting use MLE
+template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b); // not done
 template <typename T> vector<T> vec_log(vector<T> data);
 
 template <typename T> T vec_stddev(vector<T> const & func);
 template <typename T> T vec_variance(vector<T> const & func);
 template <typename T> float vec_mean(vector<T> const & func);
+template <typename T> float vec_median(vector<T> const & func);
 template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx);
 template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx);
+template <typename T> T vec_max(vector<T> const &func);
+template <typename T> T vec_min(vector<T> const &func);
 template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx);
 template <typename T> vector<size_t> sort_indexes(const vector<T> &v, bool ascending = true, size_t start_id = 0);
 template <typename T> T ttest2(vector<T> arr1, vector<T> arr2);
