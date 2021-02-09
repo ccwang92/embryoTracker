@@ -149,6 +149,13 @@ struct nodeRelation{
 //    simpleCell kids[2];
 //    int kid_num = 0;
 //};
+struct splitMergeNodeInfo{
+    bool parent_flag; // true means, this node is the parent of two family nodes, otherwise kid.
+    size_t node_id;
+    size_t family_nodes[2];
+    float link_costs[2];
+};
+
 struct nodeInfo{
     size_t node_id;
     //directFamily family_members; // neighboring relationship, at most two kids or parents
@@ -179,6 +186,14 @@ struct singleCellCensus{
     //directFamily family_members; // neighboring relationship, at most two kids or parents
 };
 
+struct combinedCellsCensus{
+    std::vector<size_t> node_ids; //
+    int frame;
+    std::vector<size_t> voxIdx;
+    std::vector<int> vox_x, vox_y, vox_z;
+    std::vector<int> range_xyz;
+    std::vector<int> start_coord_xyz;
+};
 
 struct allCellsCensus{
     std::vector<float> xCoord, yCoord, zCoord;

@@ -11,7 +11,20 @@ public:
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
     void initTransitionCost(cellSegmentMain &cellSegment);
+
+    // distance calculation
     float voxelwise_avg_distance(size_t cell_curr, size_t cell_nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(vector<size_t> &joint_cells_curr, vector<size_t> &joint_cells_nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(size_t cell_curr, vector<size_t> &joint_cells_nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(vector<size_t> &joint_cells_curr, size_t cell_nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(combinedCellsCensus &curr, combinedCellsCensus &nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(size_t curr, combinedCellsCensus &nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(combinedCellsCensus &curr, size_t nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vector<int> &curr_vox_x, vector<int> &curr_vox_y,
+                                 vector<int> &curr_vox_z, vector<int> &curr_range_xyz, vector<int> &curr_start_coord_xyz, int curr_frame,
+                                 vector<size_t> &nei_voxIdx, vector<int> &nei_vox_x, vector<int> &nei_vox_y,
+                                 vector<int> &nei_vox_z, vector<int> &nei_range_xyz, vector<int> &nei_start_coord_xyz, int nei_frame,
+                                 float &c2n, float &n2c);
     void updatePreNeighborInfo();
     size_t cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &cellSegment);
     void calCell2neighborDistance(vector<float> &nn_dist);
@@ -29,10 +42,18 @@ private:
     void updateArcCost();
     void getArcCostOne2OneTrack(size_t track_id, vector<float> &arc_costs);
     void stableSegmentFixed();
-private:
+    void movieInfoUpate();
+private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
-private:
+    void handleMergeSplitRegions();
+    void detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info);
+    void combineCellsIntoOneRegion(vector<size_t> &cell_idxes, combinedCellsCensus &out_region_info);
+    float bestPeerCandidate(size_t node_id, vector<size_t> &bestPeer, bool parent_flag);
+    void peerRegionVerify(size_t mergedReg_id, size_t peerReg_ids[2], bool post_flag);
+    void regionRefresh(cellSegmentMain &cellSegment);
+private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
+
 private:
     allCellsCensus movieInfo;
     trackParameter p4tracking;

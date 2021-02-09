@@ -75,46 +75,249 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
 }
 /**
  * @brief voxelwise_avg_distance: use matlab's matrix indexing method
- * @param cell_curr
- * @param cell_nei
+ * @param cell_curr: id of current cell
+ * @param cell_nei: id of neighbor cell
+ * @param c2n: distance from cell_curr to cell_nei
+ * @param n2c: distance from cell_nei to cell_curr
+ * @return
+ */
+float cellTrackingMain::voxelwise_avg_distance(size_t cell_curr, size_t cell_nei, float &c2n, float &n2c){
+//    bool *ref_cell = new bool[movieInfo.voxIdx[cell_curr].size()];
+//    memset(ref_cell, false, movieInfo.voxIdx[cell_curr].size());
+//    size_t idx;
+//    size_t frame_sz = movieInfo.range_xyz[cell_curr][0] * movieInfo.range_xyz[cell_curr][1];
+//    for(size_t i = 0; i < movieInfo.voxIdx[cell_curr].size(); i++){
+//        idx = (movieInfo.vox_z[cell_curr][i] - movieInfo.start_coord_xyz[cell_curr][2]) * frame_sz +
+//               (movieInfo.vox_x[cell_curr][i] - movieInfo.start_coord_xyz[cell_curr][0]) * movieInfo.range_xyz[cell_curr][1] +
+//                movieInfo.vox_y[cell_curr][i] - movieInfo.start_coord_xyz[cell_curr][1];
+//        ref_cell[idx] = true;
+//    }
+//    bool *mov_cell = new bool[movieInfo.voxIdx[cell_nei].size()];
+//    memset(mov_cell, false, movieInfo.voxIdx[cell_nei].size());
+//    frame_sz = movieInfo.range_xyz[cell_nei][0] * movieInfo.range_xyz[cell_nei][1];
+//    for(size_t i = 0; i < movieInfo.voxIdx[cell_nei].size(); i++){
+//        idx = (movieInfo.vox_z[cell_nei][i] - movieInfo.start_coord_xyz[cell_nei][2]) * frame_sz +
+//               (movieInfo.vox_x[cell_nei][i] - movieInfo.start_coord_xyz[cell_nei][0]) * movieInfo.range_xyz[cell_nei][1] +
+//                movieInfo.vox_y[cell_nei][i] - movieInfo.start_coord_xyz[cell_nei][1];
+//        mov_cell[idx] = true;
+//    }
+//    vector<float> dist(2);
+//    vector<double> shift_xyz(3); // the true shift from ref cell to mov cell (:nei_start-ref_start-drift)
+//    shift_xyz = vec_Minus(movieInfo.frame_shift_xyz[movieInfo.frames[cell_curr]],
+//            movieInfo.frame_shift_xyz[movieInfo.frames[cell_nei]]); //this is -drift
+//    shift_xyz[0] += vec_min(movieInfo.vox_x[cell_nei]) - vec_min(movieInfo.vox_x[cell_curr]);
+//    shift_xyz[1] += vec_min(movieInfo.vox_y[cell_nei]) - vec_min(movieInfo.vox_y[cell_curr]);
+//    shift_xyz[2] += vec_min(movieInfo.vox_z[cell_nei]) - vec_min(movieInfo.vox_z[cell_curr]);
+//    float max_dist = distanceTransRegion2Region(ref_cell, movieInfo.range_xyz[cell_curr],
+//                               mov_cell, movieInfo.range_xyz[cell_nei],
+//                               shift_xyz, dist);
+//    c2n = dist[0];
+//    n2c = dist[1];
+//    return max_dist;
+
+    return voxelwise_avg_distance(movieInfo.voxIdx[cell_curr], movieInfo.vox_x[cell_curr], movieInfo.vox_y[cell_curr],
+                                  movieInfo.vox_z[cell_curr], movieInfo.range_xyz[cell_curr], movieInfo.start_coord_xyz[cell_curr],
+                                  movieInfo.frames[cell_curr], movieInfo.voxIdx[cell_nei], movieInfo.vox_x[cell_nei], movieInfo.vox_y[cell_nei],
+                                  movieInfo.vox_z[cell_nei], movieInfo.range_xyz[cell_nei], movieInfo.start_coord_xyz[cell_nei],
+                                  movieInfo.frames[cell_nei], c2n, n2c);
+}
+
+/**
+ * @brief voxelwise_avg_distance: the distance between two regions, each region contains >=1 cells
+ * @param joint_cells_curr
+ * @param joint_cells_nei
  * @param c2n
  * @param n2c
  * @return
  */
-float cellTrackingMain::voxelwise_avg_distance(size_t cell_curr, size_t cell_nei, float &c2n, float &n2c){
-    bool *ref_cell = new bool[movieInfo.voxIdx[cell_curr].size()];
-    memset(ref_cell, false, movieInfo.voxIdx[cell_curr].size());
+float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &joint_cells_curr, vector<size_t> &joint_cells_nei, float &c2n, float &n2c){
+    combinedCellsCensus curr_joint_reg, nei_joint_reg;
+    combineCellsIntoOneRegion(joint_cells_curr, curr_joint_reg);
+    combineCellsIntoOneRegion(joint_cells_nei, nei_joint_reg);
+    return voxelwise_avg_distance(curr_joint_reg, nei_joint_reg, c2n, n2c);
+}
+
+float cellTrackingMain::voxelwise_avg_distance(size_t cell_curr, vector<size_t> &joint_cells_nei, float &c2n, float &n2c){
+    combinedCellsCensus nei_joint_reg;
+    combineCellsIntoOneRegion(joint_cells_nei, nei_joint_reg);
+    return voxelwise_avg_distance(cell_curr, nei_joint_reg, c2n, n2c);
+}
+float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &joint_cells_curr, size_t cell_nei, float &c2n, float &n2c){
+    return voxelwise_avg_distance(cell_nei, joint_cells_curr, n2c, c2n);
+}
+/**
+ * @brief voxelwise_avg_distance
+ * @param curr
+ * @param nei
+ * @param c2n
+ * @param n2c
+ * @return
+ */
+float cellTrackingMain::voxelwise_avg_distance(combinedCellsCensus &curr, combinedCellsCensus &nei, float &c2n, float &n2c){
+//    bool *ref_cell = new bool[curr.voxIdx.size()];
+//    memset(ref_cell, false, curr.voxIdx.size());
+//    size_t idx;
+//    size_t frame_sz = curr.range_xyz[0] * curr.range_xyz[1];
+//    for(size_t i = 0; i < curr.voxIdx.size(); i++){
+//        idx = (curr.vox_z[i] - curr.start_coord_xyz[2]) * frame_sz +
+//               (curr.vox_x[i] - curr.start_coord_xyz[0]) * curr.range_xyz[1] +
+//                curr.vox_y[i] - curr.start_coord_xyz[1];
+//        ref_cell[idx] = true;
+//    }
+//    bool *mov_cell = new bool[nei.voxIdx.size()];
+//    memset(mov_cell, false, nei.voxIdx.size());
+//    frame_sz = nei.range_xyz[0] * nei.range_xyz[1];
+//    for(size_t i = 0; i < nei.voxIdx.size(); i++){
+//        idx = (nei.vox_z[i] - nei.start_coord_xyz[2]) * frame_sz +
+//               (nei.vox_x[i] - nei.start_coord_xyz[0]) * nei.range_xyz[1] +
+//                nei.vox_y[i] - nei.start_coord_xyz[1];
+//        mov_cell[idx] = true;
+//    }
+//    vector<float> dist(2);
+//    vector<double> shift_xyz(3); // the true shift from ref cell to mov cell (:nei_start-ref_start-drift)
+//    shift_xyz = vec_Minus(movieInfo.frame_shift_xyz[curr.frame],
+//            movieInfo.frame_shift_xyz[nei.frame]); //this is -drift
+//    shift_xyz[0] += vec_min(nei.vox_x) - vec_min(curr.vox_x);
+//    shift_xyz[1] += vec_min(nei.vox_y) - vec_min(curr.vox_y);
+//    shift_xyz[2] += vec_min(nei.vox_z) - vec_min(curr.vox_z);
+//    float max_dist = distanceTransRegion2Region(ref_cell, curr.range_xyz,
+//                               mov_cell, nei.range_xyz,
+//                               shift_xyz, dist);
+//    c2n = dist[0];
+//    n2c = dist[1];
+//    return max_dist;
+
+    return voxelwise_avg_distance(curr.voxIdx, curr.vox_x, curr.vox_y, curr.vox_z, curr.range_xyz,
+                                  curr.start_coord_xyz, curr.frame,
+                                  nei.voxIdx, nei.vox_x, nei.vox_y, nei.vox_z, nei.range_xyz,
+                                  nei.start_coord_xyz, nei.frame,
+                                  c2n, n2c);
+}
+/**
+ * @brief voxelwise_avg_distance
+ * @param curr
+ * @param nei
+ * @param c2n
+ * @param n2c
+ * @return
+ */
+float cellTrackingMain::voxelwise_avg_distance(size_t curr, combinedCellsCensus &nei, float &c2n, float &n2c){
+//    voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vector<int> &curr_vox_x, vector<int> &curr_vox_y,
+//                                 vector<int> &curr_vox_z, vector<int> &curr_range_xyz, vector<int> &curr_start_coord_xyz, int curr_frame,
+//                                 vector<size_t> &nei_voxIdx, vector<int> &nei_vox_x, vector<int> &nei_vox_y,
+//                                 vector<int> &nei_vox_z, vector<int> &nei_range_xyz, vector<int> &nei_start_coord_xyz, int nei_frame,
+//                                 float &c2n, float &n2c)
+    return voxelwise_avg_distance(movieInfo.voxIdx[curr], movieInfo.vox_x[curr], movieInfo.vox_y[curr],
+                                  movieInfo.vox_z[curr], movieInfo.range_xyz[curr], movieInfo.start_coord_xyz[curr],
+                                  movieInfo.frames[curr], nei.voxIdx, nei.vox_x, nei.vox_y, nei.vox_z, nei.range_xyz,
+                                  nei.start_coord_xyz, nei.frame, c2n, n2c);
+}
+/**
+ * @brief voxelwise_avg_distance
+ * @param curr
+ * @param nei
+ * @param c2n
+ * @param n2c
+ * @return
+ */
+float cellTrackingMain::voxelwise_avg_distance(combinedCellsCensus &curr, size_t nei, float &c2n, float &n2c){
+    return voxelwise_avg_distance(nei, curr, n2c, c2n);
+}
+/**
+ * @brief voxelwise_avg_distance: the final function to calculate the vox-wise distance between two regions
+ * @param curr_voxIdx
+ * @param curr_vox_x
+ * @param curr_vox_y
+ * @param curr_vox_z
+ * @param curr_range_xyz
+ * @param curr_start_coord_xyz
+ * @param curr_frame
+ * @param nei_voxIdx
+ * @param nei_vox_x
+ * @param nei_vox_y
+ * @param nei_vox_z
+ * @param nei_range_xyz
+ * @param nei_start_coord_xyz
+ * @param nei_frame
+ * @param c2n
+ * @param n2c
+ * @return
+ */
+float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vector<int> &curr_vox_x, vector<int> &curr_vox_y,
+                             vector<int> &curr_vox_z, vector<int> &curr_range_xyz, vector<int> &curr_start_coord_xyz, int curr_frame,
+                             vector<size_t> &nei_voxIdx, vector<int> &nei_vox_x, vector<int> &nei_vox_y,
+                             vector<int> &nei_vox_z, vector<int> &nei_range_xyz, vector<int> &nei_start_coord_xyz, int nei_frame,
+                             float &c2n, float &n2c){
+    bool *ref_cell = new bool[curr_voxIdx.size()];
+    memset(ref_cell, false, curr_voxIdx.size());
     size_t idx;
-    size_t frame_sz = movieInfo.range_xyz[cell_curr][0] * movieInfo.range_xyz[cell_curr][1];
-    for(size_t i = 0; i < movieInfo.voxIdx[cell_curr].size(); i++){
-        idx = (movieInfo.vox_z[cell_curr][i] - movieInfo.start_coord_xyz[cell_curr][2]) * frame_sz +
-               (movieInfo.vox_x[cell_curr][i] - movieInfo.start_coord_xyz[cell_curr][0]) * movieInfo.range_xyz[cell_curr][1] +
-                movieInfo.vox_y[cell_curr][i] - movieInfo.start_coord_xyz[cell_curr][1];
+    size_t frame_sz = curr_range_xyz[0] * curr_range_xyz[1];
+    for(size_t i = 0; i < curr_voxIdx.size(); i++){
+        idx = (curr_vox_z[i] - curr_start_coord_xyz[2]) * frame_sz +
+               (curr_vox_x[i] - curr_start_coord_xyz[0]) * curr_range_xyz[1] +
+                curr_vox_y[i] - curr_start_coord_xyz[1];
         ref_cell[idx] = true;
     }
-    bool *mov_cell = new bool[movieInfo.voxIdx[cell_nei].size()];
-    memset(mov_cell, false, movieInfo.voxIdx[cell_nei].size());
-    frame_sz = movieInfo.range_xyz[cell_nei][0] * movieInfo.range_xyz[cell_nei][1];
-    for(size_t i = 0; i < movieInfo.voxIdx[cell_nei].size(); i++){
-        idx = (movieInfo.vox_z[cell_nei][i] - movieInfo.start_coord_xyz[cell_nei][2]) * frame_sz +
-               (movieInfo.vox_x[cell_nei][i] - movieInfo.start_coord_xyz[cell_nei][0]) * movieInfo.range_xyz[cell_nei][1] +
-                movieInfo.vox_y[cell_nei][i] - movieInfo.start_coord_xyz[cell_nei][1];
+    bool *mov_cell = new bool[nei_voxIdx.size()];
+    memset(mov_cell, false, nei_voxIdx.size());
+    frame_sz = nei_range_xyz[0] * nei_range_xyz[1];
+    for(size_t i = 0; i < nei_voxIdx.size(); i++){
+        idx = (nei_vox_z[i] - nei_start_coord_xyz[2]) * frame_sz +
+               (nei_vox_x[i] - nei_start_coord_xyz[0]) * nei_range_xyz[1] +
+                nei_vox_y[i] - nei_start_coord_xyz[1];
         mov_cell[idx] = true;
     }
     vector<float> dist(2);
     vector<double> shift_xyz(3); // the true shift from ref cell to mov cell (:nei_start-ref_start-drift)
-    shift_xyz = vec_Minus(movieInfo.frame_shift_xyz[movieInfo.frames[cell_curr]],
-            movieInfo.frame_shift_xyz[movieInfo.frames[cell_nei]]); //this is -drift
-    shift_xyz[0] += vec_min(movieInfo.vox_x[cell_nei]) - vec_min(movieInfo.vox_x[cell_curr]);
-    shift_xyz[1] += vec_min(movieInfo.vox_y[cell_nei]) - vec_min(movieInfo.vox_y[cell_curr]);
-    shift_xyz[2] += vec_min(movieInfo.vox_z[cell_nei]) - vec_min(movieInfo.vox_z[cell_curr]);
-    float max_dist = distanceTransRegion2Region(ref_cell, movieInfo.range_xyz[cell_curr],
-                               mov_cell, movieInfo.range_xyz[cell_nei],
+    shift_xyz = vec_Minus(movieInfo.frame_shift_xyz[curr_frame],
+            movieInfo.frame_shift_xyz[nei_frame]); //this is -drift
+    shift_xyz[0] += vec_min(nei_vox_x) - vec_min(curr_vox_x);
+    shift_xyz[1] += vec_min(nei_vox_y) - vec_min(curr_vox_y);
+    shift_xyz[2] += vec_min(nei_vox_z) - vec_min(curr_vox_z);
+    float max_dist = distanceTransRegion2Region(ref_cell, curr_range_xyz,
+                               mov_cell, nei_range_xyz,
                                shift_xyz, dist);
     c2n = dist[0];
     n2c = dist[1];
     return max_dist;
 }
+
+/**
+ * @brief combineCellsIntoOneRegion: make a region by joining several cells
+ * @param cell_idxes
+ * @param out_region_info
+ */
+void cellTrackingMain::combineCellsIntoOneRegion(vector<size_t> &cell_idxes, combinedCellsCensus &out_region_info){
+    out_region_info.frame = movieInfo.frames[cell_idxes[0]];
+    out_region_info.start_coord_xyz.resize(3);
+    fill(out_region_info.range_xyz.begin(), out_region_info.range_xyz.end(), -1);
+
+    for(size_t n : cell_idxes){
+        out_region_info.voxIdx.insert(out_region_info.voxIdx.end(), movieInfo.voxIdx[n].begin(), movieInfo.voxIdx[n].end());
+        out_region_info.vox_x.insert(out_region_info.vox_x.end(), movieInfo.vox_x[n].begin(), movieInfo.vox_x[n].end());
+        out_region_info.vox_y.insert(out_region_info.vox_y.end(), movieInfo.vox_y[n].begin(), movieInfo.vox_y[n].end());
+        out_region_info.vox_z.insert(out_region_info.vox_z.end(), movieInfo.vox_z[n].begin(), movieInfo.vox_z[n].end());
+
+        if(out_region_info.range_xyz[0] == -1){
+            out_region_info.range_xyz = movieInfo.range_xyz[n];
+            out_region_info.start_coord_xyz =  movieInfo.start_coord_xyz[n];
+        }else{
+            if(movieInfo.start_coord_xyz[n][0] < out_region_info.start_coord_xyz[0]){
+                out_region_info.range_xyz[0] += (out_region_info.start_coord_xyz[0] - movieInfo.start_coord_xyz[n][0]);
+                out_region_info.start_coord_xyz[0] = movieInfo.start_coord_xyz[n][0];
+            }
+            if(movieInfo.start_coord_xyz[n][1] < out_region_info.start_coord_xyz[1]){
+                out_region_info.range_xyz[1] += (out_region_info.start_coord_xyz[1] - movieInfo.start_coord_xyz[n][1]);
+                out_region_info.start_coord_xyz[1] = movieInfo.start_coord_xyz[n][1];
+            }
+            if(movieInfo.start_coord_xyz[n][2] < out_region_info.start_coord_xyz[2]){
+                out_region_info.range_xyz[2] += (out_region_info.start_coord_xyz[2] - movieInfo.start_coord_xyz[n][2]);
+                out_region_info.start_coord_xyz[2] = movieInfo.start_coord_xyz[n][2];
+            }
+        }
+    }
+}
+
 /**
  * @brief updatePreNeighborInfo: update the information of candidate parents of a node
  */
@@ -257,7 +460,7 @@ void cellTrackingMain::mccTracker(vector<pair<size_t, float>> merge_node_idx, ve
     long long m_append = merge_node_idx.size() + split_node_idx.size();
     // build the graph without split and merge settings
     long long n = 2*movieInfo.nodes.size() + 1; // # vertices in graph
-    long long m = movieInfo.overall_neighbor_num + 3*movieInfo.nodes.size() + m_append; // # arcs in graph
+    long long m = movieInfo.overall_neighbor_num + 3*movieInfo.nodes.size() + m_append; // # arcs in graph (upper bound)
     double *mtail = new double[m];
     double *mhead = new double[m];
     double *mlow = new double[m]; memset(mlow, 0, m);
@@ -267,6 +470,10 @@ void cellTrackingMain::mccTracker(vector<pair<size_t, float>> merge_node_idx, ve
     long long arc_cnt = 0;
     double src_id = 1;
     int rand_max = 100;
+    bool link_adj_frs = false;
+    if(p4tracking.splitMergeHandle == NOJUMPALL && m_append > 0){
+        link_adj_frs = true;
+    }
     for(nodeInfo node : movieInfo.nodes){
         // in arc
         mtail[arc_cnt] = src_id;
@@ -279,11 +486,23 @@ void cellTrackingMain::mccTracker(vector<pair<size_t, float>> merge_node_idx, ve
         mcost[arc_cnt] = round(node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // link with neighbors
-        for(nodeRelation neighbor : node.neighbors){
-            mtail[arc_cnt] = 2 * node.node_id;
-            mhead[arc_cnt] =  2 * neighbor.node_id;
-            mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
-            arc_cnt ++;
+        if(link_adj_frs){
+            int curr_frame = movieInfo.frames[node.node_id];
+            for(nodeRelation neighbor : node.neighbors){
+                if(movieInfo.frames[neighbor.node_id]-1 == curr_frame){
+                    mtail[arc_cnt] = 2 * node.node_id;
+                    mhead[arc_cnt] =  2 * neighbor.node_id;
+                    mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                    arc_cnt ++;
+                }
+            }
+        }else{
+            for(nodeRelation neighbor : node.neighbors){
+                mtail[arc_cnt] = 2 * node.node_id;
+                mhead[arc_cnt] =  2 * neighbor.node_id;
+                mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+            }
         }
     }
     // add the arcs of splitting and merging
@@ -302,13 +521,14 @@ void cellTrackingMain::mccTracker(vector<pair<size_t, float>> merge_node_idx, ve
             arc_cnt ++;
         }
     }
-    assert(arc_cnt == m);
+    //assert(arc_cnt == m);
     long *msz = new long[3]; // should be long long, but for our data, long is enough
     msz[0] = 12;
     msz[1] = n;
-    msz[2] = m;
+    //msz[2] = m;
+    msz[2] = arc_cnt; // m is the upper bound
 
-    // call pyCS2
+    // call pyCS2: note, everything needs to be very precise
     long long *track_vec = pyCS2(msz, mtail, mhead, mlow, macap, mcost);
 
     // update movieInfo.tracks
@@ -557,10 +777,103 @@ void cellTrackingMain::stableSegmentFixed(){
         }
     }
 }
+/**
+ * @brief bestPeerCandidate: given a region id, find if there are two regions that can together fit into its territory
+ * @param node_id
+ * @param bestPeer
+ * @param parent_flag
+ */
+float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &bestPeer, bool parent_flag){
+    vector<size_t> peerCandidates(0);
+    bestPeer.resize(0);
+    if(parent_flag && movieInfo.nodes[node_id].neighbors.size() >= 2){
+        float curr_cost;
+        bool currBest;
+        for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
+            curr_cost = neighbor.dist_c2n;
+            currBest = true;
+            for(nodeRelation preNeighbor : movieInfo.nodes[neighbor.node_id].preNeighbors){
+                if(curr_cost > preNeighbor.dist_c2n && preNeighbor.node_id != node_id){
+                    currBest = false;
+                    break;
+                }
+            }
+            if(currBest) peerCandidates.push_back(neighbor.node_id);
+        }
+    }else if(movieInfo.nodes[node_id].preNeighbors.size() >= 2){
+        float curr_cost;
+        bool currBest;
+        for(nodeRelation preNeighbor : movieInfo.nodes[node_id].preNeighbors){
+            curr_cost = preNeighbor.dist_c2n;
+            currBest = true;
+            for(nodeRelation neighbor : movieInfo.nodes[preNeighbor.node_id].neighbors){
+                if(curr_cost > neighbor.dist_c2n && neighbor.node_id != node_id){
+                    currBest = false;
+                    break;
+                }
+            }
+            if(currBest) peerCandidates.push_back(preNeighbor.node_id);
+        }
+    }
+    if(peerCandidates.size() < 2){
+        return INFINITY;
+    }else if(peerCandidates.size() == 2){
+        bestPeer = peerCandidates;
+        float dummy_c2n, dummy_n2c;
+        return voxelwise_avg_distance(node_id, bestPeer, dummy_c2n, dummy_n2c);
+    }else{ // more than two regions available
+        float min_distance = INFINITY, curr_distance;
 
-// to be implemented
+        FOREACH_i(peerCandidates){
+            bestPeer[0] = peerCandidates
+            for(size_t j = i + 1; j < peerCandidates.size(); j ++){
+                curr_distance = voxelwise_avg_distance(())
+            }
+        }
+    }
+}
+/**
+ * @brief detectPeerRegions: test if two regions should be merged based on their common kid or parent region
+ * @param merge_node_idx
+ * @param split_node_idx
+ */
+void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info){
+    for(nodeInfo node : movieInfo.nodes){
+        bool parents_test = true;
+        bool kids_test = true;
+        if(p4tracking.stableNodeTest){ // for stable node, no need to split/merge
+            switch (node.stable_status){
+                case STABLE_TRACK_HEAD:
+                    kids_test = false;
+                    break;
+                case STABLE_TRACK_MID:
+                    parents_test = false;
+                    kids_test = false;
+                    break;
+                case STABLE_TRACK_END:
+                    parents_test = false;
+                    break;
+                default:
+                    break;
+            }
+        }
+        if(parents_test){
+
+        }
+        if(kids_test){
+
+        }
+    }
+}
+/**
+ * @brief handleMergeSplitRegions: build the network allowing split/merge
+ */
+void cellTrackingMain::handleMergeSplitRegions(){
+    vector<splitMergeNodeInfo> split_merge_node_info;
+    detectPeerRegions(split_merge_node_info);
+}
 void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
-
+    handleMergeSplitRegions();
 }
 
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
