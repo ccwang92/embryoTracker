@@ -31,7 +31,7 @@ private:
     float distance2cost(float distance, float alpha, float beta, float punish);
     void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
     void mccTracker_one2one();
-    void mccTracker_splitMerge();
+    void mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_merge_node_info);
     void track2parentKid();
     void refreshTracks(); //remove the empty tracks
     void mergeOvTracks(); //
@@ -54,7 +54,7 @@ private: // remaining for split/merge module
     void peerRegionVerify(size_t node_id, float cost_good2go, bool parents_test,
                           vector<splitMergeNodeInfo> &split_merge_node_info,
                           unordered_map<long, long> &node_id2split_merge_node_id);
-    size_t sizeCumulate(size_t curr_cell, size_t[2] familiy_members);
+    size_t sizeCumulate(size_t curr_cell, size_t familiy_members[2]);
     void regionRefresh(cellSegmentMain &cellSegment);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);

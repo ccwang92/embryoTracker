@@ -534,13 +534,17 @@ void cellTrackingMain::mccTracker_one2one(){
     delete[] mcost;
     free(track_vec);
 }
-
-void cellTrackingMain::mccTracker_splitMerge(){
+/**
+ * @brief mccTracker_splitMerge: tracking using CINDA allows for split/merge, but no jump
+ * @param split_merge_node_info
+ * @param node_id2split_merge_node_id
+ */
+void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_merge_node_info){
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     //      We directly use the interface I wrote for python with the following function name               //
     // long long* pyCS2(long *msz, double *mtail, double *mhead, double *mlow, double *macap, double *mcost)//
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
-    long long m_append = merge_node_idx.size() + split_node_idx.size();
+    long long m_append = split_merge_node_info.size();
     // build the graph without split and merge settings
     long long n = 2*movieInfo.nodes.size() + 1; // # vertices in graph
     long long m = movieInfo.overall_neighbor_num + 3*movieInfo.nodes.size() + m_append; // # arcs in graph (upper bound)
@@ -551,13 +555,59 @@ void cellTrackingMain::mccTracker_splitMerge(){
     double *mcost = new double[m];
 
     long long arc_cnt = 0;
-    double src_id = 1;
+    double src_id = 0;
     int rand_max = 100;
     bool link_adj_frs = false;
-    if(p4tracking.splitMergeHandle == NOJUMPALL && m_append > 0){
+    if(p4tracking.splitMergeHandle == NOJUMPALL){
         link_adj_frs = true;
     }
+    bool *visited = new bool[movieInfo.nodes.size()];
+    memset(visited, false, movieInfo.nodes.size());
+    // add the arcs of splitting and merging
+    for(splitMergeNodeInfo sp_mg_info : split_merge_node_info){
+        if(sp_mg_info.node_id >= 0){
+            if(sp_mg_info.parent_flag){
+                mtail[arc_cnt] = 2 * sp_mg_info.node_id + 2;
+                mhead[arc_cnt] =  2 * sp_mg_info.family_nodes[0] + 1;
+                mcost[arc_cnt] = round(sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+
+                mtail[arc_cnt] = 2 * sp_mg_info.node_id + 2;
+                mhead[arc_cnt] =  2 * sp_mg_info.family_nodes[1] + 1;
+                mcost[arc_cnt] = round(sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+
+                mtail[arc_cnt] = src_id;
+                mhead[arc_cnt] =  2 * sp_mg_info.node_id + 2;
+                mcost[arc_cnt] = round(sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+
+                visited[sp_mg_info.node_id] = true;
+            }else{
+                mtail[arc_cnt] = 2 * sp_mg_info.family_nodes[0] + 2;
+                mhead[arc_cnt] =  2 * sp_mg_info.node_id + 1;
+                mcost[arc_cnt] = round(sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+
+                mtail[arc_cnt] = 2 * sp_mg_info.family_nodes[1] + 2;
+                mhead[arc_cnt] =  2 * sp_mg_info.node_id + 1;
+                mcost[arc_cnt] = round(sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+
+                mtail[arc_cnt] = 2 * sp_mg_info.node_id + 1;
+                mhead[arc_cnt] =  src_id;
+                mcost[arc_cnt] = round(sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+
+                visited[sp_mg_info.family_nodes[0]] = true;
+                visited[sp_mg_info.family_nodes[1]] = true;
+            }
+        }
+    }
     for(nodeInfo node : movieInfo.nodes){
+        if(visited[node.node_id]){
+            continue;
+        }
         // in arc
         mtail[arc_cnt] = src_id;
         mhead[arc_cnt] =  2 * node.node_id;
@@ -586,22 +636,6 @@ void cellTrackingMain::mccTracker_splitMerge(){
                 mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
             }
-        }
-    }
-    // add the arcs of splitting and merging
-    if(m_append > 0){
-        for(pair<size_t, float> node_id_cost : merge_node_idx){
-            mtail[arc_cnt] = 2 * node_id_cost.first;
-            mhead[arc_cnt] =  src_id;
-            mcost[arc_cnt] = round(node_id_cost.second * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
-            arc_cnt ++;
-        }
-
-        for(pair<size_t, float> node_id_cost : split_node_idx){
-            mtail[arc_cnt] = src_id;
-            mhead[arc_cnt] = 2 * node_id_cost.first + 1;
-            mcost[arc_cnt] = round(node_id_cost.second * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
-            arc_cnt ++;
         }
     }
     //assert(arc_cnt == m);
@@ -637,20 +671,13 @@ void cellTrackingMain::mccTracker_splitMerge(){
     if(m_append > 0){// merge tracks with overlapped nodes
         mergeOvTracks();
     }
-    // update the jumpCost in p4tracking if no split/merge allowed
-    if (m_append == 0){ // by the way, also update stable segmentations
-        updateJumpCost();
-        stableSegmentFixed();
-        if (false){
-            //re-link jump-over cells
-        }
-    }
 
     delete[] mtail;
     delete[] mhead;
     delete[] mlow;
     delete[] macap;
     delete[] mcost;
+    delete[] visited;
     free(track_vec);
 }
 void cellTrackingMain::refreshTracks(){
@@ -1077,9 +1104,12 @@ void cellTrackingMain::handleMergeSplitRegions(){
             }
         }
     }
+    mccTracker_splitMerge(split_merge_node_info);
+
 }
 void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
     handleMergeSplitRegions();
+    //refreshRegions
 }
 
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
