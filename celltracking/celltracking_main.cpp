@@ -823,13 +823,20 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &bestPe
         return voxelwise_avg_distance(node_id, bestPeer, dummy_c2n, dummy_n2c);
     }else{ // more than two regions available
         float min_distance = INFINITY, curr_distance;
-
+        float dummy_c2n, dummy_n2c;
+        vector<size_t> curr_peer(2);
         FOREACH_i(peerCandidates){
-            bestPeer[0] = peerCandidates
+            curr_peer[0] = peerCandidates[i];
             for(size_t j = i + 1; j < peerCandidates.size(); j ++){
-                curr_distance = voxelwise_avg_distance(())
+                curr_peer[0] = peerCandidates[j];
+                curr_distance = voxelwise_avg_distance(node_id, curr_peer, dummy_c2n, dummy_n2c);
+                if(curr_distance < min_distance){
+                    bestPeer = curr_peer;
+                    min_distance = curr_distance;
+                }
             }
         }
+        return min_distance;
     }
 }
 /**
@@ -838,7 +845,12 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &bestPe
  * @param split_node_idx
  */
 void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info){
+    float cost_good2go; // the average cost of arcs in a track: only arc with larger cost will be test
     for(nodeInfo node : movieInfo.nodes){
+        cost_good2go = movieInfo.track_arcs_avg_mid_std[node.nodeId2trackId][0];
+        if (cost_good2go > MIN(p4tracking.c_en, p4tracking.c_ex)){
+            cost_good2go = 0;
+        }
         bool parents_test = true;
         bool kids_test = true;
         if(p4tracking.stableNodeTest){ // for stable node, no need to split/merge
@@ -858,10 +870,18 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
             }
         }
         if(parents_test){
-
+            vector<size_t> peerParents(2);
+            float merged_cost = bestPeerCandidate(node.node_id, peerParents, true);
+            bool merge_best_flag = true;
+            for(nodeRelation neighbor : node.neighbors){
+                if(neighbor.dist_c2n < merged_cost){
+                    break;
+                }
+            }
         }
         if(kids_test){
-
+            vector<size_t> peerKids(2);
+            float merged_cost = bestPeerCandidate(node.node_id, peerKids, false);
         }
     }
 }
