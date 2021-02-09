@@ -46,10 +46,13 @@ private:
 private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
     void handleMergeSplitRegions();
-    void detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info);
+    void detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info,
+                           unordered_map<long, long> &node_id2split_merge_node_id);
     void combineCellsIntoOneRegion(vector<size_t> &cell_idxes, combinedCellsCensus &out_region_info);
     float bestPeerCandidate(size_t node_id, vector<size_t> &bestPeer, bool parent_flag);
-    void peerRegionVerify(size_t mergedReg_id, size_t peerReg_ids[2], bool post_flag);
+    void peerRegionVerify(size_t node_id, float cost_good2go, bool parents_test,
+                          vector<splitMergeNodeInfo> &split_merge_node_info,
+                          unordered_map<long, long> &node_id2split_merge_node_id);
     void regionRefresh(cellSegmentMain &cellSegment);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);

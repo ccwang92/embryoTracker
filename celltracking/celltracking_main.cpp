@@ -839,12 +839,62 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &bestPe
         return min_distance;
     }
 }
+
+/**
+ * @brief peerRegionVerify: to verify if there are two regions in adjacent frame that jointly has better linking cost
+ * @param node_id
+ * @param cost_good2go
+ * @param parents_test
+ * @param split_merge_node_info
+ */
+void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool parents_test,
+                                        vector<splitMergeNodeInfo> &split_merge_node_info,
+                                        unordered_map<long, long> &node_id2split_merge_node_id){
+    float merged_cost, min_exist_cost = INFINITY;
+    vector<size_t> bestPeers(2);
+    merged_cost = bestPeerCandidate(node_id, bestPeers, parents_test);
+    if(parents_test){
+        for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
+            if(neighbor.dist_c2n < min_exist_cost){
+                min_exist_cost = neighbor.dist_c2n;
+            }
+        }
+    }else{
+        for(nodeRelation preNeighbor : movieInfo.nodes[node_id].preNeighbors){
+            if(preNeighbor.dist_c2n < min_exist_cost){
+                min_exist_cost = preNeighbor.dist_c2n;
+            }
+        }
+    }
+    splitMergeNodeInfo split_merge_peer;
+    if(merged_cost < min_exist_cost && min_exist_cost > cost_good2go){
+        if (p4tracking.splitMergeCost){
+            merged_cost /= 2;
+        }
+        if(merged_cost < MIN(p4tracking.c_en, p4tracking.c_ex)){
+            split_merge_peer.family_nodes[0] = bestPeers[0];
+            split_merge_peer.family_nodes[1] = bestPeers[1];
+            split_merge_peer.link_costs[0] = merged_cost;
+            split_merge_peer.link_costs[1] = merged_cost;
+            split_merge_peer.node_id = node_id;
+            split_merge_peer.parent_flag = parents_test;
+            split_merge_node_info.push_back(split_merge_peer);
+            // long is enough for our data analysis, indeed all the size_t are redundantly large
+            if(parents_test){
+                node_id2split_merge_node_id.insert(make_pair<long, long>(node_id, split_merge_node_info.size()));
+            }else{
+                node_id2split_merge_node_id.insert(make_pair<long, long>(-node_id, split_merge_node_info.size()));
+            }
+        }
+    }
+}
 /**
  * @brief detectPeerRegions: test if two regions should be merged based on their common kid or parent region
  * @param merge_node_idx
  * @param split_node_idx
  */
-void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info){
+void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info,
+                                         unordered_map<long, long> &node_id2split_merge_node_id){
     float cost_good2go; // the average cost of arcs in a track: only arc with larger cost will be test
     for(nodeInfo node : movieInfo.nodes){
         cost_good2go = movieInfo.track_arcs_avg_mid_std[node.nodeId2trackId][0];
@@ -869,19 +919,12 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
                     break;
             }
         }
+
         if(parents_test){
-            vector<size_t> peerParents(2);
-            float merged_cost = bestPeerCandidate(node.node_id, peerParents, true);
-            bool merge_best_flag = true;
-            for(nodeRelation neighbor : node.neighbors){
-                if(neighbor.dist_c2n < merged_cost){
-                    break;
-                }
-            }
+            peerRegionVerify(node.node_id, cost_good2go, true, split_merge_node_info, node_id2split_merge_node_id);
         }
         if(kids_test){
-            vector<size_t> peerKids(2);
-            float merged_cost = bestPeerCandidate(node.node_id, peerKids, false);
+            peerRegionVerify(node.node_id, cost_good2go, false, split_merge_node_info, node_id2split_merge_node_id);
         }
     }
 }
@@ -890,7 +933,12 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
  */
 void cellTrackingMain::handleMergeSplitRegions(){
     vector<splitMergeNodeInfo> split_merge_node_info;
-    detectPeerRegions(split_merge_node_info);
+    unordered_map<long, long> node_id2split_merge_node_id;
+    detectPeerRegions(split_merge_node_info, node_id2split_merge_node_id);
+    // 1. check these contradict conditions: a->b+c and a+d->b
+    FOREACH_i(split_merge_node_info){
+
+    }
 }
 void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
     handleMergeSplitRegions();
