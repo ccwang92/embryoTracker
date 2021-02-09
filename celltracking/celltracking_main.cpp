@@ -450,9 +450,92 @@ void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t c
     }
 }
 /**
- * @brief cellInfo2graph: using the movieInfo to build the graph for CINDA
+ * @brief mccTracker_one2one: build the graph without split and merge settings, but allows jump
  */
-void cellTrackingMain::mccTracker(vector<pair<size_t, float>> merge_node_idx, vector<pair<size_t, float>> split_node_idx){
+void cellTrackingMain::mccTracker_one2one(){
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //      We directly use the interface I wrote for python with the following function name               //
+    // long long* pyCS2(long *msz, double *mtail, double *mhead, double *mlow, double *macap, double *mcost)//
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    long long n = 2*movieInfo.nodes.size() + 1; // # vertices in graph
+    long long m = movieInfo.overall_neighbor_num + 3*movieInfo.nodes.size(); // # arcs in graph (upper bound)
+    double *mtail = new double[m];
+    double *mhead = new double[m];
+    double *mlow = new double[m]; memset(mlow, 0, m);
+    double *macap = new double[m]; memset(macap, 1, m);
+    double *mcost = new double[m];
+
+    long long arc_cnt = 0;
+    double src_id = 1;
+    int rand_max = 100;
+
+    for(nodeInfo node : movieInfo.nodes){
+        // in arc
+        mtail[arc_cnt] = src_id;
+        mhead[arc_cnt] =  2 * node.node_id;
+        mcost[arc_cnt] = round(node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        arc_cnt ++;
+        // out arc
+        mhead[arc_cnt] = src_id;
+        mtail[arc_cnt] =  2 * node.node_id;
+        mcost[arc_cnt] = round(node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        arc_cnt ++;
+        // link with neighbors
+        for(nodeRelation neighbor : node.neighbors){
+            mtail[arc_cnt] = 2 * node.node_id;
+            mhead[arc_cnt] =  2 * neighbor.node_id;
+            mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+            arc_cnt ++;
+        }
+    }
+    assert(arc_cnt == m);
+    long *msz = new long[3]; // should be long long, but for our data, long is enough
+    msz[0] = 12;
+    msz[1] = n;
+    msz[2] = m;
+
+    // call pyCS2: note, everything needs to be very precise
+    long long *track_vec = pyCS2(msz, mtail, mhead, mlow, macap, mcost);
+
+    // update movieInfo.tracks
+    vector<long long> cost;
+    vector<size_t> curr_track;
+    for(long long i = 1; i < track_vec[0] + 1; i++){
+        if(track_vec[i] > 0){
+            curr_track.push_back(track_vec[i]);
+        }
+        else{
+            cost.push_back(track_vec[i]);
+            vector<size_t> new_track;
+            for(size_t j = 0; j < curr_track.size(); j+=2){
+                new_track.push_back(size_t(curr_track[j] / 2));
+            }
+            if (new_track.size() > 1){
+                movieInfo.tracks.push_back(new_track);
+            }
+        }
+    }
+    // update parent and kids given tracks
+    track2parentKid();
+
+    // update the jumpCost in p4tracking if no split/merge allowed
+    updateJumpCost();
+    // by the way, also update stable segmentations
+    stableSegmentFixed();
+    if (false){
+        //TODO: re-link jump-over cells, this will only be called in the last iteration
+
+    }
+
+    delete[] mtail;
+    delete[] mhead;
+    delete[] mlow;
+    delete[] macap;
+    delete[] mcost;
+    free(track_vec);
+}
+
+void cellTrackingMain::mccTracker_splitMerge(){
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     //      We directly use the interface I wrote for python with the following function name               //
     // long long* pyCS2(long *msz, double *mtail, double *mhead, double *mlow, double *macap, double *mcost)//
@@ -872,14 +955,17 @@ void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool
             merged_cost /= 2;
         }
         if(merged_cost < MIN(p4tracking.c_en, p4tracking.c_ex)){
+            // add to the list
             split_merge_peer.family_nodes[0] = bestPeers[0];
             split_merge_peer.family_nodes[1] = bestPeers[1];
             split_merge_peer.link_costs[0] = merged_cost;
             split_merge_peer.link_costs[1] = merged_cost;
             split_merge_peer.node_id = node_id;
             split_merge_peer.parent_flag = parents_test;
+            split_merge_peer.src_link_cost = 0.0;
+            split_merge_peer.invalid = false;
             split_merge_node_info.push_back(split_merge_peer);
-            // long is enough for our data analysis, indeed all the size_t are redundantly large
+            // 'long' is enough for our data analysis, indeed all the size_t are redundantly large
             if(parents_test){
                 node_id2split_merge_node_id.insert(make_pair<long, long>(node_id, split_merge_node_info.size()));
             }else{
@@ -929,15 +1015,67 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
     }
 }
 /**
+ * @brief sizeCumulate: calculate the overall size of three nodes
+ * @param curr_cell
+ * @param familiy_members
+ * @return
+ */
+size_t cellTrackingMain::sizeCumulate(size_t curr_cell, size_t familiy_members[2]){
+    return movieInfo.voxIdx[curr_cell].size() + movieInfo.voxIdx[familiy_members[0]].size() +
+            movieInfo.voxIdx[familiy_members[1]].size();
+}
+/**
  * @brief handleMergeSplitRegions: build the network allowing split/merge
  */
 void cellTrackingMain::handleMergeSplitRegions(){
     vector<splitMergeNodeInfo> split_merge_node_info;
     unordered_map<long, long> node_id2split_merge_node_id;
     detectPeerRegions(split_merge_node_info, node_id2split_merge_node_id);
-    // 1. check these contradict conditions: a->b+c and a+d->b
-    FOREACH_i(split_merge_node_info){
-
+    // 1. check these contradict conditions: e.g. a->b+c and a+d->b
+    for(size_t ss = 0; ss < split_merge_node_info.size(); ss++){
+        auto sp_mgInfo = split_merge_node_info[ss];
+        if(sp_mgInfo.invalid) continue;
+        vector<pair<size_t,size_t>> contradict_groups;
+        if(sp_mgInfo.parent_flag){ // current is a->b+c, we are finding if there is d+e->b or f+g->c
+            for(int i = 0; i < 2; i++){
+                auto it = node_id2split_merge_node_id.find(-sp_mgInfo.family_nodes[i]);
+                if (it != node_id2split_merge_node_id.end() &&
+                        !split_merge_node_info[it->second].invalid){
+                    contradict_groups.push_back({it->second,
+                                                 sizeCumulate(sp_mgInfo.family_nodes[i],
+                                                 split_merge_node_info[it->second].family_nodes)});
+                }
+            }
+        }else{
+            for(int i = 0; i < 2; i++){
+                auto it = node_id2split_merge_node_id.find(sp_mgInfo.family_nodes[i]);
+                if (it != node_id2split_merge_node_id.end() &&
+                        !split_merge_node_info[it->second].invalid){
+                    contradict_groups.push_back({it->second,
+                                                 sizeCumulate(sp_mgInfo.family_nodes[i],
+                                                 split_merge_node_info[it->second].family_nodes)});
+                }
+            }
+        }
+        if (contradict_groups.size() > 0){
+            contradict_groups.push_back({ss,
+                                            sizeCumulate(sp_mgInfo.node_id, sp_mgInfo.family_nodes)});
+            int best_idx = 0;
+            size_t max_group_sz = 0;
+            for(int i=0; i<contradict_groups.size(); i++){
+                auto it = contradict_groups[i];
+                if (it.second > max_group_sz){
+                    max_group_sz = it.second;
+                    best_idx = i;
+                }
+            }
+            for(int i=0; i<contradict_groups.size(); i++){
+                if(i != best_idx){ // remove contradict ones
+                    split_merge_node_info[ss].invalid = true; //
+                    //node_id2split_merge_node_id.erease(-sp_mgInfo.family_nodes[i]);
+                }
+            }
+        }
     }
 }
 void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){

@@ -1,4 +1,4 @@
-#ifndef TYPES_DEFINE_H
+﻿#ifndef TYPES_DEFINE_H
 #define TYPES_DEFINE_H
 #include <opencv2/core.hpp> //basic building blocks of opencv
 #include <string>
@@ -154,6 +154,8 @@ struct splitMergeNodeInfo{
     size_t node_id;
     size_t family_nodes[2];
     float link_costs[2];
+    float src_link_cost;
+    bool invalid;
 };
 
 struct nodeInfo{
