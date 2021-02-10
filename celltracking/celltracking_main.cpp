@@ -1112,6 +1112,58 @@ void cellTrackingMain::handleMergeSplitRegions(){
     mccTracker_splitMerge(split_merge_node_info);
 
 }
+/**
+ * @brief handleInconsistentParentKid: we assume the inconsistent parents/kids are not all wrong, either
+ * parents or kids are correct. We split the current cell region to see which one is correct.
+ *
+ * @param node_id
+ * @return
+ */
+int cellTrackingMain::handleInconsistentParentKid(cellSegmentMain &cellSegment, size_t node_id){
+    // test if the two parents can be used to split the cell region reprented by node_id
+    vector<vector<size_t>> reg4seeds(2);
+    reg4seeds[0] = movieInfo.voxIdx[movieInfo.nodes[node_id].parents[0]];
+    reg4seeds[1] = movieInfo.voxIdx[movieInfo.nodes[node_id].parents[1]];
+    int reg4seeds_frame = movieInfo.frames[movieInfo.nodes[node_id].parents[0]];
+    bool gapBasedSplit = true;
+    vector<vector<size_t>> splitRegs(2);
+    float reg4seeds2splitRes_costs[2];
+    bool valid_p = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                         splitRegs, *reg4seeds2splitRes_costs);
+    if(!valid_p){
+        gapBasedSplit = false;
+        valid_p = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                         splitRegs, *reg4seeds2splitRes_costs);
+    }
+
+    // test if the two kids can be used to split the cell region reprented by node_id
+    vector<vector<size_t>> reg4seeds(2);
+    reg4seeds[0] = movieInfo.voxIdx[movieInfo.nodes[node_id].kids[0]];
+    reg4seeds[1] = movieInfo.voxIdx[movieInfo.nodes[node_id].kids[1]];
+    reg4seeds_frame = movieInfo.frames[movieInfo.nodes[node_id].kids[0]];
+    gapBasedSplit = true;
+    bool valid_k = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                         splitRegs, *reg4seeds2splitRes_costs);
+    if(!valid_k){
+        gapBasedSplit = false;
+        valid_k = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                         splitRegs, *reg4seeds2splitRes_costs);
+    }
+    if(valid_p && valid_k){
+        return MERGE_BOTH_PARENTS_KIDS;
+    }else if(valid_p){
+        return SPLIT_BY_PARENTS;
+    }else if(valid_k){
+        return SPLIT_BY_KIDS;
+    }else{
+        return MERGE_SPLIT_NOT_SURE;
+    }
+    
+}
 int cellTrackingMain::parentsKidsConsistency(size_t node_id){
     if(movieInfo.nodes[node_id].parent_num != 2 || movieInfo.nodes[node_id].kid_num != 2 ||
             !p4tracking.par_kid_consistency_check){
@@ -1145,21 +1197,89 @@ int cellTrackingMain::parentsKidsConsistency(size_t node_id){
         return PARENTS_KIDS_NOT_CONSISTENT;
     }
 }
-bool cellTrackingMain::exist_in_pairs(vector<pair<size_t[2], int>> &pairs, size_t id){
-    if (pairs.size() == 0) return false;
+// bool cellTrackingMain::exist_in_pairs(vector<size_t> &pairs, size_t id){
+//     if (pairs.size() == 0) return false;
 
-    for(pair<size_t[2], int> p : pairs){
-        if (p.first[0] == id || p.first[1] == id){
-            return true;
+//     for(size_t p : pairs){
+//         if (p == id){
+//             return true;
+//         }
+//     }
+//     return false;
+// }
+
+bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+                    vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
+                     vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs){
+        
+}
+/** regionSplitMergeJudge: tell if a region represented by curr_node_id should be split or merge its parents/kids
+ * 
+**/
+int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t curr_node_id, bool one2multiple_flag, float pvalue){
+    int curr_frame = movieInfo.frames[curr_node_id];
+    //build the previous tree
+    vector<unordered_set<size_t>> left_cells;
+    left_cells.push_back({curr_node_id});
+    int frame_parents = curr_frame;
+    while(true){
+        unordered_set<size_t> tmp_parents;
+        frame_parents--;
+        for(size_t nid : left_cells[left_cells.size()-1]){
+            assert(movieInfo.nodes[nid].node_id == nid);
+            for(int i = 0 ; i < movieInfo.nodes[nid].parent_num; i++){
+                assert(frame_parents == movieInfo.frames(movieInfo.nodes[nid].parents[i]));
+                tmp_parents.insert(movieInfo.nodes[nid].parents[i]);
+            }
+        }
+        
+        unordered_set<size_t> tmp_kids;
+        int frame_kids = frame_parents + 1;
+        for(size_t nid : tmp_parents){
+            assert(movieInfo.nodes[nid].node_id == nid);
+            for(int i = 0 ; i < movieInfo.nodes[nid].kid_num; i++){
+                assert(frame_kids == movieInfo.frames(movieInfo.nodes[nid].kids[i]));
+                tmp_kids.insert(movieInfo.nodes[nid].kids[i]);
+            }
+        }
+        
+        if(set_equal(tmp_kids, left_cells[left_cells.size()-1])){
+            right_cells.push_back(tmp_parents);
+        }else{
+            break;
         }
     }
-    return false;
-}
+    //build the following tree
+    vector<unordered_set<size_t>> right_cells;
+    right_cells.push_back({curr_node_id});
+    int frame_kids = curr_frame;
+    while(true){
+        unordered_set<size_t> tmp_kids;
+        frame_kids++;
+        for(size_t nid : right_cells[right_cells.size()-1]){
+            assert(movieInfo.nodes[nid].node_id == nid);
+            for(int i = 0 ; i < movieInfo.nodes[nid].kid_num; i++){
+                assert(frame_kids == movieInfo.frames(movieInfo.nodes[nid].kids[i]));
+                tmp_kids.insert(movieInfo.nodes[nid].kids[i]);
+            }
+        }
+        unordered_set<size_t> tmp_parents;
+        for(size_t nid : tmp_kids){
+            assert(movieInfo.nodes[nid].node_id == nid);
+            for(int i = 0 ; i < movieInfo.nodes[nid].parent_num; i++){
+                assert((frame_kids - 1) == movieInfo.frames(movieInfo.nodes[nid].parents[i]));
+                tmp_parents.insert(movieInfo.nodes[nid].parents[i]);
+            }
+        }
+        if(set_equal(tmp_parents, right_cells[right_cells.size()-1])){
+            right_cells.push_back(tmp_kids);
+        }else{
+            break;
+        }
+    }
 
-bool bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
-                    vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
-                     vector<vector<size_t>> splitRegs, float &reg4seeds2splitRes_costs){
-
+    // start to judge if the region should be merged or split or leave it to next iteration
+    
 }
 /**
  * @brief regionRefresh: based on the tracking results, check if the region should be split or merge
@@ -1170,12 +1290,36 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
         if(track.size() < 2 || track[0] < 0){
             continue;
         }
-        vector<pair<size_t[2], int>> merged_split_peers; //
-        vector<pair<size_t, int>> p_k_consistency;
+        vector<tuple<size_t, int, float>> merged_peers; //node_id, decision, confidence
+        unordered_set<size_t> nodes4merge;
+        unordered_map<size_t, int> p_k_InConsistenct;
+        size_t dummy_idx;
         for(size_t curr_node_id : track){
-            if(movieInfo.nodes[curr_node_id].kid_num > 1 &&
-                    !exist_in_pairs(merged_split_peers, curr_node_id)){
-                if()
+            if(movieInfo.nodes[curr_node_id].kid_num > 1 && !set_exist(nodes4merge, curr_node_id, dummy_idx)){
+                if (parentsKidsConsistency(curr_node_id) == PARENTS_KIDS_NOT_CONSISTENT){
+                    int curr_decision = handleInconsistentParentKid(cellSegment, curr_node_id);
+                    p_k_InConsistenct.add({curr_node_id, curr_decision});
+
+                    if (curr_decision != MERGE_SPLIT_NOT_SURE){ // if not sure, leave it to future iterations
+                        if (curr_decision == MERGE_BOTH_PARENTS_KIDS){
+                            if(adjacentRegions(cellSegment.cell_label_maps[movieInfo.frames[movieInfo.nodes[curr_node_id].kids[0]]]), 
+                            movieInfo.voxIdx[movieInfo.nodes[curr_node_id].kids[0]], movieInfo.nodes[curr_node_id].kids[1]){
+                                merged_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, INFINITY));
+                                nodes4merge.add(movieInfo.nodes[curr_node_id].kids[0]);
+                                nodes4merge.add(movieInfo.nodes[curr_node_id].kids[1]);
+                            }else{
+                                merged_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, 0.0));
+                            }
+                        }
+                        else{
+                            merged_peers.push_back(make_tuple(curr_node_id, curr_decision, 1.0));
+                        }
+                    }
+                }else{
+                    float pavlue;
+                    int curr_decision = regionSplitMergeJudge(cellSegment, curr_node_id, true, pvalue);
+                }
+                
             }
         }
     }

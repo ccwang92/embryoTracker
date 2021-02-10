@@ -376,6 +376,35 @@ template <typename T> T vec_max(vector<T> const &func){
 template <typename T> T vec_min(vector<T> const &func){
     return *min_element(func.begin(), func.end());
 }
+
+template <typename T> bool set_exist(unordered_set<T> const &func, T target){
+    auto it = func.find (target);
+    if (it != func.end()){
+        return true;
+    }else{
+        return false;
+    }
+}
+template <typename T> bool set_equal(unordered_set<T> const &func0, unordered_set<T> const &func1){
+    if(func0.size() != func1.size()) return false;
+
+    for(auto nid : func0){
+        auto it = func1.find(nid);
+        if(it == func1.end()){
+            return false;
+        }
+    }
+    return true;
+}
+template <typename T> bool vec_find(vector<T> const &func, T target, size_t &idx){
+    auto it = find (func.begin(), func.end(), target);
+    if (it != func.end()){
+        idx = distance(func.begin(), it);
+        return true;
+    }else{
+        return false;
+    }
+}
 template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     double sum = 0.0;

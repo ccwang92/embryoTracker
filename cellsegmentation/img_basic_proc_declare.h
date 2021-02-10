@@ -45,7 +45,7 @@ enum slitMergeHandleMethods {NOJUMPALL = 0, NOJUMP, NOT_DECIDE};
 
 enum segmentStableStatus {NOT_STABLE = -1, STABLE_TRACK_HEAD, STABLE_TRACK_MID, STABLE_TRACK_END};
 enum parentsKidsConsistentFlag {CONSISTENCY_NOT_SURE = 0, PARENTS_KIDS_CONSISTENT, PARENTS_KIDS_NOT_CONSISTENT};
-enum merge_split_decisions {SPLIT_CONFIRMED = 0, MERGE_CONFIRMED, MERGE_SPLIT_NOT_SURE};
+enum merge_split_decisions {SPLIT_BY_KIDS = 0, SPLIT_BY_PARENTS, MERGE_PARENTS, MERGE_KIDS, MERGE_BOTH_PARENTS_KIDS, MERGE_SPLIT_NOT_SURE};
 
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
@@ -124,7 +124,8 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
 float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        bool *bw_mov_cell, vector<int> mov_range_xyz,
                                                        vector<double> shift_xyz, vector<float> dist);
-
+void adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect = 10);
+bool adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int test_adj_label, int connect = 10);
 // fucntions for display
 void colorMapGen(Mat *src, Mat3b &colormap, String colorType = "HSV");
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
@@ -194,6 +195,9 @@ template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx);
 template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx);
 template <typename T> T vec_max(vector<T> const &func);
 template <typename T> T vec_min(vector<T> const &func);
+template <typename T> bool vec_find(vector<T> const &func, T target, size_t &idx);
+template <typename T> bool set_exist(unordered_set<T> const &func, T target);
+template <typename T> bool set_equal(unordered_set<T> const &func0, unordered_set<T> const &func1);
 template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx);
 template <typename T> vector<size_t> sort_indexes(const vector<T> &v, bool ascending = true, size_t start_id = 0);
 template <typename T> T ttest2(vector<T> arr1, vector<T> arr2);

@@ -2272,6 +2272,97 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
 
     return MAX(dist[0], dist[1]);
 }
+
+/** adjacentRegions: return the region adjacent to curr_label
+ * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating 
+ * if test_ajd_label is indeed adjacent to curr_label.
+ * 
+ * **/
+bool adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int test_adj_label,int connect){
+    vector<int> n_y(connect), n_x(connect), n_z(connect);
+    if(connect == 8){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0 };
+    }else if(connect == 4){
+        n_y = { -1,  1,  0, 0 };// 8 shifts to neighbors
+        n_x = {  0,  0, -1, 1 };// used in functions
+        n_z = {  0,  0,  0, 0 };
+    }else if (connect == 6){
+        n_y = { -1, 1,  0, 0, 0,  0 };
+        n_x = { 0,  0, -1, 1, 0,  0 };
+        n_z = { 0,  0,  0, 0, 1, -1 };
+    }else if(connect == 26){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, -1, -1, -1,  1,  1,  1,  0,  0, 0,  -1, -1, -1,  1, 1, 1,  0, 0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1, -1,  0,  1, -1,  0,  1, -1,  1, 0,  -1,  0,  1, -1, 0, 1, -1, 1, 0 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1,  1,  1,  1,  1, 1, 1,  1, 1, 1 };
+    }else if(connect == 10){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, 0,  0 };
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1, 0,  0 };
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, 1, -1 };
+    }else if(connect == 18){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, -1,  1,  0,  0, 0, -1, 1,  0, 0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1,  0,  0, -1,  1, 0,  0, 0, -1, 1, 0 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, 1, 1,  1, 1, 1 };
+    }
+    int sz[3] = {src->size[0], src->size[1], src->size[2]};
+    int x, y, z, remain;
+    int page_sz = sz[0] * sz[1];
+    int cur_nei_idx;
+    size_t linkage_cnt = 0;
+    vector<bool> checked_label(sz[2] * page_sz, false);
+    FOREACH_i(curr_label_idx){
+        z = curr_label_idx[i] / page_sz;
+        remain = curr_label_idx[i] - (z*page_sz);
+        y = remain / sz[1];
+        x = remain - y * sz[1];
+        for(int j = 0; j < n_y.size(); j++){
+            if(inField(y + n_y[j], x + n_x[j], z + n_z[j], sz)){
+                cur_nei_idx = x + n_x[j] + (y + n_y[j])*sz[1] + (z + n_z[j])*page_sz;
+                if(src->at<int>(cur_nei_idx) == test_adj_label){
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+/** adjacentRegions: return the region adjacent to curr_label
+ * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating 
+ * if test_ajd_label is indeed adjacent to curr_label.
+ * 
+ * **/
+bool adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect){
+    nei_idx.resize(idx.size() * connect);
+    center_idx.resize(idx.size() * connect);
+
+    vector<int> n_y(connect), n_x(connect), n_z(connect);
+    if(connect == 8){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0 };
+    }else if(connect == 4){
+        n_y = { -1,  1,  0, 0 };// 8 shifts to neighbors
+        n_x = {  0,  0, -1, 1 };// used in functions
+        n_z = {  0,  0,  0, 0 };
+    }else if (connect == 6){
+        n_y = { -1, 1,  0, 0, 0,  0 };
+        n_x = { 0,  0, -1, 1, 0,  0 };
+        n_z = { 0,  0,  0, 0, 1, -1 };
+    }else if(connect == 26){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, -1, -1, -1,  1,  1,  1,  0,  0, 0,  -1, -1, -1,  1, 1, 1,  0, 0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1, -1,  0,  1, -1,  0,  1, -1,  1, 0,  -1,  0,  1, -1, 0, 1, -1, 1, 0 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1,  1,  1,  1,  1, 1, 1,  1, 1, 1 };
+    }else if(connect == 10){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, 0,  0 };
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1, 0,  0 };
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, 1, -1 };
+    }else if(connect == 18){
+        n_y = { -1, -1, -1,  1, 1, 1,  0, 0, -1,  1,  0,  0, 0, -1, 1,  0, 0, 0 };// 8 shifts to neighbors
+        n_x = { -1,  0,  1, -1, 0, 1, -1, 1,  0,  0, -1,  1, 0,  0, 0, -1, 1, 0 };// used in functions
+        n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, 1, 1,  1, 1, 1 };
+    }
+}
 /**************************Functions for debug*******************************/
 void ccShowSlice3Dmat(Mat src3d, int datatype, int slice, bool binary){
     ccShowSlice3Dmat(&src3d, datatype, slice, binary);
