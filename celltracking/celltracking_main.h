@@ -14,6 +14,7 @@ private:
 
     // distance calculation
     float voxelwise_avg_distance(size_t cell_curr, size_t cell_nei, float &c2n, float &n2c);
+    float voxelwise_avg_distance(size_t joint_cells_curr[], size_t joint_cells_nei[], float &c2n, float &n2c);
     float voxelwise_avg_distance(vector<size_t> &joint_cells_curr, vector<size_t> &joint_cells_nei, float &c2n, float &n2c);
     float voxelwise_avg_distance(size_t cell_curr, vector<size_t> &joint_cells_nei, float &c2n, float &n2c);
     float voxelwise_avg_distance(vector<size_t> &joint_cells_curr, size_t cell_nei, float &c2n, float &n2c);
@@ -46,6 +47,7 @@ private:
     void movieInfoUpate();
 private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
+
     void handleMergeSplitRegions();
     void detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info,
                            unordered_map<long, long> &node_id2split_merge_node_id);
@@ -55,7 +57,14 @@ private: // remaining for split/merge module
                           vector<splitMergeNodeInfo> &split_merge_node_info,
                           unordered_map<long, long> &node_id2split_merge_node_id);
     size_t sizeCumulate(size_t curr_cell, size_t familiy_members[2]);
+
     void regionRefresh(cellSegmentMain &cellSegment);
+    bool exist_in_pairs(vector<pair<size_t[2], int>> &pairs, size_t id);
+    int parentsKidsConsistency(size_t node_id);
+    bool bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+                        vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
+                         vector<vector<size_t>> splitRegs, float &reg4seeds2splitRes_costs);
+    void nodesMergeTest(cellSegmentMain &cellSegment);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
 

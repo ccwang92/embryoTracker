@@ -44,6 +44,9 @@ enum priorDistrType {pri_GAUSS = 0, pri_WEIGHTEDAVG, pri_GAMMA};
 enum slitMergeHandleMethods {NOJUMPALL = 0, NOJUMP, NOT_DECIDE};
 
 enum segmentStableStatus {NOT_STABLE = -1, STABLE_TRACK_HEAD, STABLE_TRACK_MID, STABLE_TRACK_END};
+enum parentsKidsConsistentFlag {CONSISTENCY_NOT_SURE = 0, PARENTS_KIDS_CONSISTENT, PARENTS_KIDS_NOT_CONSISTENT};
+enum merge_split_decisions {SPLIT_CONFIRMED = 0, MERGE_CONFIRMED, MERGE_SPLIT_NOT_SURE};
+
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)

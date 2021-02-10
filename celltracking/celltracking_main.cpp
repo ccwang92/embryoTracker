@@ -121,7 +121,12 @@ float cellTrackingMain::voxelwise_avg_distance(size_t cell_curr, size_t cell_nei
                                   movieInfo.vox_z[cell_nei], movieInfo.range_xyz[cell_nei], movieInfo.start_coord_xyz[cell_nei],
                                   movieInfo.frames[cell_nei], c2n, n2c);
 }
+float voxelwise_avg_distance(size_t joint_cells_curr[], size_t joint_cells_nei[], float &c2n, float &n2c){
+    vector<size_t> curr(joint_cells_curr, joint_cells_curr + sizeof(joint_cells_curr)/sizeof(joint_cells_curr[0]));
+    vector<size_t> nei(joint_cells_nei, joint_cells_nei + sizeof(joint_cells_nei)/sizeof(joint_cells_nei[0]));
 
+    return voxelwise_avg_distance(curr, nei, c2n, n2c);
+}
 /**
  * @brief voxelwise_avg_distance: the distance between two regions, each region contains >=1 cells
  * @param joint_cells_curr
@@ -425,7 +430,7 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
         movieInfo.nodes[i].stable_status = NOT_STABLE;
     }
     // start a naive linking
-    mccTracker({}, {}); // with no split/merge vectors
+    mccTracker_one2one(); // with no split/merge vectors
     updateGammaParam();
     updateArcCost();
     stableSegmentFixed();
@@ -1107,11 +1112,85 @@ void cellTrackingMain::handleMergeSplitRegions(){
     mccTracker_splitMerge(split_merge_node_info);
 
 }
+int cellTrackingMain::parentsKidsConsistency(size_t node_id){
+    if(movieInfo.nodes[node_id].parent_num != 2 || movieInfo.nodes[node_id].kid_num != 2 ||
+            !p4tracking.par_kid_consistency_check){
+        return CONSISTENCY_NOT_SURE;
+    }
+    float dummy_c2n, dummy_n2c;
+    float merged_distance = voxelwise_avg_distance(movieInfo.nodes[node_id].parents, movieInfo.nodes[node_id].kids,
+                                                   dummy_c2n, dummy_n2c);
+    float merged_cost = distance2cost(merged_distance, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+
+    if (merged_cost >= abs(p4tracking.observationCost)){
+        return CONSISTENCY_NOT_SURE;
+    }
+    float map_2x2[4];
+    memset(map_2x2, INFINITY, 4);
+    int cnt = 0;
+    for(size_t p : movieInfo.nodes[node_id].parents){
+        for(size_t k : movieInfo.nodes[node_id].kids){
+            for(nodeRelation nr : movieInfo.nodes[p].neighbors){
+                if (nr.node_id == k){
+                    map_2x2[cnt] = distance2cost(nr.dist_c2n, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+                }
+                cnt++;
+            }
+        }
+    }
+    if (MAX(map_2x2[0], map_2x2[3]) < abs(p4tracking.observationCost) ||
+            MAX(map_2x2[1], map_2x2[2]) < abs(p4tracking.observationCost) ){
+        return PARENTS_KIDS_CONSISTENT;
+    }else{
+        return PARENTS_KIDS_NOT_CONSISTENT;
+    }
+}
+bool cellTrackingMain::exist_in_pairs(vector<pair<size_t[2], int>> &pairs, size_t id){
+    if (pairs.size() == 0) return false;
+
+    for(pair<size_t[2], int> p : pairs){
+        if (p.first[0] == id || p.first[1] == id){
+            return true;
+        }
+    }
+    return false;
+}
+
+bool bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+                    vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
+                     vector<vector<size_t>> splitRegs, float &reg4seeds2splitRes_costs){
+
+}
+/**
+ * @brief regionRefresh: based on the tracking results, check if the region should be split or merge
+ * @param cellSegment
+ */
+void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
+    for(vector<size_t> track : movieInfo.tracks){
+        if(track.size() < 2 || track[0] < 0){
+            continue;
+        }
+        vector<pair<size_t[2], int>> merged_split_peers; //
+        vector<pair<size_t, int>> p_k_consistency;
+        for(size_t curr_node_id : track){
+            if(movieInfo.nodes[curr_node_id].kid_num > 1 &&
+                    !exist_in_pairs(merged_split_peers, curr_node_id)){
+                if()
+            }
+        }
+    }
+}
+void nodesMergeTest(cellSegmentMain &cellSegment){
+
+}
+
+
+
 void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
     handleMergeSplitRegions();
     //refreshRegions
+    regionRefresh(cellSegment);
 }
-
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
 
 }
