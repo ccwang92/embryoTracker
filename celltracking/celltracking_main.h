@@ -81,6 +81,7 @@ private:
     allCellsCensus movieInfo;
     trackParameter p4tracking;
     vector<size_t> cumulative_cell_nums;
+    vector<Mat> validGapMaps;
     //friend class cellSegmentMain;
 public:
     void init_parameter(segParameter &p4seg, long cell_num){

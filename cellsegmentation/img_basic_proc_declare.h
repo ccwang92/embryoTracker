@@ -110,6 +110,8 @@ void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t>
 void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
                 Mat *fgMap, int connect, int cost_design[], bool bg2sink = true);
 void setValMat(Mat &src, int datatype, vector<size_t> idx, float v);
+float getMaxValMat(Mat &src, int datatype, vector<size_t> idx);
+void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl=1.0, float vh=0.0);
 void setValMat(Mat &src, int datatype, Mat *mask, float v);
 void extractGapVoxel(Mat *label_map, Mat *fgMap, int numCC, int gap_radius, vector<vector<size_t>> &gap_voxIdx, vector<int> tested_flag);
 void neighbor_idx_2d(vector<size_t> idx, Mat *fgMap, vector<vector<size_t>> &neighbor_idx_list, int radius);
@@ -127,6 +129,8 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        vector<double> shift_xyz, vector<float> dist);
 void adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect = 10);
 bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label, int connect = 10);
+
+
 // fucntions for display
 void colorMapGen(Mat *src, Mat3b &colormap, String colorType = "HSV");
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
@@ -213,8 +217,6 @@ template <typename T> void OV_truncatedGauss(vector<T> fg, vector<T> bg, T &mu, 
 template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector<T> otherVals, float &mu, float &sigma);
 template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in = 0);
 template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in = 0);
-
-template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl=1.0, float vh=0.0);
 
 template <typename T> void vec_unique(vector<T> & v);
 template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2);

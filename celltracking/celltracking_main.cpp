@@ -72,6 +72,12 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
         cumulative_cell_nums[i] = (cumulative_cell_nums[i-1] + cellSegment.number_cells[i]);
     }
     movieInfo.tracks.resize(0);
+
+    validGapMaps.resize(cellSegment.number_cells.size());
+    for(int i = 0; i < cellSegment.number_cells.size(); i++){
+        validGapMaps = Mat(cellSegment.cell_label_maps[i].dims, cellSegment.cell_label_maps[i].size,
+                           CV_8U, Scalar(1));
+    }
 }
 /**
  * @brief voxelwise_avg_distance: use matlab's matrix indexing method
@@ -121,7 +127,7 @@ float cellTrackingMain::voxelwise_avg_distance(size_t cell_curr, size_t cell_nei
                                   movieInfo.vox_z[cell_nei], movieInfo.range_xyz[cell_nei], movieInfo.start_coord_xyz[cell_nei],
                                   movieInfo.frames[cell_nei], c2n, n2c);
 }
-float voxelwise_avg_distance(size_t joint_cells_curr[], size_t joint_cells_nei[], float &c2n, float &n2c){
+float cellTrackingMain::voxelwise_avg_distance(size_t joint_cells_curr[], size_t joint_cells_nei[], float &c2n, float &n2c){
     vector<size_t> curr(joint_cells_curr, joint_cells_curr + sizeof(joint_cells_curr)/sizeof(joint_cells_curr[0]));
     vector<size_t> nei(joint_cells_nei, joint_cells_nei + sizeof(joint_cells_nei)/sizeof(joint_cells_nei[0]));
 
@@ -1139,7 +1145,7 @@ int cellTrackingMain::handleInconsistentParentKid(cellSegmentMain &cellSegment, 
     }
 
     // test if the two kids can be used to split the cell region reprented by node_id
-    vector<vector<size_t>> reg4seeds(2);
+//    vector<vector<size_t>> reg4seeds(2);
     reg4seeds[0] = movieInfo.voxIdx[movieInfo.nodes[node_id].kids[0]];
     reg4seeds[1] = movieInfo.voxIdx[movieInfo.nodes[node_id].kids[1]];
     reg4seeds_frame = movieInfo.frames[movieInfo.nodes[node_id].kids[0]];
@@ -1207,7 +1213,7 @@ int cellTrackingMain::parentsKidsConsistency(size_t node_id){
 //     }
 //     return false;
 // }
-void bisectRegion_gapGuided(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+void cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
                             vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
                              vector<vector<size_t>> &splitRegs){
     if(reg4seeds.size() != 2 || reg4seeds[0].size() == 0 || reg4seeds[1].size() == 0){
@@ -1227,9 +1233,27 @@ void bisectRegion_gapGuided(cellSegmentMain &cellSegment, vector<size_t> reg2spl
     cellSegment.cropSeed(-1, overall_idx, single_frame, nullptr, &cellSegment.cell_label_maps[reg2split_frame],
                          reg2split_frame, seed, cellSegment.p4segVol);
 
+    Mat subGapMap;
+    subVolExtract(&validGapMaps[reg2split_frame], CV_8U, subGapMap, seed.crop_range_yxz);// deep copy
 
+    Mat mask = seed.eigMap2d < 0;
+    setValMat(seed.eigMap2d, CV_32F, &mask, 0.0);
+    Mat1b possbileGap2d;
+    bitwise_and(seed.eigMap2d > 0, subGapMap, possbileGap2d);
+    float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split);
+    scale_vol(&seed.eigMap2d, CV_32F, &seed.score2d, 0.001, 1, 0, max_val);
+
+    mask = seed.eigMap3d < 0;
+    setValMat(seed.eigMap3d, CV_32F, &mask, 0.0);
+    Mat1b possbileGap3d;
+    bitwise_and(seed.eigMap3d > 0, subGapMap, possbileGap3d);
+    max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split);
+    scale_vol(&seed.eigMap3d, CV_32F, &seed.score3d, 0.001, 1, 0, max_val);
+
+
+    seed.scoreMap = seed.score2d + seed.score3d;
 }
-void bisectRegion_bruteforce(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+void cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
                              vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
                               vector<vector<size_t>> &splitRegs){
 

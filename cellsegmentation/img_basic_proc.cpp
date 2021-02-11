@@ -1714,7 +1714,53 @@ void setValMat(Mat &vol3d, int datatype, vector<size_t> idx, float v){
         }
     }
 }
+float getMaxValMat(Mat &vol3d, int datatype, vector<size_t> idx){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
 
+    float max_val = -INFINITY;
+    float tmp;
+    if (datatype == CV_8U){
+        FOREACH_i(idx){
+            tmp = (float)vol3d.at<unsigned char>(idx[i]);
+            if(tmp > max_val) tmp = max_val;
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i(idx){
+            tmp = vol3d.at<float>(idx[i]);
+            if(tmp > max_val) tmp = max_val;
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i(idx){
+            tmp = (float)vol3d.at<int>(idx[i]);
+            if(tmp > max_val) tmp = max_val;
+        }
+    }
+    return max_val;
+}
+
+void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl, float vh){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    if (vl > vh){
+        normalize(*src3d, *dst, il, ih, NORM_MINMAX, CV_32FC1);
+    }else{
+        dst->create(src3d->dims, src3d->size, CV_32F);
+        float term = (vh-vl) / (ih - il);
+
+        if (datatype == CV_8U){
+            FOREACH_i_ptrMAT(src3d){
+                dst->at<unsigned char>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
+            }
+        }else if (datatype == CV_32F){
+            FOREACH_i_ptrMAT(src3d){
+                dst->at<float>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
+            }
+        }else if (datatype == CV_32S){
+            FOREACH_i_ptrMAT(src3d){
+                dst->at<int>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
+            }
+        }
+    }
+}
 void setValMat(Mat &src, int datatype, Mat *mask, float v){
     vector<size_t> idx = fgMapIdx(mask, CV_8U, 0);
     setValMat(src, datatype, idx, v);
