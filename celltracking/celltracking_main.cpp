@@ -1259,44 +1259,84 @@ bool cellTrackingMain::testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSeg
 /**
  * @brief mergeValidTest: for the linking reuslts a0->a1+b1->a2+b2->...->end, if such track is short,
  * highly likely we should merge a1 and b1.
- * @param cellSegment
  * @param curr_node_id
  * @param seedRegs4split
  * @return
  */
-bool cellTrackingMain::mergeValidTest(cellSegmentMain &cellSegment, size_t curr_node_id, size_t seedRegs4split[2]){
+bool cellTrackingMain::mergeValidTest(size_t curr_node_id, size_t seedRegs4split[2]){
     int root_fr = movieInfo.frames[curr_node_id];
     int seed_fr = movieInfo.frames[seedRegs4split[0]];
     bool kid_flag = true;
     if (seed_fr < root_fr) kid_flag = false;
 
-    int root_node2 = -1;
     int loopCnt = 0;
-    size_t bases[2];
+    vector<size_t> bases(2);
+    vector<size_t> pre_bases(2);
     bases[0] = seedRegs4split[0];
     bases[1] = seedRegs4split[1];
     while (loopCnt < p4tracking.validtrackLength4var){ // if the length is already enough to be a valid track, break;
         loopCnt ++;
+        pre_bases = bases;
         if(kid_flag){
             if(movieInfo.nodes[bases[0]].kid_num == 1 && movieInfo.nodes[bases[1]].kid_num == 1){
                 bases[0] = movieInfo.nodes[bases[0]].kids[0];
-                bases[1] = movieInfo.nodes[bases[0]].kids[1];
+                bases[1] = movieInfo.nodes[bases[1]].kids[0];
             }else if(movieInfo.nodes[bases[0]].kid_num == 0 && movieInfo.nodes[bases[1]].kid_num == 0){
                 return true;
+            }else if(movieInfo.nodes[bases[0]].kid_num == 1 && movieInfo.nodes[bases[1]].kid_num == 0){
+                bases[0] = movieInfo.nodes[bases[0]].kids[0];
+                bases[1] = movieInfo.nodes[bases[0]].kids[0];
+            }else if(movieInfo.nodes[bases[0]].kid_num == 0 && movieInfo.nodes[bases[1]].kid_num == 1){
+                bases[0] = movieInfo.nodes[bases[1]].kids[0];
+                bases[1] = movieInfo.nodes[bases[1]].kids[0];
             }else{
                 return false;
             }
         }else{
             if(movieInfo.nodes[bases[0]].parent_num == 1 && movieInfo.nodes[bases[1]].parent_num == 1){
                 bases[0] = movieInfo.nodes[bases[0]].parents[0];
-                bases[1] = movieInfo.nodes[bases[0]].parents[1];
+                bases[1] = movieInfo.nodes[bases[1]].parents[0];
             }else if(movieInfo.nodes[bases[0]].parent_num == 0 && movieInfo.nodes[bases[1]].parent_num == 0){
+                return true;
+            }else if(movieInfo.nodes[bases[0]].parent_num == 1 && movieInfo.nodes[bases[1]].parent_num == 0){
+                bases[0] = movieInfo.nodes[bases[0]].parents[0];
+                bases[1] = movieInfo.nodes[bases[0]].parents[0];
+            }else if(movieInfo.nodes[bases[0]].parent_num == 0 && movieInfo.nodes[bases[1]].parent_num == 1){
+                bases[0] = movieInfo.nodes[bases[1]].parents[0];
+                bases[1] = movieInfo.nodes[bases[1]].parents[0];
+            }else {
+                return false;
+            }
+        }
+        if(bases[0] == bases[1]){
+            size_t root_node2 = bases[0];
+
+            if(kid_flag && movieInfo.nodes[root_node2].parent_num > 1){
+                bases[0] = movieInfo.nodes[root_node2].parents[0];
+                bases[1] = movieInfo.nodes[root_node2].parents[1];
+                if((bases[0] != pre_bases[0] && bases[0] != pre_bases[1]) ||
+                        (bases[1] != pre_bases[0] && bases[1] != pre_bases[1])){
+                    return false;
+                }
+            }else if(!kid_flag && movieInfo.nodes[root_node2].kid_num > 1){
+                bases[0] = movieInfo.nodes[root_node2].kids[0];
+                bases[1] = movieInfo.nodes[root_node2].kids[1];
+                if((bases[0] != pre_bases[0] && bases[0] != pre_bases[1]) ||
+                        (bases[1] != pre_bases[0] && bases[1] != pre_bases[1])){
+                    return false;
+                }
+            }
+
+            float dummy_c2n, dummy_n2c;
+            float maxDistance = voxelwise_avg_distance(root_node2, pre_bases, dummy_c2n, dummy_n2c);
+            if(distance2cost(maxDistance, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]) < p4tracking.c_ex){
                 return true;
             }else{
                 return false;
             }
         }
     }
+    return false;
 
 }
 /** regionSplitMergeJudge: tell if a region represented by curr_node_id should be split or merge its parents/kids

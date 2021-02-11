@@ -1,4 +1,4 @@
-#ifndef CELLTRACKINGMAIN_H
+﻿#ifndef CELLTRACKINGMAIN_H
 #define CELLTRACKINGMAIN_H
 #include "../cellsegmentation/cellsegment_main.h"
 
@@ -67,7 +67,7 @@ private: // remaining for split/merge module
                          vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs);
     int regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t curr_node_id, bool one2multiple_flag, float &pvalue);
     bool testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSegment, vector<unordered_set<size_t>> left_or_right_cells);
-    bool mergeValidTest(cellSegmentMain &cellSegment, size_t curr_node_id, size_t seedRegs4split[2]);
+    bool mergeValidTest(size_t curr_node_id, size_t seedRegs4split[2]);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
 
