@@ -282,7 +282,12 @@ template <typename T> T normInv(T p, T mu, T sigma)
 
     return mu + sigma * val;
 }
-
+/** binomial distribution, n choose m, assume the Bernoulli distribution is with
+ * probability p.
+ */
+template <typename T> float binocdf(T num_cls0, T num_all, float p){
+    return boost::math::cdf(boost::math::binomial(num_all, p), num_cls0);
+}
 template <typename T> double chi2inv(T p, int df){
     return 2*boost::math::gamma_p_inv(((double)df)/2, (double)p);
 }
@@ -384,6 +389,15 @@ template <typename T> bool set_exist(unordered_set<T> const &func, T target){
     }else{
         return false;
     }
+}
+template <typename T> bool set_exist(unordered_set<T> const &set_sub, unordered_set<T> const &set_large){
+    for(T ele : set_sub){
+        auto it = set_large.find (ele);
+        if (it == set_large.end()){
+            return false;
+        }
+    }
+    return true;
 }
 template <typename T> bool set_equal(unordered_set<T> const &func0, unordered_set<T> const &func1){
     if(func0.size() != func1.size()) return false;

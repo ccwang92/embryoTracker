@@ -1213,10 +1213,75 @@ bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, vector<size
                      vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs){
         
 }
+/**
+ * @brief testCellsInOneTrackAdjacentOrNot: there can be several regions in the same frame belonging to the same track.
+ * If they are spatially disjoint, we can tell that this tracking contains at least two cells.
+ * @param left_or_right_cells
+ */
+bool cellTrackingMain::testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSegment, vector<unordered_set<size_t>> left_or_right_cells){
+    for(size_t i=1; i < left_or_right_cells.size(); i++){ // neglect the first, which is the current node for test
+        if(left_or_right_cells[i].size() > 1){
+            // if there is a stable node, return not adjacent(false)
+            if (p4tracking.stableNodeTest){
+                for(auto nid : left_or_right_cells[i]){
+                    assert(movieInfo.nodes[nid].node_id >= 0);
+                    if(movieInfo.nodes[nid].stable_status != NOT_STABLE){
+                        return false;
+                    }
+                }
+            }
+            unordered_set<int> labelInMaps;
+            for(auto it : left_or_right_cells[i]){
+                labelInMaps.insert(movieInfo.labelInMap[it]);
+            }
+            size_t test_cnt = 0;
+            for(auto it : left_or_right_cells[i]){
+                unordered_set<int> tmp;
+                assert(it = movieInfo.nodes[it].node_id);
+                int frame = movieInfo.frames[it];
+                adjacentRegions(cellSegment.cell_label_maps[frame], movieInfo.voxIdx[it],
+                                movieInfo.labelInMap[it], tmp);
+                tmp.insert(movieInfo.labelInMap[it]);
+                if (!set_exist(labelInMaps, tmp)){
+                    return false;
+                }
+                test_cnt ++;
+                if((test_cnt+1)==left_or_right_cells[i].size()){
+                    break;
+                }
+            }
+        }else{ // once there is a frame that there is only one region, quit the test
+            return true;
+        }
+    }
+    return true;
+}
+/**
+ * @brief mergeValidTest: for the linking reuslts a0->a1+b1->a2+b2->...->end, if such track is short,
+ * highly likely we should merge a1 and b1.
+ * @param cellSegment
+ * @param curr_node_id
+ * @param seedRegs4split
+ * @return
+ */
+bool cellTrackingMain::mergeValidTest(cellSegmentMain &cellSegment, size_t curr_node_id, size_t &seedRegs4split[2]){
+    int root_fr = movieInfo.frames[curr_node_id];
+    int seed_fr = movieInfo.frames[seedRegs4split[0]];
+    bool kid_flag = true;
+    if (seed_fr < root_fr) kid_flag = false;
+
+    int root_node2 = -1;
+    int loopCnt = 1;
+
+    while (loopCnt < p4tracking.validtrackLength4var){ // if the length is already enough to be a valid track, break;
+
+    }
+
+}
 /** regionSplitMergeJudge: tell if a region represented by curr_node_id should be split or merge its parents/kids
  * 
 **/
-int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t curr_node_id, bool one2multiple_flag, float pvalue){
+int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t curr_node_id, bool one2multiple_flag, float &pvalue){
     int curr_frame = movieInfo.frames[curr_node_id];
     //build the previous tree
     vector<unordered_set<size_t>> left_cells;
@@ -1228,7 +1293,7 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
         for(size_t nid : left_cells[left_cells.size()-1]){
             assert(movieInfo.nodes[nid].node_id == nid);
             for(int i = 0 ; i < movieInfo.nodes[nid].parent_num; i++){
-                assert(frame_parents == movieInfo.frames(movieInfo.nodes[nid].parents[i]));
+                assert(frame_parents == movieInfo.frames[movieInfo.nodes[nid].parents[i]]);
                 tmp_parents.insert(movieInfo.nodes[nid].parents[i]);
             }
         }
@@ -1238,13 +1303,13 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
         for(size_t nid : tmp_parents){
             assert(movieInfo.nodes[nid].node_id == nid);
             for(int i = 0 ; i < movieInfo.nodes[nid].kid_num; i++){
-                assert(frame_kids == movieInfo.frames(movieInfo.nodes[nid].kids[i]));
+                assert(frame_kids == movieInfo.frames[movieInfo.nodes[nid].kids[i]]);
                 tmp_kids.insert(movieInfo.nodes[nid].kids[i]);
             }
         }
         
         if(set_equal(tmp_kids, left_cells[left_cells.size()-1])){
-            right_cells.push_back(tmp_parents);
+            left_cells.push_back(tmp_parents);
         }else{
             break;
         }
@@ -1259,7 +1324,7 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
         for(size_t nid : right_cells[right_cells.size()-1]){
             assert(movieInfo.nodes[nid].node_id == nid);
             for(int i = 0 ; i < movieInfo.nodes[nid].kid_num; i++){
-                assert(frame_kids == movieInfo.frames(movieInfo.nodes[nid].kids[i]));
+                assert(frame_kids == movieInfo.frames[movieInfo.nodes[nid].kids[i]]);
                 tmp_kids.insert(movieInfo.nodes[nid].kids[i]);
             }
         }
@@ -1267,7 +1332,7 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
         for(size_t nid : tmp_kids){
             assert(movieInfo.nodes[nid].node_id == nid);
             for(int i = 0 ; i < movieInfo.nodes[nid].parent_num; i++){
-                assert((frame_kids - 1) == movieInfo.frames(movieInfo.nodes[nid].parents[i]));
+                assert((frame_kids - 1) == movieInfo.frames[movieInfo.nodes[nid].parents[i]]);
                 tmp_parents.insert(movieInfo.nodes[nid].parents[i]);
             }
         }
@@ -1279,7 +1344,138 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
     }
 
     // start to judge if the region should be merged or split or leave it to next iteration
-    
+    // we totally has 5 ways to determine if a one2multiple or multiple2one link is one region or should be split
+    pvalue = 0.5;
+    float pVal_thres = 0.05;
+    /** way 1: the neighbors of the root node lead to consistent conclusion **/
+    size_t mergeVSseg[2] = {1, 0}; // 1-vs-more
+    float oneCellpValue = 0.5; // initialize as non-significant
+    float multiCellpValue = 0.5; // initialize as non-significant
+    for(int i = 0; i < MIN(MIN(left_cells.size()-1, right_cells.size()-1), 10); i++){
+        if (i+1 < left_cells.size()){
+            if (left_cells[i+1].size()>1){
+                mergeVSseg[1]++;
+            }
+            else{
+                mergeVSseg[0]++;
+            }
+        }
+        if (i+1 < right_cells.size()){
+            if (right_cells[i+1].size()>1){
+                mergeVSseg[1]++;
+            }else{
+                mergeVSseg[0]++;
+            }
+        }
+        oneCellpValue = binocdf(mergeVSseg[0], mergeVSseg[0] + mergeVSseg[1], 0.5);
+        multiCellpValue = binocdf(mergeVSseg[1], mergeVSseg[0] + mergeVSseg[1], 0.5);
+        if (MIN(multiCellpValue, oneCellpValue) < pVal_thres){
+            break;
+        }
+    }
+    if (oneCellpValue < pVal_thres){ // probability of one cell in this region is low
+        pvalue = oneCellpValue;
+        if (one2multiple_flag) return SPLIT_BY_KIDS;
+        else return SPLIT_BY_PARENTS;
+    }
+    if (multiCellpValue < pVal_thres){ // probability of multi-cell in this region is low
+        pvalue = multiCellpValue;
+        if (one2multiple_flag) return MERGE_KIDS;
+        else return MERGE_PARENTS;
+    }
+
+    /** way 2: if the regions in the same frame are not spatially adjacent
+     * or there is stable nodes, split them **/
+    if(!testCellsInOneTrackAdjacentOrNot(cellSegment, left_cells) ||
+            !testCellsInOneTrackAdjacentOrNot(cellSegment, right_cells)){
+        if (one2multiple_flag) return SPLIT_BY_KIDS;
+        else return SPLIT_BY_KIDS;
+    }
+    /** way 3: segmentation is not consistent in consecutive two frames **/
+    // adjframesConsistency.m: I think this is over-fitting, should not add here
+    // Its assumption is that if cost(a+b->c+d) < MIN(cost(a+b->c, a+b->d)), a and b should merge.
+    /** way 4: the neighbors of the root with similar size node lead to consistent conclusion **/
+    int max_num_frame_include = 10;
+    vector<long> sz_diff_adj_frames(left_cells.size() + right_cells.size() - 2);
+    long sz_diff_adj_frames_cnt = 0;
+    vector<long> sz_diff2test_region_left(left_cells.size());
+    for (size_t i=0; i< left_cells.size(); i++){
+        sz_diff2test_region_left[i] = 0;
+        for(auto it : left_cells[i]){
+            sz_diff2test_region_left[i] += movieInfo.voxIdx[it].size();
+        }
+    }
+    for (size_t i=1; i< left_cells.size(); i++){
+        sz_diff_adj_frames[sz_diff_adj_frames_cnt] = sz_diff2test_region_left[i] -
+                sz_diff2test_region_left[i-1];
+        sz_diff_adj_frames_cnt++;
+    }
+    for (size_t i=1; i< left_cells.size(); i++){
+        sz_diff2test_region_left[i] = sz_diff2test_region_left[i] -
+                sz_diff2test_region_left[0];
+    }
+    sz_diff2test_region_left[0] = 0;
+
+    long sz_diff2test_region_right[right_cells.size()];
+    for (size_t i=0; i< right_cells.size(); i++){
+        sz_diff2test_region_right[i] = 0;
+        for(auto it : right_cells[i]){
+            sz_diff2test_region_right[i] += movieInfo.voxIdx[it].size();
+        }
+    }
+    for (size_t i=1; i< right_cells.size(); i++){
+        sz_diff_adj_frames[sz_diff_adj_frames_cnt] = sz_diff2test_region_right[i] -
+                sz_diff2test_region_right[i-1];
+        sz_diff_adj_frames_cnt++;
+    }
+    for (size_t i=1; i< right_cells.size(); i++){
+        sz_diff2test_region_right[i] = sz_diff2test_region_right[i] -
+                sz_diff2test_region_right[0];
+    }
+    sz_diff2test_region_right[0] = 0;
+
+    float sz_std = vec_stddev(sz_diff_adj_frames);
+    mergeVSseg[0] = 1; // 1-vs-more
+    mergeVSseg[1] = 0;
+    oneCellpValue = 0.5; // initialize as non-significant
+    multiCellpValue = 0.5; // initialize as non-significant
+    for (size_t i=0; i<MIN(MAX(left_cells.size()-1, right_cells.size()-1), max_num_frame_include); i++){
+        if (i+1 < left_cells.size()){
+            if (abs(sz_diff2test_region_left[i+1]) < sz_std){
+                if (left_cells[i+1].size() > 1){
+                    mergeVSseg[1] ++;
+                }else{
+                    mergeVSseg[0] ++;
+                }
+            }
+        }
+        if (i+1 < right_cells.size()){
+            if (abs(sz_diff2test_region_right[i+1]) < sz_std){
+                if (right_cells[i+1].size()>1){
+                    mergeVSseg[1] ++;
+                }else{
+                    mergeVSseg[0] ++;
+                }
+            }
+        }
+        oneCellpValue = binocdf(mergeVSseg[0], mergeVSseg[0] + mergeVSseg[1], 0.5);
+        multiCellpValue = binocdf(mergeVSseg[1], mergeVSseg[0] + mergeVSseg[1], 0.5);
+        if (MIN(multiCellpValue, oneCellpValue) < pVal_thres){
+            break;
+        }
+    }
+    if (oneCellpValue < pVal_thres){ // probability of one cell in this region is low
+        pvalue = oneCellpValue;
+        if (one2multiple_flag) return SPLIT_BY_KIDS;
+        else return SPLIT_BY_PARENTS;
+    }
+    if (multiCellpValue < pVal_thres){ // probability of multi-cell in this region is low
+        pvalue = multiCellpValue;
+        if (one2multiple_flag) return MERGE_KIDS;
+        else return MERGE_PARENTS;
+    }
+
+    /** way 5: test if the region is a small piece of shit **/
 }
 /**
  * @brief regionRefresh: based on the tracking results, check if the region should be split or merge
@@ -1295,18 +1491,18 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
         unordered_map<size_t, int> p_k_InConsistenct;
         size_t dummy_idx;
         for(size_t curr_node_id : track){
-            if(movieInfo.nodes[curr_node_id].kid_num > 1 && !set_exist(nodes4merge, curr_node_id, dummy_idx)){
+            if(movieInfo.nodes[curr_node_id].kid_num > 1 && !set_exist(nodes4merge, curr_node_id)){
                 if (parentsKidsConsistency(curr_node_id) == PARENTS_KIDS_NOT_CONSISTENT){
                     int curr_decision = handleInconsistentParentKid(cellSegment, curr_node_id);
-                    p_k_InConsistenct.add({curr_node_id, curr_decision});
+                    p_k_InConsistenct.insert({curr_node_id, curr_decision});
 
                     if (curr_decision != MERGE_SPLIT_NOT_SURE){ // if not sure, leave it to future iterations
                         if (curr_decision == MERGE_BOTH_PARENTS_KIDS){
-                            if(adjacentRegions(cellSegment.cell_label_maps[movieInfo.frames[movieInfo.nodes[curr_node_id].kids[0]]]), 
-                            movieInfo.voxIdx[movieInfo.nodes[curr_node_id].kids[0]], movieInfo.nodes[curr_node_id].kids[1]){
+                            if(adjacentRegions(cellSegment.cell_label_maps[movieInfo.frames[movieInfo.nodes[curr_node_id].kids[0]]],
+                            movieInfo.voxIdx[movieInfo.nodes[curr_node_id].kids[0]], movieInfo.nodes[curr_node_id].kids[1])){
                                 merged_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, INFINITY));
-                                nodes4merge.add(movieInfo.nodes[curr_node_id].kids[0]);
-                                nodes4merge.add(movieInfo.nodes[curr_node_id].kids[1]);
+                                nodes4merge.insert(movieInfo.nodes[curr_node_id].kids[0]);
+                                nodes4merge.insert(movieInfo.nodes[curr_node_id].kids[1]);
                             }else{
                                 merged_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, 0.0));
                             }
@@ -1316,7 +1512,7 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
                         }
                     }
                 }else{
-                    float pavlue;
+                    float pvalue;
                     int curr_decision = regionSplitMergeJudge(cellSegment, curr_node_id, true, pvalue);
                 }
                 

@@ -2278,7 +2278,7 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
  * if test_ajd_label is indeed adjacent to curr_label.
  * 
  * **/
-bool adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int test_adj_label,int connect){
+bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label,int connect){
     vector<int> n_y(connect), n_x(connect), n_z(connect);
     if(connect == 8){
         n_y = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors

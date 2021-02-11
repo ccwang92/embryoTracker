@@ -65,10 +65,9 @@ private: // remaining for split/merge module
     bool bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
                         vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
                          vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs);
-    int regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t curr_node_id, bool one2multiple_flag, float pvalue);
-    
-    
-    void nodesMergeTest(cellSegmentMain &cellSegment);
+    int regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t curr_node_id, bool one2multiple_flag, float &pvalue);
+    bool testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSegment, vector<unordered_set<size_t>> left_or_right_cells);
+    bool mergeValidTest(cellSegmentMain &cellSegment, size_t curr_node_id, size_t seedRegs4split[2]);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
 

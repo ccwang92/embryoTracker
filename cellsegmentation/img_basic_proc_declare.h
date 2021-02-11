@@ -7,6 +7,7 @@
 #include <opencv2/imgproc.hpp> // image process
 #include <boost/math/distributions/chi_squared.hpp>
 #include <boost/math/distributions/gamma.hpp>
+#include <boost/math/distributions/binomial.hpp>
 #include <boost/math/special_functions/digamma.hpp>
 //#include "itkImage.h"
 //#include "itkImageFileReader.h"
@@ -124,8 +125,8 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
 float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        bool *bw_mov_cell, vector<int> mov_range_xyz,
                                                        vector<double> shift_xyz, vector<float> dist);
-void adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect = 10);
-bool adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int test_adj_label, int connect = 10);
+void adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect = 10);
+bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label, int connect = 10);
 // fucntions for display
 void colorMapGen(Mat *src, Mat3b &colormap, String colorType = "HSV");
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
@@ -180,6 +181,7 @@ template <typename T> T normalPDF(T x, T m = 0, T s = 1);
 template <typename T> T zscore2pvalue(T z);
 template <typename T> T pvalue2zscore(T p);
 template <typename T> T normInv(T p, T mu = 0.0, T sigma = 1.0);
+template <typename T> float binocdf(T num_cls0, T num_all, float p);
 
 template <typename T> double chi2inv(T p, int df = 1); // inverse chi-square distribution
 template <typename T> double gammacdf(T x, T a, T b, bool upper = true); // gamma cdf function
@@ -197,6 +199,7 @@ template <typename T> T vec_max(vector<T> const &func);
 template <typename T> T vec_min(vector<T> const &func);
 template <typename T> bool vec_find(vector<T> const &func, T target, size_t &idx);
 template <typename T> bool set_exist(unordered_set<T> const &func, T target);
+template <typename T> bool set_exist(unordered_set<T> const &set_sub, unordered_set<T> const &set_large);
 template <typename T> bool set_equal(unordered_set<T> const &func0, unordered_set<T> const &func1);
 template <typename T> float mat_mean(Mat *src3d, int datatype, vector<T> idx);
 template <typename T> vector<size_t> sort_indexes(const vector<T> &v, bool ascending = true, size_t start_id = 0);
