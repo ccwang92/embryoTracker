@@ -371,6 +371,10 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
 void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_grayim3d,
                                Mat *data_stbized, Mat *idMap, int curr_frame, singleCellSeed &seed,
                                segParameter p4segVol){
+    bool seed_extract_in_tracking =false;
+    if(data_stbized == nullptr){
+        seed_extract_in_tracking = true;
+    }
     seed.id = seed_id;
     seed.idx_yxz = idx_yxz; // deep copy
     seed.y.resize(idx_yxz.size());
@@ -433,14 +437,18 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     subVolExtract(&principalCurv2d[curr_frame], CV_32F, seed.eigMap2d, seed.crop_range_yxz);// deep copy
     subVolExtract(&principalCurv3d[curr_frame], CV_32F, seed.eigMap3d, seed.crop_range_yxz);// deep copy
     subVolExtract(&varMaps[curr_frame], CV_32F, seed.varMap, seed.crop_range_yxz);// deep copy
-    subVolExtract(&stblizedVarMaps[curr_frame], CV_32F, seed.stblizedVarMap, seed.crop_range_yxz);// deep copy
+    if(!seed_extract_in_tracking){
+        subVolExtract(&stblizedVarMaps[curr_frame], CV_32F, seed.stblizedVarMap, seed.crop_range_yxz);// deep copy
+    }
     //ccShowSlice3Dmat(&seed.stblizedVarMap, CV_32F);
     seed.gap2dMap = seed.eigMap2d > 0;
     seed.gap3dMap = seed.eigMap3d > 0;
 //    seed.volUint8 = (*data_grayim3d)(seed.crop_range_yxz); // all shallow copy
 //    seed.volStblizedFloat = (*data_stbized)(seed.crop_range_yxz); // all shallow copy
     subVolExtract(data_grayim3d, CV_8U, seed.volUint8, seed.crop_range_yxz);// deep copy
-    subVolExtract(data_stbized, CV_32F, seed.volStblizedFloat, seed.crop_range_yxz);// deep copy
+    if(!seed_extract_in_tracking){
+        subVolExtract(data_stbized, CV_32F, seed.volStblizedFloat, seed.crop_range_yxz);// deep copy
+    }
 //    ccShowSliceLabelMat(&seed.idMap, 6);
 //    ccShowSlice3Dmat(&seed.seedMap, CV_8U, 6);
 //    ccShowSlice3Dmat(&seed.volUint8, CV_8U, 6);

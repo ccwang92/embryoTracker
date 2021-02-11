@@ -62,6 +62,12 @@ private: // remaining for split/merge module
     bool exist_in_pairs(vector<pair<size_t[2], int>> &pairs, size_t id);
     int parentsKidsConsistency(size_t node_id);
     int handleInconsistentParentKid(cellSegmentMain &cellSegment, size_t node_id);
+    void bisectRegion_gapGuided(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+                                vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
+                                 vector<vector<size_t>> &splitRegs);
+    void bisectRegion_bruteforce(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+                                 vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
+                                  vector<vector<size_t>> &splitRegs);
     bool bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
                         vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
                          vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs);

@@ -197,6 +197,7 @@ template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx);
 template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx);
 template <typename T> T vec_max(vector<T> const &func);
 template <typename T> T vec_min(vector<T> const &func);
+template <typename T> void vec_unique(vector<T> & v);
 template <typename T> bool vec_find(vector<T> const &func, T target, size_t &idx);
 template <typename T> bool set_exist(unordered_set<T> const &func, T target);
 template <typename T> bool set_exist(unordered_set<T> const &set_sub, unordered_set<T> const &set_large);

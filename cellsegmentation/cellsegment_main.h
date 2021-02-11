@@ -22,6 +22,7 @@ public:
     void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
     void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,
                               cv::Mat *idMapIn /*int*/, int seed_num, int frame, bool roundOne);
+    //void cropSeed(vector<size_t> idx_yxz, Mat *data_3d, int shift_yxz[3]);
     void cropSeed(int seed_id, std::vector<std::size_t> idx_yxz, cv::Mat *data_grayim3d, cv::Mat *data_stbized,
                   cv::Mat *idMap, int frame, singleCellSeed &seed, segParameter p4segVol);
     // the key function to get cell territory
@@ -37,7 +38,7 @@ public:
 
     void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
                         Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound);
-private:
+public:
     string debug_folder;
     string default_name;
     int data_type;

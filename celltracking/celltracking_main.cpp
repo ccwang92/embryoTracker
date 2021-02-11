@@ -1207,11 +1207,42 @@ int cellTrackingMain::parentsKidsConsistency(size_t node_id){
 //     }
 //     return false;
 // }
+void bisectRegion_gapGuided(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+                            vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
+                             vector<vector<size_t>> &splitRegs){
+    if(reg4seeds.size() != 2 || reg4seeds[0].size() == 0 || reg4seeds[1].size() == 0){
+        return;
+    }
+    singleCellSeed seed;
+    vector<size_t> overall_idx(reg2split);
+    overall_idx.insert(overall_idx.end(), reg4seeds[0].begin(), reg4seeds[0].end());
+    overall_idx.insert(overall_idx.end(), reg4seeds[1].begin(), reg4seeds[1].end());
+    vec_unique(overall_idx);
+    long sz_single_frame = cellSegment.data_rows_cols_slices[0]*
+            cellSegment.data_rows_cols_slices[1]*cellSegment.data_rows_cols_slices[2];
 
+    unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*reg2split_frame; // sub-matrix pointer
+    Mat *single_frame = new Mat(3, cellSegment.normalized_data4d.size, CV_8U, ind);
+
+    cellSegment.cropSeed(-1, overall_idx, single_frame, nullptr, &cellSegment.cell_label_maps[reg2split_frame],
+                         reg2split_frame, seed, cellSegment.p4segVol);
+
+
+}
+void bisectRegion_bruteforce(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
+                             vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
+                              vector<vector<size_t>> &splitRegs){
+
+}
 bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
                     vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
-                     vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs){
-        
+                     vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs){    
+    splitRegs.resize(reg4seeds.size());
+    if(gapBasedSplit){
+
+    }else{
+
+    }
 }
 /**
  * @brief testCellsInOneTrackAdjacentOrNot: there can be several regions in the same frame belonging to the same track.
@@ -1537,6 +1568,62 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
     }
 
     /** way 5: test if the region is a small piece of shit **/
+    // Way 5.1: one side show solid evidence of spliting.
+    int split_cnt_left = 0, split_cnt_right = 0;
+    for(int i = 0; i<MIN(6, left_cells.size()); i++){
+        if(left_cells[i].size() > 1){
+            split_cnt_left ++;
+        }
+    }
+    for(int i = 0; i<MIN(6, right_cells.size()); i++){
+        if(right_cells[i].size() > 1){
+            split_cnt_right ++;
+        }
+    }
+    if(split_cnt_right > 4 || split_cnt_left > 4){
+        if (one2multiple_flag) return SPLIT_BY_KIDS;
+        else return SPLIT_BY_PARENTS;
+    }
+    // Way 5.2: more than two ancestors or kids exist.
+    vector<size_t> bases(2);
+    bool split_again_flag = false, split_consistent_flag = false;
+    if(one2multiple_flag){
+        bases[0] = movieInfo.nodes[curr_node_id].kids[0];
+        bases[1] = movieInfo.nodes[curr_node_id].kids[1];
+        if(movieInfo.nodes[bases[0]].kid_num > 1 || movieInfo.nodes[bases[1]].kid_num > 1){
+            split_again_flag = true;
+        }else if(movieInfo.nodes[bases[0]].kid_num == movieInfo.nodes[bases[1]].kid_num){
+            split_consistent_flag = true;
+        }
+    }else{
+        bases[0] = movieInfo.nodes[curr_node_id].parents[0];
+        bases[1] = movieInfo.nodes[curr_node_id].parents[1];
+        if(movieInfo.nodes[bases[0]].parent_num > 1 || movieInfo.nodes[bases[1]].parent_num > 1){
+            split_again_flag = true;
+        }else if(movieInfo.nodes[bases[0]].parent_num == movieInfo.nodes[bases[1]].parent_num){
+            split_consistent_flag = true;
+        }
+    }
+    if(split_again_flag){
+        if (one2multiple_flag) return SPLIT_BY_KIDS;
+        else return SPLIT_BY_PARENTS;
+    }else if(split_consistent_flag){
+        if (one2multiple_flag) return MERGE_KIDS;
+        else return MERGE_PARENTS;
+    }
+    // Way 5.3: gap exists for spliting.
+    vector<vector<size_t>> reg4seeds(2), dummy_splitRegs;
+    float dummy_costs[2];
+    reg4seeds[0] = movieInfo.voxIdx[bases[0]];
+    reg4seeds[1] = movieInfo.voxIdx[bases[1]];
+    bool sectTest = bisectValidTest(cellSegment, movieInfo.voxIdx[curr_node_id], movieInfo.frames[curr_node_id],
+                                    reg4seeds, movieInfo.frames[bases[0]], false, dummy_splitRegs, *dummy_costs);
+    if(sectTest){
+        if (one2multiple_flag) return SPLIT_BY_KIDS;
+        else return SPLIT_BY_PARENTS;
+    }
+
+    return MERGE_SPLIT_NOT_SURE;
 }
 /**
  * @brief regionRefresh: based on the tracking results, check if the region should be split or merge
