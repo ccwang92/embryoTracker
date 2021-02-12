@@ -905,7 +905,7 @@ void extractVolume(Mat *label3d, vector<size_t> &voxSzList, int numCC){
  * @param min_size
  * @param relabel
  */
-bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = true){
+bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel){
     vector<size_t> cc_size(numCC);
     fill(cc_size.begin(), cc_size.end(), 0);
     for (size_t i = 0; i < label3d.total(); i++){
@@ -2351,7 +2351,7 @@ bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label
         n_x = { -1,  0,  1, -1, 0, 1, -1, 1,  0,  0, -1,  1, 0,  0, 0, -1, 1, 0 };// used in functions
         n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, 1, 1,  1, 1, 1 };
     }
-    int sz[3] = {src->size[0], src->size[1], src->size[2]};
+    int sz[3] = {src.size[0], src.size[1], src.size[2]};
     int x, y, z, remain;
     int page_sz = sz[0] * sz[1];
     int cur_nei_idx;
@@ -2365,7 +2365,7 @@ bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label
         for(int j = 0; j < n_y.size(); j++){
             if(inField(y + n_y[j], x + n_x[j], z + n_z[j], sz)){
                 cur_nei_idx = x + n_x[j] + (y + n_y[j])*sz[1] + (z + n_z[j])*page_sz;
-                if(src->at<int>(cur_nei_idx) == test_adj_label){
+                if(src.at<int>(cur_nei_idx) == test_adj_label){
                     return true;
                 }
             }
@@ -2373,15 +2373,39 @@ bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label
     }
     return false;
 }
+void coordinateTransfer(vector<size_t> &in_idx, int org_sz_yxz[3],
+                        vector<size_t> &out_idx, int crop_start_yxz[3], int crop_sz_yxz[3]){
+    vector<int> y(in_idx.size()), x(in_idx.size()), z(in_idx.size());
+    vec_ind2sub(in_idx, y, x, z, org_sz_yxz);
+    y = vec_Minus(y, crop_start_yxz[0]);
+    x = vec_Minus(x, crop_start_yxz[1]);
+    z = vec_Minus(z, crop_start_yxz[2]);
+
+
+    vec_sub2ind(out_idx, y, x, z, crop_sz_yxz);
+}
+
+void coordinateTransfer(vector<size_t> &in_idx, MatSize org_sz_yxz,
+    vector<size_t> &out_idx, int crop_start_yxz[3], MatSize crop_sz_yxz){
+    int org_sz_yxz_new[3] = {org_sz_yxz[0], org_sz_yxz[1], org_sz_yxz[2]};
+    int crop_sz_yxz_new[3] = {crop_sz_yxz[0], crop_sz_yxz[1], crop_sz_yxz[2]};
+
+    coordinateTransfer(in_idx, org_sz_yxz_new, out_idx, crop_start_yxz, crop_sz_yxz_new);
+}
+void bwareaopenMat(Mat1b &fgMap, Mat1b &fgMap_new, size_t minSz, int connect){
+    Mat1i tmp;
+    int numcc = connectedComponents3d(&fgMap, tmp, connect);
+
+    removeSmallCC(tmp, numcc, minSz, false);
+
+    fgMap_new = tmp > 0;
+}
 /** adjacentRegions: return the region adjacent to curr_label
  * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating 
  * if test_ajd_label is indeed adjacent to curr_label.
  * 
  * **/
-bool adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect){
-    nei_idx.resize(idx.size() * connect);
-    center_idx.resize(idx.size() * connect);
-
+void adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect){
     vector<int> n_y(connect), n_x(connect), n_z(connect);
     if(connect == 8){
         n_y = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
@@ -2407,6 +2431,26 @@ bool adjacentRegions(Mat *src, vector<size_t> curr_label_idx, int curr_label, un
         n_y = { -1, -1, -1,  1, 1, 1,  0, 0, -1,  1,  0,  0, 0, -1, 1,  0, 0, 0 };// 8 shifts to neighbors
         n_x = { -1,  0,  1, -1, 0, 1, -1, 1,  0,  0, -1,  1, 0,  0, 0, -1, 1, 0 };// used in functions
         n_z = {  0,  0,  0,  0, 0, 0,  0, 0, -1, -1, -1, -1, -1, 1, 1,  1, 1, 1 };
+    }
+
+    int sz[3] = {src.size[0], src.size[1], src.size[2]};
+    int x, y, z, remain;
+    int page_sz = sz[0] * sz[1];
+    int cur_nei_idx;
+    vector<bool> checked_label(sz[2] * page_sz, false);
+    FOREACH_i(curr_label_idx){
+        z = curr_label_idx[i] / page_sz;
+        remain = curr_label_idx[i] - (z*page_sz);
+        y = remain / sz[1];
+        x = remain - y * sz[1];
+        for(int j = 0; j < n_y.size(); j++){
+            if(inField(y + n_y[j], x + n_x[j], z + n_z[j], sz)){
+                cur_nei_idx = x + n_x[j] + (y + n_y[j])*sz[1] + (z + n_z[j])*page_sz;
+                if(src.at<int>(cur_nei_idx) > 0 && src.at<int>(cur_nei_idx) != curr_label){
+                    adj_labels.insert(src.at<int>(cur_nei_idx));
+                }
+            }
+        }
     }
 }
 /**************************Functions for debug*******************************/

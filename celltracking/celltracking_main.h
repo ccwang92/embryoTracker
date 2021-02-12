@@ -62,12 +62,25 @@ private: // remaining for split/merge module
     bool exist_in_pairs(vector<pair<size_t[2], int>> &pairs, size_t id);
     int parentsKidsConsistency(size_t node_id);
     int handleInconsistentParentKid(cellSegmentMain &cellSegment, size_t node_id);
-    void bisectRegion_gapGuided(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
-                                vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
-                                 vector<vector<size_t>> &splitRegs);
-    void bisectRegion_bruteforce(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
-                                 vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
-                                  vector<vector<size_t>> &splitRegs);
+
+    //TODO : implement
+    bool seedsRefine_intensity(Mat1b *data3d, vector<size_t> &root_idx, int root_frame,
+                               vector<vector<size_t>> &seeds_idx, int seed_frame,
+                               vector<vector<size_t>> &ref_seeds_idx);
+    bool seedRefine_gap(Mat1b *data3d, vector<size_t> &root_idx, int root_frame,
+                        vector<vector<size_t>> &seeds_idx, int seed_frame,
+                        vector<vector<size_t>> &ref_seeds_idx);
+
+
+
+    bool binary_seedsMap_create(Mat1b &fgMap, Mat1b *possbileGap3d, Mat1b *possbileGap2d,
+                                vector<vector<size_t>> seeds_idx, Mat1i &seeds_map, size_t minSz);
+    bool bisectRegion_gapGuided(cellSegmentMain &cellSegment, size_t reg2split_idx,
+                                vector<size_t> &reg2split, int reg2split_frame,
+                                vector<vector<size_t>> &reg4seeds, vector<vector<size_t>> &splitRegs);
+    bool bisectRegion_bruteforce(cellSegmentMain &cellSegment, size_t reg2split_idx,
+                                 vector<size_t> &reg2split, int reg2split_frame,
+                                 vector<vector<size_t>> &reg4seeds, vector<vector<size_t>> &splitRegs);
     bool bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
                         vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
                          vector<vector<size_t>> &splitRegs, float &reg4seeds2splitRes_costs);

@@ -695,6 +695,11 @@ template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size)
 }
 
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size){
+    int size_new[3] = {size[0], size[1], size[2]};
+    vec_sub2ind(idx, y, x, z, size_new);
+}
+
+template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, int size[3]){
     size_t nPixels_slice = size[0]*size[1];
     idx.resize(y.size());
     FOREACH_i(y){
@@ -702,6 +707,10 @@ template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int
     }
 }
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size){
+    int size_new[3] = {size[0], size[1], size[2]};
+    vec_ind2sub(idx, y, x, z, size_new);
+}
+template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, int size[3]){
     size_t nPixels_slice = size[0]*size[1];
     T rmder;
     y.resize(idx.size());
@@ -714,7 +723,6 @@ template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int
         x[i] = rmder-y[i]*size[1];
     }
 }
-
 
 template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
@@ -767,30 +775,6 @@ template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> v
 }
 
 
-template <typename T> void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl, float vh){
-    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
-    if (vl > vh){
-        normalize(*src3d, *dst, il, ih, NORM_MINMAX, CV_32FC1);
-    }else{
-        dst->create(src3d->dims, src3d->size, CV_32F);
-        float term = (vh-vl) / (ih - il);
-
-        if (datatype == CV_8U){
-            FOREACH_i_ptrMAT(src3d){
-                dst->at<unsigned char>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
-            }
-        }else if (datatype == CV_32F){
-            FOREACH_i_ptrMAT(src3d){
-                dst->at<float>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
-            }
-        }else if (datatype == CV_32S){
-            FOREACH_i_ptrMAT(src3d){
-                dst->at<int>(i) = (src3d->at<unsigned char>(i) - il) * term + vl;
-            }
-        }
-    }
-}
-
 template <typename T> void vec_unique(vector<T> & v){
     sort(v.begin(), v.end());
     typename vector<T>::iterator it;
@@ -840,4 +824,32 @@ template <typename T> void mergeIntersectGroups(vector<vector<T>> &groups){
     }
 }
 
+/** Mode of a iteratable structure like vector, set. Return 0 if no mode is found
+ *
+ */
+template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter first, Iter last)
+{
+    typedef typename std::iterator_traits<Iter>::value_type type_t;
 
+    std::vector<type_t> arr (first, last);
+
+    std::sort(arr.begin(), arr.end() );
+
+    type_t output = type_t();
+    int final_frequency = 0;
+    int local_frequency = 0;
+
+    for (typename std::vector<type_t>::iterator it = arr.begin(); it != arr.end()-1; ++it)
+    {
+        if (*it == *(it+1)) local_frequency++;
+        else                local_frequency = 0;
+
+        if (local_frequency > final_frequency)
+        {
+            final_frequency = local_frequency;
+            output = *it;
+        }
+    }
+
+    return output;
+}

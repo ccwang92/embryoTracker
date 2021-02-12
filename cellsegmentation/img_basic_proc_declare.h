@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <iomanip>      // std::setprecision
 #include <set>
+#include <iterator>
 #include "maxflow_bk/graph.h" //max-flow BK algorithm
 
 #include "cc3d.hpp" //connected component
@@ -85,11 +86,11 @@ void regionAvgIntensity(Mat* src3dFloatData, Mat* src3dIdMap, int numCC, vector<
 void regionAvgIntensity(Mat* src3dFloatData, vector<vector<size_t>> &voxList, vector<float> &avgIntensities);
 
 void extractVoxIdxList(Mat *label3d, vector<vector<size_t>> &voxList, int numCC, bool bk_extract = false);
-void extractVoxIdxGivenId(Mat *label3d, vector<size_t> &voxList, int id);
 void extractVoxIdxList(Mat *label3d, vector<vector<int>> &voxList, int numCC, bool bk_extract = false);
 void extractVoxIdxList(vector<Mat> &label3d, vector<vector<size_t>> &voxList, vector<size_t> numCC);
+void extractVoxIdxGivenId(Mat *label3d, vector<size_t> &voxList, int id);
 void extractVolume(Mat *label3d, vector<size_t> &voxSzList, int numCC);
-bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel);
+bool removeSmallCC(Mat &label3d, int &numCC, size_t min_size, bool relabel = true);
 void volumeDilate(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
 void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
 
@@ -129,6 +130,15 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        vector<double> shift_xyz, vector<float> dist);
 void adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect = 10);
 bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label, int connect = 10);
+void coordinateTransfer(vector<size_t> &in_idx, int org_sz_yxz[3],
+            vector<size_t> &out_idx, int crop_start_yxz[3], int crop_sz_yxz[3]);
+void coordinateTransfer(vector<size_t> &in_idx, MatSize org_sz_yxz,
+            vector<size_t> &out_idx, int crop_start_yxz[3], MatSize crop_sz_yxz);
+void bwareaopenMat(Mat1b &fgMap, Mat1b &fgMap_new, size_t minSz, int connect);
+
+
+
+
 
 
 // fucntions for display
@@ -169,7 +179,8 @@ template <typename T> T vol_sub2ind(int y, int x, int z, int col_num, T page_sz)
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size);
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size);
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size);
-
+template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, int size[3]);
+template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, int size[3]);
 
 template <typename T> vector<double> vec_cumsum(vector<T> v1);
 template <typename T> vector<T> vec_pointMultiply(vector<T> v1, vector<T> v2);
@@ -224,7 +235,7 @@ template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2)
 template <typename T> void mergeIntersectGroups(vector<vector<T>> &groups);
 
 
-
+template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter first, Iter last);
 #endif // IMG_BASIC_PROC_H
 
 
