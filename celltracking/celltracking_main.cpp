@@ -1199,14 +1199,18 @@ int cellTrackingMain::handleInconsistentParentKid(cellSegmentMain &cellSegment, 
     bool gapBasedSplit = true;
     vector<vector<size_t>> splitRegs(2);
     float reg4seeds2splitRes_costs[2];
-    bool valid_p = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+//    bisectValidTest(cellSegmentMain &cellSegment, size_t reg2split_idx, vector<size_t> reg2split,
+//                                           int reg2split_frame, vector<vector<size_t>> reg4seeds, int reg4seeds_frame,
+//                                           bool gapBasedSplit, vector<vector<size_t>> &splitRegs,
+//                                           float *reg4seeds2splitRes_costs)
+    bool valid_p = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
                         reg4seeds, reg4seeds_frame, gapBasedSplit,
-                         splitRegs, *reg4seeds2splitRes_costs);
+                         splitRegs, reg4seeds2splitRes_costs);
     if(!valid_p){
         gapBasedSplit = false;
-        valid_p = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+        valid_p = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
                         reg4seeds, reg4seeds_frame, gapBasedSplit,
-                         splitRegs, *reg4seeds2splitRes_costs);
+                         splitRegs, reg4seeds2splitRes_costs);
     }
 
     // test if the two kids can be used to split the cell region reprented by node_id
@@ -1215,14 +1219,14 @@ int cellTrackingMain::handleInconsistentParentKid(cellSegmentMain &cellSegment, 
     reg4seeds[1] = movieInfo.voxIdx[movieInfo.nodes[node_id].kids[1]];
     reg4seeds_frame = movieInfo.frames[movieInfo.nodes[node_id].kids[0]];
     gapBasedSplit = true;
-    bool valid_k = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+    bool valid_k = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
                         reg4seeds, reg4seeds_frame, gapBasedSplit,
-                         splitRegs, *reg4seeds2splitRes_costs);
+                         splitRegs, reg4seeds2splitRes_costs);
     if(!valid_k){
         gapBasedSplit = false;
-        valid_k = bisectValidTest(cellSegment, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
+        valid_k = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
                         reg4seeds, reg4seeds_frame, gapBasedSplit,
-                         splitRegs, *reg4seeds2splitRes_costs);
+                         splitRegs, reg4seeds2splitRes_costs);
     }
     if(valid_p && valid_k){
         return MERGE_BOTH_PARENTS_KIDS;
@@ -1650,7 +1654,7 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
 bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2split_idx, vector<size_t> reg2split,
                                        int reg2split_frame, vector<vector<size_t>> reg4seeds, int reg4seeds_frame,
                                        bool gapBasedSplit, vector<vector<size_t>> &splitRegs,
-                                       float &reg4seeds2splitRes_costs){
+                                       float *reg4seeds2splitRes_costs){
     splitRegs.resize(reg4seeds.size());
 
 //    bool bisectRegion_gapGuided(cellSegmentMain &cellSegment, size_t reg2split_idx,
@@ -1667,6 +1671,23 @@ bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2
     }else{
         valid_reg_found = bisectRegion_bruteforce(cellSegment, reg2split_idx, reg2split,
                                                   reg2split_frame, reg4seeds, reg4seeds_frame, splitRegs);
+    }
+    if(valid_reg_found){
+//        float voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int curr_frame,
+//                                                                           vector<size_t> &nei_voxIdx, int nei_frame,
+//                                                                           MatSize data3d_sz, float &c2n, float &n2c);
+        float dummy_c2n, dummy_n2c;
+        reg4seeds2splitRes_costs[0] = voxelwise_avg_distance(reg2split, reg2split_frame, splitRegs[0], reg4seeds_frame,
+                cellSegment.cell_label_maps[0].size, dummy_c2n, dummy_n2c);
+        reg4seeds2splitRes_costs[1] = voxelwise_avg_distance(reg2split, reg2split_frame, splitRegs[1], reg4seeds_frame,
+                cellSegment.cell_label_maps[0].size, dummy_c2n, dummy_n2c);
+        if(MAX(reg4seeds2splitRes_costs[0], reg4seeds2splitRes_costs[1]) < abs(p4tracking.observationCost)){
+            return true;
+        }else{
+            return false;
+        }
+    }else{
+        return false;
     }
 }
 /**
