@@ -233,7 +233,7 @@ template <typename T> void vec_unique(vector<T> & v);
 template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2);
 
 template <typename T> void mergeIntersectGroups(vector<vector<T>> &groups);
-
+template <typename T> vector<T> intersection(vector<T> &v1, vector<T> &v2);
 
 template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter first, Iter last);
 #endif // IMG_BASIC_PROC_H
