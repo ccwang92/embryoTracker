@@ -1405,8 +1405,67 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
 bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, size_t reg2split_idx,
                                                vector<size_t> &reg2split, int reg2split_frame,
                                                vector<vector<size_t>> &reg4seeds, vector<vector<size_t>> &splitRegs){
-    return false;
+    if(reg4seeds.size() != 2 || reg4seeds[0].size() == 0 || reg4seeds[1].size() == 0){
+        return false;
+    }
+    // build score map
+    singleCellSeed seed;
+    vector<size_t> overall_idx(reg2split);
+    overall_idx.insert(overall_idx.end(), reg4seeds[0].begin(), reg4seeds[0].end());
+    overall_idx.insert(overall_idx.end(), reg4seeds[1].begin(), reg4seeds[1].end());
+    vec_unique(overall_idx);
+    long sz_single_frame = cellSegment.data_rows_cols_slices[0]*
+            cellSegment.data_rows_cols_slices[1]*cellSegment.data_rows_cols_slices[2];
 
+    unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*reg2split_frame; // sub-matrix pointer
+    Mat *single_frame = new Mat(3, cellSegment.normalized_data4d.size, CV_8U, ind);
+
+    cellSegment.cropSeed(-1, overall_idx, single_frame, nullptr, &cellSegment.cell_label_maps[reg2split_frame],
+                         reg2split_frame, seed, cellSegment.p4segVol);
+
+    Mat subGapMap;
+    subVolExtract(&validGapMaps[reg2split_frame], CV_8U, subGapMap, seed.crop_range_yxz);// deep copy
+
+    Mat mask = seed.eigMap2d < 0;
+    setValMat(seed.eigMap2d, CV_32F, &mask, 0.0);
+    Mat1b possibleGap2d;
+    bitwise_and(seed.eigMap2d > 0, subGapMap, possibleGap2d);
+    float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split);
+    scale_vol(&seed.eigMap2d, CV_32F, &seed.score2d, 0.001, 1, 0, max_val);
+
+    mask = seed.eigMap3d < 0;
+    setValMat(seed.eigMap3d, CV_32F, &mask, 0.0);
+    Mat1b possibleGap3d;
+    bitwise_and(seed.eigMap3d > 0, subGapMap, possibleGap3d);
+    max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split);
+    scale_vol(&seed.eigMap3d, CV_32F, &seed.score3d, 0.001, 1, 0, max_val);
+
+    // start to build seed map
+    Mat1b fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
+    vector<vector<size_t>> seeds_idx(reg4seeds.size());
+    int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+    FOREACH_i(reg4seeds){
+        coordinateTransfer(reg4seeds[i], single_frame->size, seeds_idx[i], crop_start, seed.idMap.size);
+    }
+    Mat1i seedsMap;
+    bool success = binary_seedsMap_create(fgMap, &possibleGap3d, nullptr, seeds_idx, seedsMap);
+    if(!success){
+        success = binary_seedsMap_create(fgMap, nullptr, &possibleGap3d, seeds_idx, seedsMap);
+        if(!success){
+            return false;
+        }
+    }
+    seed.scoreMap = seed.score2d + seed.score3d;
+    Mat1i outLabelMap;
+    regionGrow(&seedsMap, 2, outLabelMap, &seed.scoreMap, &fgMap,
+               cellSegment.p4segVol.growConnectInRefine, cellSegment.p4segVol.graph_cost_design, false);
+
+    splitRegs.resize(2);
+    extractVoxIdxGivenId(&outLabelMap, splitRegs[0], 1);
+    extractVoxIdxGivenId(&outLabelMap, splitRegs[1], 2);
+    int crop_start_yxz[3] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start, -seed.crop_range_yxz[2].start};
+    coordinateTransfer(splitRegs[0], outLabelMap.size, splitRegs[0], crop_start_yxz,single_frame->size);
+    coordinateTransfer(splitRegs[1], outLabelMap.size, splitRegs[1], crop_start_yxz,single_frame->size);
 }
 bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, vector<size_t> reg2split, int reg2split_frame,
                     vector<vector<size_t>> reg4seeds, int reg4seeds_frame, bool gapBasedSplit,
