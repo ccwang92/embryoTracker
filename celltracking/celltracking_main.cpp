@@ -969,9 +969,9 @@ void cellTrackingMain::stableSegmentFixed(){
  * @param bestPeer
  * @param parent_flag
  */
-float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &bestPeer, bool parent_flag){
+float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_bestPeer, bool parent_flag){
     vector<size_t> peerCandidates(0);
-    bestPeer.resize(0);
+    out_bestPeer.resize(0);
     if(parent_flag && movieInfo.nodes[node_id].neighbors.size() >= 2){
         float curr_cost;
         bool currBest;
@@ -1004,7 +1004,7 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &bestPe
     if(peerCandidates.size() < 2){
         return INFINITY;
     }else if(peerCandidates.size() == 2){
-        bestPeer = peerCandidates;
+        out_bestPeer = peerCandidates;
         float dummy_c2n, dummy_n2c;
         return voxelwise_avg_distance(node_id, bestPeer, dummy_c2n, dummy_n2c);
     }else{ // more than two regions available
@@ -1017,7 +1017,7 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &bestPe
                 curr_peer[0] = peerCandidates[j];
                 curr_distance = voxelwise_avg_distance(node_id, curr_peer, dummy_c2n, dummy_n2c);
                 if(curr_distance < min_distance){
-                    bestPeer = curr_peer;
+                    out_bestPeer = curr_peer;
                     min_distance = curr_distance;
                 }
             }
@@ -2198,6 +2198,63 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
 
 }
 /**
+ * @brief findBestNeighbor: find the best neighbor (linking cost) of n1 cell in a given frame
+ * @param n1
+ * @param target_frame
+ * @return
+ */
+bool cellTrackingMain::findBestNeighbor(size_t n1, size_t &out_best_nei, float &cost, int target_frame){
+    cost = INFINITY;
+    if (target_frame > movieInfo.frames[n1]){
+        for(nodeRelation n : movieInfo.nodes[n1].neighbors){
+            if(movieInfo.frames[n.node_id]==target_frame && n.link_cost < cost){
+                cost = n.link_cost;
+                out_best_nei = n.node_id;
+            }
+        }
+    }else{
+        for(nodeRelation n : movieInfo.nodes[n1].preNeighbors){
+            if(movieInfo.frames[n.node_id]==target_frame && n.link_cost < cost){
+                cost = n.link_cost;
+                out_best_nei = n.node_id;
+            }
+        }
+    }
+    if(cost == INFINITY){
+        return false;
+    }else{
+        return true;
+    }
+}
+/**
+ * @brief isBestNeighbor: is n1 and n2 are best neighbor (correspond to linking cost)
+ * @param n1
+ * @param n2
+ * @param cost
+ * @return
+ */
+bool cellTrackingMain::isBestNeighbor(size_t n1, size_t n2, float &cost){
+    size_t best_nei;
+    if(findBestNeighbor(n1, best_nei, cost, movieInfo.frames[n2])){
+        if (n2 != best_nei){
+            return false;
+        }else{
+            if(findBestNeighbor(n2, best_nei, cost, movieInfo.frames[n1])){
+                if(n1 != best_nei){
+                    return false;
+                }else{
+                    return true;
+                }
+            }else{
+                return false;
+            }
+        }
+    }else{
+        return false;
+    }
+
+}
+/**
  * @brief regNodeValid: we may removed some region already
  * @param node_idx
  * @return
@@ -2214,6 +2271,12 @@ bool cellTrackingMain::isValid(size_t node_idx, cellSegmentMain *cellSegment){
     return true;
 
 }
+void cellTrackingMain::infinitifyCellRelation(size_t n1, size_t n2){
+    if(n1 > movieInfo.nodes.size() || n2 > movieInfo.nodes.size()) return;
+    int f1 = movieInfo.frames[n1];
+    int f2 = movieInfo.frames[n2];
+
+}
 /**
  * @brief separateRegion
  * @param cellSegment
@@ -2223,14 +2286,53 @@ bool cellTrackingMain::isValid(size_t node_idx, cellSegmentMain *cellSegment){
 bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2]){
     // first check that the regions is valid
     if(isValid(node_idx, &cellSegment)){
+        bool split_success = false;
+        vector<vector<size_t>> splitRegs(2);
+        float reg4seeds2splitRes_costs[2];
+        bool gapBasedSplit = false, usePriorGapMap = true;
         if(p4tracking.stableNodeTest == false || movieInfo.nodes[node_idx].stable_status == NOT_STABLE){
+            vector<vector<size_t>> reg4seeds(2);
+            reg4seeds[0] = movieInfo.voxIdx[seeds[0]];
+            reg4seeds[1] = movieInfo.voxIdx[seeds[1]];
+            int reg4seeds_frame = movieInfo.frames[seeds[0]];
+            gapBasedSplit = false;
+            split_success = bisectValidTest(cellSegment, node_idx, movieInfo.voxIdx[node_idx], movieInfo.frames[node_idx],
+                                reg4seeds, reg4seeds_frame, gapBasedSplit, usePriorGapMap,
+                                 splitRegs, reg4seeds2splitRes_costs);
+            if(!split_success){
+                splitRegs.clear();
+                gapBasedSplit = true;
+                split_success = bisectValidTest(cellSegment, node_idx, movieInfo.voxIdx[node_idx], movieInfo.frames[node_idx],
+                                    reg4seeds, reg4seeds_frame, gapBasedSplit, usePriorGapMap,
+                                     splitRegs, reg4seeds2splitRes_costs);
+            }
+        }
+        if(!split_success){ // fail to split: let's check if merge is a possible solution
+
+
+        }else{
 
         }
     }else{
         qFatal("This region or seeds has been nullified!");
     }
 }
+/**
+ * @brief handleNonSplitRegion:
+ * @param node_idx
+ * @param seeds
+ */
+void cellTrackingMain::handleNonSplitRegion(size_t node_idx, size_t seeds[2]){
+    float curr_link_cost;
+    for(int i=0; i<2; i++){
+        if(isBestNeighbor(node_idx, seeds[0], curr_link_cost)){
+            if(curr_link_cost < abs(p4tracking.observationCost)){
 
+            }
+            break;
+        }
+    }
+}
 /**
  * @brief mergedRegionGrow
  * @param cellSegment

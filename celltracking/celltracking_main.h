@@ -53,6 +53,9 @@ private:
     void movieInfoUpate();
 
     bool isValid(size_t node_idx, cellSegmentMain *cellSegment = nullptr);
+    bool isBestNeighbor(size_t n1, size_t n2, float &cost);
+    bool findBestNeighbor(size_t n1, size_t &out_n, float &cost, int target_frame);
+    void infinitifyCellRelation(size_t n1, size_t n2);
 private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
 
@@ -60,7 +63,7 @@ private: // remaining for split/merge module
     void detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info,
                            unordered_map<long, long> &node_id2split_merge_node_id);
     void combineCellsIntoOneRegion(vector<size_t> &cell_idxes, combinedCellsCensus &out_region_info);
-    float bestPeerCandidate(size_t node_id, vector<size_t> &bestPeer, bool parent_flag);
+    float bestPeerCandidate(size_t node_id, vector<size_t> &out_bestPeer, bool parent_flag);
     void peerRegionVerify(size_t node_id, float cost_good2go, bool parents_test,
                           vector<splitMergeNodeInfo> &split_merge_node_info,
                           unordered_map<long, long> &node_id2split_merge_node_id);
@@ -98,6 +101,7 @@ private: // remaining for split/merge module
     bool mergeValidTest(size_t curr_node_id, size_t seedRegs4split[2]);
 
     bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2]);
+    void handleNonSplitRegion(size_t node_idx, size_t seeds[2]);
     bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2]);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
