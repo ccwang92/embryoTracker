@@ -51,6 +51,8 @@ private:
     void getArcCostOne2OneTrack(size_t track_id, vector<float> &arc_costs);
     void stableSegmentFixed();
     void movieInfoUpate();
+
+    bool isValid(size_t node_idx, cellSegmentMain *cellSegment = nullptr);
 private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
 
@@ -69,7 +71,8 @@ private: // remaining for split/merge module
     int parentsKidsConsistency(size_t node_id);
     int handleInconsistentParentKid(cellSegmentMain &cellSegment, size_t node_id);
 
-    //TODO : implement
+    // TODO: it seems we have already avoid conflict decisions
+    void conflict_decision_handle(vector<tuple<size_t, int, float>> &merged_split_peers);
     bool seedsRefine_intensity(cellSegmentMain &cellSegment, vector<size_t> &root_idx, int root_frame,
                                vector<vector<size_t>> &seeds_idx, int seed_frame,
                                vector<vector<size_t>> &ref_seeds_idx);
@@ -81,18 +84,21 @@ private: // remaining for split/merge module
                                 vector<vector<size_t>> seeds_idx, Mat1i &seeds_map, size_t minSz);
     bool bisectRegion_gapGuided(cellSegmentMain &cellSegment, size_t reg2split_idx,
                                 vector<size_t> &reg2split, int reg2split_frame,
-                                vector<vector<size_t>> &reg4seeds, vector<vector<size_t>> &splitRegs);
+                                vector<vector<size_t>> &reg4seeds, bool usePriorGapMap, vector<vector<size_t>> &splitRegs);
     bool bisectRegion_bruteforce(cellSegmentMain &cellSegment, size_t reg2split_idx,
                                  vector<size_t> &reg2split, int reg2split_frame,
                                  vector<vector<size_t>> &reg4seeds, int reg4seeds_frame,
-                                 vector<vector<size_t>> &splitRegs);
+                                 bool usePriorGapMap, vector<vector<size_t>> &splitRegs);
     bool bisectValidTest(cellSegmentMain &cellSegment, size_t reg2split_idx, vector<size_t> reg2split,
                          int reg2split_frame, vector<vector<size_t>> reg4seeds, int reg4seeds_frame,
-                         bool gapBasedSplit, vector<vector<size_t>> &splitRegs,
+                         bool gapBasedSplit, bool usePriorGapMap, vector<vector<size_t>> &splitRegs,
                          float *reg4seeds2splitRes_costs);
     int regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t curr_node_id, bool one2multiple_flag, float &pvalue);
     bool testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSegment, vector<unordered_set<size_t>> left_or_right_cells);
     bool mergeValidTest(size_t curr_node_id, size_t seedRegs4split[2]);
+
+    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2]);
+    bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2]);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
 

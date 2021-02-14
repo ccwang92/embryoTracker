@@ -1204,12 +1204,12 @@ int cellTrackingMain::handleInconsistentParentKid(cellSegmentMain &cellSegment, 
 //                                           bool gapBasedSplit, vector<vector<size_t>> &splitRegs,
 //                                           float *reg4seeds2splitRes_costs)
     bool valid_p = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
-                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                        reg4seeds, reg4seeds_frame, gapBasedSplit, true,
                          splitRegs, reg4seeds2splitRes_costs);
     if(!valid_p){
         gapBasedSplit = false;
         valid_p = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
-                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                        reg4seeds, reg4seeds_frame, gapBasedSplit, true,
                          splitRegs, reg4seeds2splitRes_costs);
     }
 
@@ -1220,12 +1220,12 @@ int cellTrackingMain::handleInconsistentParentKid(cellSegmentMain &cellSegment, 
     reg4seeds_frame = movieInfo.frames[movieInfo.nodes[node_id].kids[0]];
     gapBasedSplit = true;
     bool valid_k = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
-                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                        reg4seeds, reg4seeds_frame, gapBasedSplit, true,
                          splitRegs, reg4seeds2splitRes_costs);
     if(!valid_k){
         gapBasedSplit = false;
         valid_k = bisectValidTest(cellSegment, node_id, movieInfo.voxIdx[node_id], movieInfo.frames[node_id],
-                        reg4seeds, reg4seeds_frame, gapBasedSplit,
+                        reg4seeds, reg4seeds_frame, gapBasedSplit, true,
                          splitRegs, reg4seeds2splitRes_costs);
     }
     if(valid_p && valid_k){
@@ -1518,7 +1518,7 @@ bool cellTrackingMain::binary_seedsMap_create(Mat1b &fgMap, Mat1b *possibleGap3d
 }
 bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size_t reg2split_idx,
                             vector<size_t> &reg2split, int reg2split_frame,
-                            vector<vector<size_t>> &reg4seeds, vector<vector<size_t>> &splitRegs){
+                            vector<vector<size_t>> &reg4seeds, bool usePriorGapMap, vector<vector<size_t>> &splitRegs){
     if(reg4seeds.size() != 2 || reg4seeds[0].size() == 0 || reg4seeds[1].size() == 0){
         return false;
     }
@@ -1537,22 +1537,25 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     cellSegment.cropSeed(-1, overall_idx, single_frame, nullptr, &cellSegment.cell_label_maps[reg2split_frame],
                          reg2split_frame, seed, cellSegment.p4segVol);
 
-    Mat subGapMap;
-    subVolExtract(&validGapMaps[reg2split_frame], CV_8U, subGapMap, seed.crop_range_yxz);// deep copy
+
 
     Mat mask = seed.eigMap2d < 0;
     setValMat(seed.eigMap2d, CV_32F, &mask, 0.0);
-    Mat1b possibleGap2d;
-    bitwise_and(seed.eigMap2d > 0, subGapMap, possibleGap2d);
+    Mat1b possibleGap2d = seed.eigMap2d > 0;
     float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split);
     scale_vol(&seed.eigMap2d, CV_32F, &seed.score2d, 0.001, 1, 0, max_val);
 
     mask = seed.eigMap3d < 0;
     setValMat(seed.eigMap3d, CV_32F, &mask, 0.0);
-    Mat1b possibleGap3d;
-    bitwise_and(seed.eigMap3d > 0, subGapMap, possibleGap3d);
+    Mat1b possibleGap3d = seed.eigMap3d > 0;
     max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split);
     scale_vol(&seed.eigMap3d, CV_32F, &seed.score3d, 0.001, 1, 0, max_val);
+    if(usePriorGapMap){
+        Mat subGapMap;
+        subVolExtract(&validGapMaps[reg2split_frame], CV_8U, subGapMap, seed.crop_range_yxz);// deep copy
+        bitwise_and(possibleGap2d, subGapMap, possibleGap2d);
+        bitwise_and(possibleGap3d, subGapMap, possibleGap3d);
+    }
 
     // start to build seed map
     Mat1b fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
@@ -1584,7 +1587,7 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
 bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, size_t reg2split_idx,
                                                vector<size_t> &reg2split, int reg2split_frame,
                                                vector<vector<size_t>> &reg4seeds, int reg4seeds_frame,
-                                               vector<vector<size_t>> &splitRegs){
+                                               bool usePriorGapMap, vector<vector<size_t>> &splitRegs){
     if(reg4seeds.size() != 2 || reg4seeds[0].size() == 0 || reg4seeds[1].size() == 0){
         return false;
     }
@@ -1603,22 +1606,23 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     cellSegment.cropSeed(-1, overall_idx, single_frame, nullptr, &cellSegment.cell_label_maps[reg2split_frame],
                          reg2split_frame, seed, cellSegment.p4segVol);
 
-    Mat subGapMap;
-    subVolExtract(&validGapMaps[reg2split_frame], CV_8U, subGapMap, seed.crop_range_yxz);// deep copy
-
     Mat mask = seed.eigMap2d < 0;
     setValMat(seed.eigMap2d, CV_32F, &mask, 0.0);
-    Mat1b possibleGap2d;
-    bitwise_and(seed.eigMap2d > 0, subGapMap, possibleGap2d);
+    Mat1b possibleGap2d = seed.eigMap2d > 0;
     float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split);
     scale_vol(&seed.eigMap2d, CV_32F, &seed.score2d, 0.001, 1, 0, max_val);
 
     mask = seed.eigMap3d < 0;
     setValMat(seed.eigMap3d, CV_32F, &mask, 0.0);
-    Mat1b possibleGap3d;
-    bitwise_and(seed.eigMap3d > 0, subGapMap, possibleGap3d);
+    Mat1b possibleGap3d = seed.eigMap3d > 0;
     max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split);
     scale_vol(&seed.eigMap3d, CV_32F, &seed.score3d, 0.001, 1, 0, max_val);
+    if(usePriorGapMap){
+        Mat subGapMap;
+        subVolExtract(&validGapMaps[reg2split_frame], CV_8U, subGapMap, seed.crop_range_yxz);// deep copy
+        bitwise_and(possibleGap2d, subGapMap, possibleGap2d);
+        bitwise_and(possibleGap3d, subGapMap, possibleGap3d);
+    }
 
     // start to build seed map
     Mat1b fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
@@ -1653,7 +1657,7 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
 }
 bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2split_idx, vector<size_t> reg2split,
                                        int reg2split_frame, vector<vector<size_t>> reg4seeds, int reg4seeds_frame,
-                                       bool gapBasedSplit, vector<vector<size_t>> &splitRegs,
+                                       bool gapBasedSplit, bool usePriorGapMap, vector<vector<size_t>> &splitRegs,
                                        float *reg4seeds2splitRes_costs){
     splitRegs.resize(reg4seeds.size());
 
@@ -1667,10 +1671,10 @@ bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2
     bool valid_reg_found;
     if(gapBasedSplit){
         valid_reg_found = bisectRegion_gapGuided(cellSegment, reg2split_idx, reg2split,
-                               reg2split_frame, reg4seeds, splitRegs);
+                               reg2split_frame, reg4seeds, usePriorGapMap, splitRegs);
     }else{
         valid_reg_found = bisectRegion_bruteforce(cellSegment, reg2split_idx, reg2split,
-                                                  reg2split_frame, reg4seeds, reg4seeds_frame, splitRegs);
+                                                  reg2split_frame, reg4seeds, reg4seeds_frame, usePriorGapMap, splitRegs);
     }
     if(valid_reg_found){
 //        float voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int curr_frame,
@@ -2076,14 +2080,14 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
  * @param cellSegment
  */
 void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
+    //vector<tuple<size_t, int, float>> all_merge_split_peers;
     for(vector<size_t> track : movieInfo.tracks){
         if(track.size() < 2 || track[0] < 0){
             continue;
         }
-        vector<tuple<size_t, int, float>> merged_peers; //node_id, decision, confidence
+        vector<tuple<size_t, int, float>> merged_split_peers; //node_id, decision, confidence
         unordered_set<size_t> nodes4merge;
         unordered_map<size_t, int> p_k_InConsistenct;
-        size_t dummy_idx;
         for(size_t curr_node_id : track){
             if(movieInfo.nodes[curr_node_id].kid_num > 1 && !set_exist(nodes4merge, curr_node_id)){
                 if (parentsKidsConsistency(curr_node_id) == PARENTS_KIDS_NOT_CONSISTENT){
@@ -2094,27 +2098,145 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
                         if (curr_decision == MERGE_BOTH_PARENTS_KIDS){
                             if(adjacentRegions(cellSegment.cell_label_maps[movieInfo.frames[movieInfo.nodes[curr_node_id].kids[0]]],
                             movieInfo.voxIdx[movieInfo.nodes[curr_node_id].kids[0]], movieInfo.nodes[curr_node_id].kids[1])){
-                                merged_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, INFINITY));
+                                merged_split_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, INFINITY));
                                 nodes4merge.insert(movieInfo.nodes[curr_node_id].kids[0]);
                                 nodes4merge.insert(movieInfo.nodes[curr_node_id].kids[1]);
                             }else{
-                                merged_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, 0.0));
+                                merged_split_peers.push_back(make_tuple(curr_node_id, MERGE_KIDS, 0.0));
                             }
                         }
                         else{
-                            merged_peers.push_back(make_tuple(curr_node_id, curr_decision, 1.0));
+                            merged_split_peers.push_back(make_tuple(curr_node_id, curr_decision, 1.0));
                         }
                     }
                 }else{
                     float pvalue;
                     int curr_decision = regionSplitMergeJudge(cellSegment, curr_node_id, true, pvalue);
+                    if (curr_decision != MERGE_SPLIT_NOT_SURE){
+                        merged_split_peers.push_back(make_tuple(curr_node_id, curr_decision, pvalue));
+                        if(curr_decision == MERGE_KIDS){
+                            nodes4merge.insert(movieInfo.nodes[curr_node_id].kids[0]);
+                            nodes4merge.insert(movieInfo.nodes[curr_node_id].kids[1]);
+                        }
+                    }
                 }
                 
             }
         }
+        // for multiple to one link
+        unordered_set<size_t> nodes4split;
+        for(size_t n : nodes4merge){
+            nodes4split.insert(n);
+            for(int j = 0; j< movieInfo.nodes[n].kid_num; j++){
+                nodes4split.insert(movieInfo.nodes[n].kids[j]);
+            }
+        }
+        for(size_t curr_node_id : track){
+            if(movieInfo.nodes[curr_node_id].parent_num > 1 && !set_exist(nodes4split, curr_node_id)){
+                if (movieInfo.nodes[curr_node_id].kid_num > 1){
+                    auto it0 = find_if(merged_split_peers.begin(), merged_split_peers.end(),
+                                                 [&curr_node_id](const tuple<size_t, int, float>& e){ return get<0>(e) == curr_node_id;} );
+
+                    auto it1 = find_if(p_k_InConsistenct.begin(), p_k_InConsistenct.end(),
+                                                 [&curr_node_id](const pair<size_t, int>& e){ return e.first == curr_node_id;} );
+                    if(it0 != merged_split_peers.end()){
+                        if(it1 != p_k_InConsistenct.end()){
+                            int curr_decision = it1->second;
+                            if(curr_decision == MERGE_BOTH_PARENTS_KIDS){
+                                if(adjacentRegions(cellSegment.cell_label_maps[movieInfo.frames[movieInfo.nodes[curr_node_id].kids[0]]],
+                                                   movieInfo.voxIdx[movieInfo.nodes[curr_node_id].parents[0]], movieInfo.nodes[curr_node_id].parents[1])){
+                                    merged_split_peers.push_back(make_tuple(curr_node_id, MERGE_PARENTS, 1));
+                                }else{
+                                    merged_split_peers.push_back(make_tuple(curr_node_id, MERGE_PARENTS, 0));
+                                }
+                            }
+                            if(curr_decision != MERGE_SPLIT_NOT_SURE){
+                                continue;
+                            }
+                        }else if(get<1>(*it0) == SPLIT_BY_KIDS){
+                            nodes4split.insert(movieInfo.nodes[curr_node_id].kids[0]);
+                            nodes4split.insert(movieInfo.nodes[curr_node_id].kids[1]);
+                            continue;
+                        }
+                    }
+                }
+                bool parents_already_merged = false;
+                for(int p = 0; p<movieInfo.nodes[curr_node_id].parent_num; p++ ){
+                    size_t p_c = movieInfo.nodes[curr_node_id].parents[p];
+                    auto it = find_if(merged_split_peers.begin(), merged_split_peers.end(),
+                                                 [&p_c](const tuple<size_t, int, float>& e){ return get<0>(e) == p_c;} );
+
+                    if(it != merged_split_peers.end() && get<1>(*it) == MERGE_KIDS){
+                        parents_already_merged = true;
+                        break;
+                    }
+                }
+                if(parents_already_merged) continue;
+
+                float pvalue;
+                int curr_decision = regionSplitMergeJudge(cellSegment, curr_node_id, false, pvalue);
+                if (curr_decision != MERGE_SPLIT_NOT_SURE){
+                    merged_split_peers.push_back(make_tuple(curr_node_id, curr_decision, pvalue));
+                    if(curr_decision == SPLIT_BY_PARENTS){
+                        nodes4split.insert(movieInfo.nodes[curr_node_id].kids[0]);
+                        nodes4split.insert(movieInfo.nodes[curr_node_id].kids[1]);
+                    }
+                }
+
+            }
+        }
+        //all_merge_split_peers.insert(all_merge_split_peers.end(), merged_split_peers.begin(), merged_split_peers.end());
+
+        // deal with inconsistent decisions: not needed
+        //conflict_decision_handle(all_merge_split_peers);
+        FOREACH_i(merged_split_peers){
+
+        }
+    }
+
+
+
+}
+/**
+ * @brief regNodeValid: we may removed some region already
+ * @param node_idx
+ * @return
+ */
+bool cellTrackingMain::isValid(size_t node_idx, cellSegmentMain *cellSegment){
+    if(node_idx >= movieInfo.nodes.size()) return false;
+    if(movieInfo.nodes[node_idx].node_id != node_idx) return false;
+    if(cellSegment == nullptr) return true;
+
+    int f = movieInfo.frames[node_idx];
+    if(cellSegment->cell_label_maps[f].at<int>(movieInfo.voxIdx[node_idx][0]) != movieInfo.labelInMap[node_idx]){
+        return false;
+    }
+    return true;
+
+}
+/**
+ * @brief separateRegion
+ * @param cellSegment
+ * @param node_idx
+ * @param seeds
+ */
+bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2]){
+    // first check that the regions is valid
+    if(isValid(node_idx, &cellSegment)){
+        if(p4tracking.stableNodeTest == false || movieInfo.nodes[node_idx].stable_status == NOT_STABLE){
+
+        }
+    }else{
+        qFatal("This region or seeds has been nullified!");
     }
 }
-void nodesMergeTest(cellSegmentMain &cellSegment){
+
+/**
+ * @brief mergedRegionGrow
+ * @param cellSegment
+ * @param seeds
+ */
+bool cellTrackingMain::mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2]){
 
 }
 

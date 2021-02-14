@@ -793,6 +793,18 @@ template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2)
         }
     }
 }
+template <typename T> vector<T> intersection(vector<T> &v1, vector<T> &v2){
+    vector<T> v3;
+
+    sort(v1.begin(), v1.end());
+    sort(v2.begin(), v2.end());
+
+    set_intersection(v1.begin(),v1.end(),
+                          v2.begin(),v2.end(),
+                          back_inserter(v3));
+    return v3;
+}
+
 template <typename T> bool group_inersect(vector<T> g1, vector<T> g2){
     FOREACH_i(g1){
         FOREACH_j(g2){
