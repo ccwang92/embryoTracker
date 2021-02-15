@@ -2079,7 +2079,7 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
  * @brief regionRefresh: based on the tracking results, check if the region should be split or merge
  * @param cellSegment
  */
-void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
+void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs){
     //vector<tuple<size_t, int, float>> all_merge_split_peers;
     for(vector<size_t> track : movieInfo.tracks){
         if(track.size() < 2 || track[0] < 0){
@@ -2188,8 +2188,10 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment){
         //all_merge_split_peers.insert(all_merge_split_peers.end(), merged_split_peers.begin(), merged_split_peers.end());
 
         // deal with inconsistent decisions: not needed
-        //conflict_decision_handle(all_merge_split_peers);
+
         FOREACH_i(merged_split_peers){
+            //separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
+            //size_t seeds[2], vector<simpleNodeInfo> &newCells)
 
         }
     }
@@ -2272,9 +2274,46 @@ bool cellTrackingMain::isValid(size_t node_idx, cellSegmentMain *cellSegment){
 
 }
 void cellTrackingMain::infinitifyCellRelation(size_t n1, size_t n2){
-    if(n1 > movieInfo.nodes.size() || n2 > movieInfo.nodes.size()) return;
+    if(n1 > movieInfo.frames.size() || n2 > movieInfo.frames.size()) return;
     int f1 = movieInfo.frames[n1];
     int f2 = movieInfo.frames[n2];
+    if(f1==f2) return;
+
+    if(f1 > f2){
+        size_t tmp = n1;
+        n1 = n2;
+        n2 = tmp;
+    }
+    for(nodeRelation &n : movieInfo.nodes[n1].neighbors){
+        if(n.node_id == n2){
+            n.link_cost = INFINITY;
+            n.dist_c2n = 1000;
+            n.dist_n2c = 1000;
+            break;
+        }
+    }
+    for(nodeRelation &n : movieInfo.nodes[n2].preNeighbors){
+        if(n.node_id == n1){
+            n.link_cost = INFINITY;
+            n.dist_c2n = 1000;
+            n.dist_n2c = 1000;
+            break;
+        }
+    }
+}
+//TODO: have not finished the implementation
+void cellTrackingMain::addOneNewCell(cellSegmentMain &cellSegment, vector<size_t> voxIdx, int frame){
+    nodeInfo n1;
+    n1.node_id = movieInfo.frames.size() + 1;
+    n1.stable_status = NOT_STABLE;
+    movieInfo.frames.push_back(frame);
+    movieInfo.voxIdx.push_back(voxIdx);
+//    vector<int> y, x, z;
+//    vec_ind2sub(voxIdx, y, x, z, cellSegment.cell_label_maps[0].size);
+//    movieInfo.vox_y.push_back(y);
+//    movieInfo.vox_x.push_back(x);
+//    movieInfo.vox_z.push_back(z);
+//    cellSegment.cell_label_maps
 
 }
 /**
@@ -2283,7 +2322,9 @@ void cellTrackingMain::infinitifyCellRelation(size_t n1, size_t n2){
  * @param node_idx
  * @param seeds
  */
-bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2]){
+bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
+                                      size_t seeds[2], vector<simpleNodeInfo> &newCells){
+    //newCells.resize(0);
     // first check that the regions is valid
     if(isValid(node_idx, &cellSegment)){
         bool split_success = false;
@@ -2308,10 +2349,22 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
             }
         }
         if(!split_success){ // fail to split: let's check if merge is a possible solution
-
-
-        }else{
-
+            if(handleNonSplitReg_link2oneSeed(node_idx, seeds)){
+                return true;
+            }else{
+                return false;
+            }
+        }else{ // split success
+            // 1. nullify the current region
+            movieInfo.nodes[node_idx].node_id = -1;
+            // 2. save the two new regions in
+            simpleNodeInfo newC1, newC2;
+            newCells.push_back(newC1);
+            newCells.push_back(newC2);
+            newCells[newCells.size() - 2].frame = movieInfo.frames[node_idx];
+            newCells[newCells.size() - 2].voxIdx = splitRegs[0];
+            newCells[newCells.size() - 1].frame = movieInfo.frames[node_idx];
+            newCells[newCells.size() - 1].voxIdx = splitRegs[1];
         }
     }else{
         qFatal("This region or seeds has been nullified!");
@@ -2322,16 +2375,19 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
  * @param node_idx
  * @param seeds
  */
-void cellTrackingMain::handleNonSplitRegion(size_t node_idx, size_t seeds[2]){
+bool cellTrackingMain::handleNonSplitReg_link2oneSeed(size_t node_idx, size_t seeds[2]){
     float curr_link_cost;
+    bool one_is_good = false;
     for(int i=0; i<2; i++){
         if(isBestNeighbor(node_idx, seeds[0], curr_link_cost)){
             if(curr_link_cost < abs(p4tracking.observationCost)){
-
+                infinitifyCellRelation(node_idx, seeds[1-i]); // remove the other node
+                one_is_good = true;
             }
             break;
         }
     }
+    return one_is_good;
 }
 /**
  * @brief mergedRegionGrow

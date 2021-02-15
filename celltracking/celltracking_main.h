@@ -69,7 +69,7 @@ private: // remaining for split/merge module
                           unordered_map<long, long> &node_id2split_merge_node_id);
     size_t sizeCumulate(size_t curr_cell, size_t familiy_members[2]);
 
-    void regionRefresh(cellSegmentMain &cellSegment);
+    void regionRefresh(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
     bool exist_in_pairs(vector<pair<size_t[2], int>> &pairs, size_t id);
     int parentsKidsConsistency(size_t node_id);
     int handleInconsistentParentKid(cellSegmentMain &cellSegment, size_t node_id);
@@ -80,7 +80,6 @@ private: // remaining for split/merge module
                                vector<vector<size_t>> &seeds_idx, int seed_frame,
                                vector<vector<size_t>> &ref_seeds_idx);
     bool seedsRefine_gap(Mat1b &possibleGaps, vector<vector<size_t>> &seeds_idx, Mat1i &outLabelMap);
-
 
 
     bool binary_seedsMap_create(Mat1b &fgMap, Mat1b *possbileGap3d, Mat1b *possbileGap2d,
@@ -100,8 +99,9 @@ private: // remaining for split/merge module
     bool testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSegment, vector<unordered_set<size_t>> left_or_right_cells);
     bool mergeValidTest(size_t curr_node_id, size_t seedRegs4split[2]);
 
-    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2]);
-    void handleNonSplitRegion(size_t node_idx, size_t seeds[2]);
+    void addOneNewCell(cellSegmentMain &cellSegment, vector<size_t> voxIdx, int frame);
+    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], vector<simpleNodeInfo> &newCells);
+    bool handleNonSplitReg_link2oneSeed(size_t node_idx, size_t seeds[2]);
     bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2]);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);

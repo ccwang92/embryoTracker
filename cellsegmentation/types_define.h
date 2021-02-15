@@ -157,9 +157,14 @@ struct splitMergeNodeInfo{
     float src_link_cost;
     bool invalid;
 };
+// save the newly found cells and refresh the data after all
+struct simpleNodeInfo{
+    int frame;
+    std::vector<size_t> voxIdx;
+};
 
 struct nodeInfo{
-    size_t node_id;
+    long long node_id;
     //directFamily family_members; // neighboring relationship, at most two kids or parents
     size_t parents[2];
     float parent_cost[2];
