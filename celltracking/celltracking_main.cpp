@@ -2530,6 +2530,11 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
     if(vec_unique(uptCell_idxs)){
         qFatal("There is duplicated updating! check first func: regionRefresh() first");
     }
+    if(p4tracking.stableNodeTest){
+
+    }
+    // TODO: there should be an update related to missing cell re-detect (named: node_tested_st_end_jump)
+
 
 }
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){

@@ -138,10 +138,17 @@ struct trackParameter{
 
 // structures to save the detection infor
 struct nodeRelation{
-    size_t node_id;
+    long long node_id;
     float dist_c2n, dist_n2c; // current to neighbor in next frames or in counter direction
     long overlap_size;
     float link_cost;
+    void operator=(nodeRelation in){
+        this->node_id = in.node_id;
+        this->dist_c2n = in.dist_c2n;
+        this->dist_n2c = in.dist_n2c;
+        this->overlap_size = in.overlap_size;
+        this->link_cost = in.link_cost;
+    }
 };
 //struct directFamily{ // for each node, it has at most two parents or two kids
 //    simpleCell parents[2];
@@ -177,6 +184,29 @@ struct nodeInfo{
     std::vector<nodeRelation> neighbors; // candidate kids
     std::vector<nodeRelation> preNeighbors; // candidate parents: it will not save dist_c2n and dist_n2c
     int stable_status;
+
+    void operator=(nodeInfo in){
+        this->node_id = in.node_id;
+        for(int i=0;i<in.parent_num;i++) {
+            this->parents[i] = in.parents[i];
+            this->parent_cost[i] = in.parent_cost[i];
+        }
+        this->parent_num = in.parent_num;
+        for(int i=0;i<in.kid_num;i++) {
+            this->kids[i] = in.kids[i];
+            this->kid_cost[i] = in.kid_cost[i];
+        }
+        this->kid_num = in.kid_num;
+        this->nodeId2trackId = in.nodeId2trackId;
+        this->nodeLocInTrack = in.nodeLocInTrack;
+        this->in_cost = in.in_cost;
+        this->out_cost = in.out_cost;
+        this->detect_confidence = in.detect_confidence;
+        this->stable_status = in.stable_status;
+        this->neighbors.resize(in.neighbors.size())
+        for(int i=0; i<in.neighbors.size(); i++) this->neighbors[i] = in.neighbors[i];
+        for(int i=0; i<in.preNeighbors.size(); i++) this->preNeighbors[i] = in.preNeighbors[i];
+    }
 };
 //struct nodeInfoInTrack{
 //    size_t nodeId2trackId, nodeLocInTrack;
