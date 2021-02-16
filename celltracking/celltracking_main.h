@@ -34,6 +34,7 @@ private:
                                  int data3d_sz[3], float &c2n, float &n2c);
     void updatePreNeighborInfo();
     size_t cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &cellSegment);
+    void reCalculateCellsDistances(vector<float> &nn_dist);
     void calCell2neighborDistance(vector<float> &nn_dist);
     float distance2cost(float distance, float alpha, float beta, float punish);
     void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
@@ -46,7 +47,7 @@ private:
     void updateJumpCost();
     // functions to update cost given new gamma fitting results
     void driftCorrection();
-    void updateGammaParam();
+    void updateGammaParam(vector<float> &nn_dist);
     void updateArcCost();
     void getArcCostOne2OneTrack(size_t track_id, vector<float> &arc_costs);
     void stableSegmentFixed();
