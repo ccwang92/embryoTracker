@@ -212,7 +212,6 @@ template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx);
 template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx);
 template <typename T> T vec_max(vector<T> const &func);
 template <typename T> T vec_min(vector<T> const &func);
-template <typename T> void vec_unique(vector<T> & v);
 template <typename T> bool vec_find(vector<T> const &func, T target, size_t &idx);
 template <typename T> bool set_exist(unordered_set<T> const &func, T target);
 template <typename T> bool set_exist(unordered_set<T> const &set_sub, unordered_set<T> const &set_large);
@@ -229,7 +228,7 @@ template <typename T> void orderStatsKSection(vector<T> fg, vector<T> bg, vector
 template <typename T> size_t overlap_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in = 0);
 template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> vec_idx, float threshold_in = 0);
 
-template <typename T> void vec_unique(vector<T> & v);
+template <typename T> bool vec_unique(vector<T> & v);
 template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2);
 
 template <typename T> void mergeIntersectGroups(vector<vector<T>> &groups);

@@ -56,10 +56,15 @@ private:
     bool isBestNeighbor(size_t n1, size_t n2, float &cost);
     bool findBestNeighbor(size_t n1, size_t &out_n, float &cost, int target_frame);
     void infinitifyCellRelation(size_t n1, size_t n2);
+    void nullifyCellOrNode(size_t node_idx); //
+    void nullifyCellOrNode(size_t node_idx[]); //
+    void nullifyCellOrNode(vector<size_t> node_idx); //
 private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
 
     void handleMergeSplitRegions();
+    void regionRefresh(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+
     void detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info,
                            unordered_map<long, long> &node_id2split_merge_node_id);
     void combineCellsIntoOneRegion(vector<size_t> &cell_idxes, combinedCellsCensus &out_region_info);
@@ -69,7 +74,7 @@ private: // remaining for split/merge module
                           unordered_map<long, long> &node_id2split_merge_node_id);
     size_t sizeCumulate(size_t curr_cell, size_t familiy_members[2]);
 
-    void regionRefresh(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+
     bool exist_in_pairs(vector<pair<size_t[2], int>> &pairs, size_t id);
     int parentsKidsConsistency(size_t node_id);
     int handleInconsistentParentKid(cellSegmentMain &cellSegment, size_t node_id);
@@ -100,17 +105,20 @@ private: // remaining for split/merge module
     bool mergeValidTest(size_t curr_node_id, size_t seedRegs4split[2]);
 
     void addOneNewCell(cellSegmentMain &cellSegment, vector<size_t> voxIdx, int frame);
-    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], vector<simpleNodeInfo> &newCells);
     bool handleNonSplitReg_link2oneSeed(size_t node_idx, size_t seeds[2]);
-    bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2]);
+    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], vector<simpleNodeInfo> &newCells);
+
+    bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<simpleNodeInfo> &newCells);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
 
 private:
+    void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+private:
     allCellsCensus movieInfo;
     trackParameter p4tracking;
     vector<size_t> cumulative_cell_nums;
-    vector<Mat> validGapMaps;
+    vector<Mat1b> validGapMaps;
     //friend class cellSegmentMain;
 public:
     void init_parameter(segParameter &p4seg, long cell_num){

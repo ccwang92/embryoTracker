@@ -1,4 +1,4 @@
-#include "celltracking_main.h"
+﻿#include "celltracking_main.h"
 #include "CINDA/src_c/cinda_funcs.c"
 
 cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment)
@@ -76,7 +76,7 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
     validGapMaps.resize(cellSegment.number_cells.size());
     for(int i = 0; i < cellSegment.number_cells.size(); i++){
         validGapMaps = Mat(cellSegment.cell_label_maps[i].dims, cellSegment.cell_label_maps[i].size,
-                           CV_8U, Scalar(1));
+                           CV_8U, Scalar(255));
     }
 }
 /**
@@ -542,33 +542,42 @@ void cellTrackingMain::mccTracker_one2one(){
     double *mcost = new double[m];
 
     long long arc_cnt = 0;
-    double src_id = 1;
+    double src_id = 0;
     int rand_max = 100;
-
+    float linkCostUpBound = INFINITY / 1e7;
     for(nodeInfo node : movieInfo.nodes){
         // in arc
         mtail[arc_cnt] = src_id;
-        mhead[arc_cnt] =  2 * node.node_id;
+        mhead[arc_cnt] =  2 * node.node_id+1;
         mcost[arc_cnt] = round(node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        arc_cnt ++;
+        // observation arc
+        mtail[arc_cnt] = 2 * node.node_id+1;
+        mhead[arc_cnt] =  2 * node.node_id + 2;
+        mcost[arc_cnt] = round(p4tracking.observationCost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // out arc
         mhead[arc_cnt] = src_id;
-        mtail[arc_cnt] =  2 * node.node_id;
+        mtail[arc_cnt] =  2 * node.node_id + 2;
         mcost[arc_cnt] = round(node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
+        linkCostUpBound = node.out_cost;
         // link with neighbors
         for(nodeRelation neighbor : node.neighbors){
-            mtail[arc_cnt] = 2 * node.node_id;
-            mhead[arc_cnt] =  2 * neighbor.node_id;
-            mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
-            arc_cnt ++;
+            if(neighbor.link_cost < linkCostUpBound){
+                mtail[arc_cnt] = 2 * node.node_id + 2;
+                mhead[arc_cnt] =  2 * neighbor.node_id + 1;
+                mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                arc_cnt ++;
+            }
+
         }
     }
-    assert(arc_cnt == m);
+    //assert(arc_cnt == m);
     long *msz = new long[3]; // should be long long, but for our data, long is enough
     msz[0] = 12;
     msz[1] = n;
-    msz[2] = m;
+    msz[2] = arc_cnt;
 
     // call pyCS2: note, everything needs to be very precise
     long long *track_vec = pyCS2(msz, mtail, mhead, mlow, macap, mcost);
@@ -639,6 +648,8 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
     }
     bool *visited = new bool[movieInfo.nodes.size()];
     memset(visited, false, movieInfo.nodes.size());
+
+    float linkCostUpBound = INFINITY / 1e7;
     // add the arcs of splitting and merging
     for(splitMergeNodeInfo sp_mg_info : split_merge_node_info){
         if(sp_mg_info.node_id >= 0){
@@ -686,12 +697,17 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
         }
         // in arc
         mtail[arc_cnt] = src_id;
-        mhead[arc_cnt] =  2 * node.node_id;
+        mhead[arc_cnt] =  2 * node.node_id + 1;
         mcost[arc_cnt] = round(node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        arc_cnt ++;
+        // observation arc
+        mtail[arc_cnt] = 2 * node.node_id+1;
+        mhead[arc_cnt] =  2 * node.node_id + 2;
+        mcost[arc_cnt] = round(p4tracking.observationCost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // out arc
         mhead[arc_cnt] = src_id;
-        mtail[arc_cnt] =  2 * node.node_id;
+        mtail[arc_cnt] =  2 * node.node_id+2;
         mcost[arc_cnt] = round(node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // link with neighbors
@@ -699,18 +715,22 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
             int curr_frame = movieInfo.frames[node.node_id];
             for(nodeRelation neighbor : node.neighbors){
                 if(movieInfo.frames[neighbor.node_id]-1 == curr_frame){
-                    mtail[arc_cnt] = 2 * node.node_id;
-                    mhead[arc_cnt] =  2 * neighbor.node_id;
-                    mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
-                    arc_cnt ++;
+                    if(neighbor.link_cost < linkCostUpBound){
+                        mtail[arc_cnt] = 2 * node.node_id+2;
+                        mhead[arc_cnt] =  2 * neighbor.node_id+1;
+                        mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                        arc_cnt ++;
+                    }
                 }
             }
         }else{
             for(nodeRelation neighbor : node.neighbors){
-                mtail[arc_cnt] = 2 * node.node_id;
-                mhead[arc_cnt] =  2 * neighbor.node_id;
-                mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
-                arc_cnt ++;
+                if(neighbor.link_cost < linkCostUpBound){
+                    mtail[arc_cnt] = 2 * node.node_id+1;
+                    mhead[arc_cnt] =  2 * neighbor.node_id+2;
+                    mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                    arc_cnt ++;
+                }
             }
         }
     }
@@ -1006,7 +1026,7 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
     }else if(peerCandidates.size() == 2){
         out_bestPeer = peerCandidates;
         float dummy_c2n, dummy_n2c;
-        return voxelwise_avg_distance(node_id, bestPeer, dummy_c2n, dummy_n2c);
+        return voxelwise_avg_distance(node_id, out_bestPeer, dummy_c2n, dummy_n2c);
     }else{ // more than two regions available
         float min_distance = INFINITY, curr_distance;
         float dummy_c2n, dummy_n2c;
@@ -2192,11 +2212,60 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
         FOREACH_i(merged_split_peers){
             //separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
             //size_t seeds[2], vector<simpleNodeInfo> &newCells)
+            size_t curr_node_idx = get<0>(merged_split_peers[i]);
+            size_t seeds[2];
+            bool merge_flag = false, split_flag = false;
+            switch (get<1>(merged_split_peers[i])){
+            case MERGE_PARENTS:
+                merge_flag = true;
+                seeds[0] = movieInfo.nodes[curr_node_idx].parents[0];
+                seeds[1] = movieInfo.nodes[curr_node_idx].parents[1];
+                break;
+            case MERGE_KIDS:
+                merge_flag = true;
+                seeds[0] = movieInfo.nodes[curr_node_idx].kids[0];
+                seeds[1] = movieInfo.nodes[curr_node_idx].kids[1];
+                break;
+            case SPLIT_BY_PARENTS:
+                split_flag = true;
+                seeds[0] = movieInfo.nodes[curr_node_idx].parents[0];
+                seeds[1] = movieInfo.nodes[curr_node_idx].parents[1];
+                break;
+            case SPLIT_BY_KIDS:
+                split_flag = true;
+                seeds[0] = movieInfo.nodes[curr_node_idx].kids[0];
+                seeds[1] = movieInfo.nodes[curr_node_idx].kids[1];
+                break;
+            default:
+                break;
+            }
 
+            if(merge_flag){
+                if(mergedRegionGrow(cellSegment, seeds, newCells)){
+                    uptCell_idxs.push_back(seeds[0]);
+                    uptCell_idxs.push_back(seeds[1]);
+                    // if success, we need to check if gap should be removed
+                    if(get<2>(merged_split_peers[i]) < 0.05){ // we are confident with the merging, so remove gaps between regions
+                        int frame = movieInfo.frames[seeds[0]];
+                        setValMat(cellSegment.cell_label_maps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
+                    }
+                }
+            }else if(split_flag){
+                if(!separateRegion(cellSegment, curr_node_idx, seeds, newCells)){
+                    //curr_node_idx (1) fails to be split and (2) none of its parents can link to it (cost > obzCost)
+                    // such case, we merge two parents
+                    if(mergedRegionGrow(cellSegment, seeds, newCells)){
+                        uptCell_idxs.push_back(curr_node_idx);
+                        // for the un-seperable region, we do not want to frequently check them; so remove the gaps between them
+                        int frame = movieInfo.frames[seeds[0]];
+                        setValMat(cellSegment.cell_label_maps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
+                    }
+                }else{
+                    uptCell_idxs.push_back(curr_node_idx);
+                }
+            }
         }
     }
-
-
 
 }
 /**
@@ -2301,13 +2370,14 @@ void cellTrackingMain::infinitifyCellRelation(size_t n1, size_t n2){
         }
     }
 }
-//TODO: have not finished the implementation
+//!!!!!!!!!!! TODO: have not finished the implementation !!!!!!!!!!!!!!!!!!!!**/
 void cellTrackingMain::addOneNewCell(cellSegmentMain &cellSegment, vector<size_t> voxIdx, int frame){
-    nodeInfo n1;
-    n1.node_id = movieInfo.frames.size() + 1;
-    n1.stable_status = NOT_STABLE;
-    movieInfo.frames.push_back(frame);
-    movieInfo.voxIdx.push_back(voxIdx);
+//    nodeInfo n1;
+//    n1.node_id = movieInfo.frames.size() + 1;
+//    n1.stable_status = NOT_STABLE;
+//    movieInfo.frames.push_back(frame);
+//    movieInfo.voxIdx.push_back(voxIdx);
+
 //    vector<int> y, x, z;
 //    vec_ind2sub(voxIdx, y, x, z, cellSegment.cell_label_maps[0].size);
 //    movieInfo.vox_y.push_back(y);
@@ -2315,6 +2385,25 @@ void cellTrackingMain::addOneNewCell(cellSegmentMain &cellSegment, vector<size_t
 //    movieInfo.vox_z.push_back(z);
 //    cellSegment.cell_label_maps
 
+}
+/**
+ * @brief nullifyCellOrNode: nullify a cell or a node from movieInfo
+ * NOTE: not necessary to remove from the array at current stage
+ * @param node_idx
+ */
+void cellTrackingMain::nullifyCellOrNode(size_t node_idx){
+    movieInfo.nodes[node_idx].node_id = -1;
+}
+void cellTrackingMain::nullifyCellOrNode(size_t node_idx[]){
+    int num = sizeof(node_idx)/sizeof(node_idx[0]);
+    for(int i=0; i<num; i++){
+        nullifyCellOrNode(node_idx[i]);
+    }
+}
+void cellTrackingMain::nullifyCellOrNode(vector<size_t> node_idx){
+    for(size_t n : node_idx){
+        nullifyCellOrNode(n);
+    }
 }
 /**
  * @brief separateRegion
@@ -2356,7 +2445,7 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
             }
         }else{ // split success
             // 1. nullify the current region
-            movieInfo.nodes[node_idx].node_id = -1;
+            nullifyCellOrNode(node_idx);
             // 2. save the two new regions in
             simpleNodeInfo newC1, newC2;
             newCells.push_back(newC1);
@@ -2365,6 +2454,7 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
             newCells[newCells.size() - 2].voxIdx = splitRegs[0];
             newCells[newCells.size() - 1].frame = movieInfo.frames[node_idx];
             newCells[newCells.size() - 1].voxIdx = splitRegs[1];
+            return true;
         }
     }else{
         qFatal("This region or seeds has been nullified!");
@@ -2390,20 +2480,57 @@ bool cellTrackingMain::handleNonSplitReg_link2oneSeed(size_t node_idx, size_t se
     return one_is_good;
 }
 /**
- * @brief mergedRegionGrow
+ * @brief mergedRegionGrow:merge two cells
  * @param cellSegment
  * @param seeds
  */
-bool cellTrackingMain::mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2]){
-
+bool cellTrackingMain::mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<simpleNodeInfo> &newCells){
+    assert(movieInfo.frames[seeds[0]] == movieInfo.frames[seeds[1]]);
+    int curr_frame = movieInfo.frames[seeds[0]];
+    if(p4tracking.stableNodeTest && movieInfo.nodes[seeds[0]].stable_status == NOT_STABLE &&
+            movieInfo.nodes[seeds[1]].stable_status == NOT_STABLE){
+        if(isValid(seeds[0], &cellSegment) && isValid(seeds[1], &cellSegment)){
+            simpleNodeInfo newC;
+            newCells.push_back(newC);
+            newCells[newCells.size() - 1].frame = curr_frame;
+            newCells[newCells.size() - 1].voxIdx = movieInfo.voxIdx[seeds[0]];
+            newCells[newCells.size() - 1].voxIdx.insert(newCells[newCells.size() - 1].voxIdx.end(),
+                    movieInfo.voxIdx[seeds[0]].begin(), movieInfo.voxIdx[seeds[0]].end());
+            nullifyCellOrNode(seeds);
+            return true;
+        }else{
+            return false;
+        }
+    }else{
+        return false;
+    }
 }
 
 
 
 void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
+    // 1. build the graph allowing split and merge and conduct min-cost circulation based tracking
     handleMergeSplitRegions();
-    //refreshRegions
-    regionRefresh(cellSegment);
+    // 2. for each one2two or two2one linking, choose to split or merge the correspond nodes
+    vector<simpleNodeInfo> newCells;
+    vector<size_t> uptCell_idxs;
+    regionRefresh(cellSegment, newCells, uptCell_idxs);
+
+    // 3. update movieInfo/cellSegment based on the newly detected cells or removed cells
+
+}
+/**
+ * @brief movieInfo_update:update movieInfo/cellSegment based on the newly detected cells or removed cells
+ * @param cellSegment
+ * @param newCells
+ * @param uptCell_idxs
+ */
+void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+                                        vector<size_t> &uptCell_idxs){
+    if(vec_unique(uptCell_idxs)){
+        qFatal("There is duplicated updating! check first func: regionRefresh() first");
+    }
+
 }
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
 

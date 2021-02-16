@@ -775,11 +775,15 @@ template <typename T> bool isempty_mat_vec(Mat *src3d, int datatype, vector<T> v
 }
 
 
-template <typename T> void vec_unique(vector<T> & v){
+template <typename T> bool vec_unique(vector<T> & v){
     sort(v.begin(), v.end());
     typename vector<T>::iterator it;
     it = unique(v.begin(), v.end());
+    if(it == v.end()){
+        return false;
+    }
     v.resize(distance(v.begin(),it));
+    return true;
 }
 
 template <typename T> void vec_ele_wise_abs_diff(vector<T> & v1, vector<T> & v2){
