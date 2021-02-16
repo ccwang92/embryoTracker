@@ -28,36 +28,65 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment)
 }
 
 void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
-    extractVoxIdxList(cellSegment.cell_label_maps, movieInfo.voxIdx, cellSegment.number_cells);
+    vector<vector<size_t>> curr_cell_idx;
+    extractVoxIdxList(cellSegment.cell_label_maps, curr_cell_idx, cellSegment.number_cells);
+    /** KEY: we generate an overly large voxIdx in movieInfo */
+    movieInfo.voxIdx.resize(2*curr_cell_idx.size()); // we assume each cell at most can be split once
+    long long increment = 0;
+    for(int i : cellSegment.number_cells){
+        for(size_t j=increment; j<(increment+i); j++){
+            movieInfo.voxIdx[j] = curr_cell_idx[i];
+        }
+        for(size_t j=increment+i; j<(increment+2*i); j++){
+            movieInfo.voxIdx[j].reserve(0);
+        }
+        increment += i*2;
+    }
+    cumulative_cell_nums.resize(cellSegment.number_cells.size());
+    cumulative_cell_nums[0] = cellSegment.number_cells[0]*2;
+    for (int i = 1; i< cumulative_cell_nums.size(); i++){
+        cumulative_cell_nums[i] = (cumulative_cell_nums[i-1] + 2*cellSegment.number_cells[i]);
+    }
     movieInfo.xCoord.resize(movieInfo.voxIdx.size());
     movieInfo.yCoord.resize(movieInfo.voxIdx.size());
     movieInfo.zCoord.resize(movieInfo.voxIdx.size());
     movieInfo.range_xyz.resize(movieInfo.voxIdx.size());
     movieInfo.start_coord_xyz.resize(movieInfo.voxIdx.size());
     FOREACH_i(movieInfo.voxIdx){
-        vec_ind2sub(movieInfo.voxIdx[i], movieInfo.vox_y[i],
-                    movieInfo.vox_x[i], movieInfo.vox_z[i], cellSegment.cell_label_maps[0].size);
-        movieInfo.xCoord[i] = vec_mean(movieInfo.vox_x[i]);
-        movieInfo.yCoord[i] = vec_mean(movieInfo.vox_y[i]);
-        movieInfo.zCoord[i] = vec_mean(movieInfo.vox_z[i]);
+        if(movieInfo.voxIdx[i].size()>0){
+            vec_ind2sub(movieInfo.voxIdx[i], movieInfo.vox_y[i],
+                        movieInfo.vox_x[i], movieInfo.vox_z[i], cellSegment.cell_label_maps[0].size);
+            movieInfo.xCoord[i] = vec_mean(movieInfo.vox_x[i]);
+            movieInfo.yCoord[i] = vec_mean(movieInfo.vox_y[i]);
+            movieInfo.zCoord[i] = vec_mean(movieInfo.vox_z[i]);
 
-        movieInfo.start_coord_xyz[i].resize(3);
-        size_t dummy;
-        movieInfo.start_coord_xyz[i][0] = vec_min(movieInfo.vox_x[i], dummy);
-        movieInfo.start_coord_xyz[i][1] = vec_min(movieInfo.vox_y[i], dummy);
-        movieInfo.start_coord_xyz[i][2] = vec_min(movieInfo.vox_z[i], dummy);
-        movieInfo.range_xyz[i].resize(3);
-        movieInfo.range_xyz[i][0] = vec_max(movieInfo.vox_x[i], dummy) - movieInfo.range_xyz[i][0] + 1;
-        movieInfo.range_xyz[i][1] = vec_max(movieInfo.vox_y[i], dummy) - movieInfo.range_xyz[i][1] + 1;
-        movieInfo.range_xyz[i][2] = vec_max(movieInfo.vox_z[i], dummy) - movieInfo.range_xyz[i][2] + 1;
+            movieInfo.start_coord_xyz[i].resize(3);
+            size_t dummy;
+            movieInfo.start_coord_xyz[i][0] = vec_min(movieInfo.vox_x[i], dummy);
+            movieInfo.start_coord_xyz[i][1] = vec_min(movieInfo.vox_y[i], dummy);
+            movieInfo.start_coord_xyz[i][2] = vec_min(movieInfo.vox_z[i], dummy);
+            movieInfo.range_xyz[i].resize(3);
+            movieInfo.range_xyz[i][0] = vec_max(movieInfo.vox_x[i], dummy) - movieInfo.range_xyz[i][0] + 1;
+            movieInfo.range_xyz[i][1] = vec_max(movieInfo.vox_y[i], dummy) - movieInfo.range_xyz[i][1] + 1;
+            movieInfo.range_xyz[i][2] = vec_max(movieInfo.vox_z[i], dummy) - movieInfo.range_xyz[i][2] + 1;
+        }else{
+            movieInfo.vox_y[i].reserve(0);
+            movieInfo.vox_x[i].reserve(0);
+            movieInfo.vox_z[i].reserve(0);
+            movieInfo.xCoord[i] = -INFINITY;
+            movieInfo.yCoord[i] = -INFINITY;
+            movieInfo.zCoord[i] = -INFINITY;
+            movieInfo.start_coord_xyz[i] = {-1,-1,-1};
+            movieInfo.range_xyz[i] = {0,0,0};
+        }
     }
     movieInfo.nodes.reserve(movieInfo.xCoord.size());
-    long increment = 0;
+    increment = 0;
     FOREACH_i(cellSegment.number_cells){
-        increment += i>0? cellSegment.number_cells[i]:0;
-        for(int j = 0; j < cellSegment.number_cells[i]; j++){
+        increment += i>0? 2*cellSegment.number_cells[i]:0;
+        for(int j = 0; j < 2*cellSegment.number_cells[i]; j++){
             movieInfo.frames[j + increment] = i;
-            movieInfo.labelInMap[j + increment] = j;
+            movieInfo.labelInMap[j + increment] = 0;
             movieInfo.nodes[j + increment].node_id = j + increment;
         }
     }
@@ -66,11 +95,7 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
     FOREACH_i(movieInfo.frame_shift_xyz){
         movieInfo.frame_shift_xyz[i] = {0, 0, 0};
     }
-    cumulative_cell_nums.resize(cellSegment.number_cells.size());
-    cumulative_cell_nums[0] = cellSegment.number_cells[0];
-    for (int i = 1; i< cumulative_cell_nums.size(); i++){
-        cumulative_cell_nums[i] = (cumulative_cell_nums[i-1] + cellSegment.number_cells[i]);
-    }
+
     movieInfo.tracks.resize(0);
 
     validGapMaps.resize(cellSegment.number_cells.size());
@@ -259,6 +284,11 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
                              vector<size_t> &nei_voxIdx, vector<int> &nei_vox_x, vector<int> &nei_vox_y,
                              vector<int> &nei_vox_z, vector<int> &nei_range_xyz, vector<int> &nei_start_coord_xyz, int nei_frame,
                              float &c2n, float &n2c){
+    if(!(curr_voxIdx.size() > 0 && nei_voxIdx.size() > 0)){
+        c2n = INFINITY;
+        n2c = c2n;
+        return INFINITY;
+    }
     bool *ref_cell = new bool[curr_voxIdx.size()];
     memset(ref_cell, false, curr_voxIdx.size());
     size_t idx;
@@ -296,6 +326,11 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
 float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int curr_frame,
                              vector<size_t> &nei_voxIdx, int nei_frame,
                              int data3d_sz[3], float &c2n, float &n2c){
+    if(!(curr_voxIdx.size() > 0 && nei_voxIdx.size() > 0)){
+        c2n = INFINITY;
+        n2c = c2n;
+        return INFINITY;
+    }
     vector<int> curr_vox_x, curr_vox_y, curr_vox_z;
     vector<int> curr_range_xyz(3), curr_start_coord_xyz(3);
     vector<int> nei_vox_x, nei_vox_y, nei_vox_z;
@@ -369,6 +404,7 @@ void cellTrackingMain::combineCellsIntoOneRegion(vector<size_t> &cell_idxes, com
     fill(out_region_info.range_xyz.begin(), out_region_info.range_xyz.end(), -1);
 
     for(size_t n : cell_idxes){
+        if(out_region_info.voxIdx.size() == 0) continue;
         out_region_info.voxIdx.insert(out_region_info.voxIdx.end(), movieInfo.voxIdx[n].begin(), movieInfo.voxIdx[n].end());
         out_region_info.vox_x.insert(out_region_info.vox_x.end(), movieInfo.vox_x[n].begin(), movieInfo.vox_x[n].end());
         out_region_info.vox_y.insert(out_region_info.vox_y.end(), movieInfo.vox_y[n].begin(), movieInfo.vox_y[n].end());
@@ -478,8 +514,10 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
         movieInfo.nodes[i].detect_confidence = p4tracking.observationCost;
         movieInfo.nodes[i].in_cost = p4tracking.c_en;
         movieInfo.nodes[i].out_cost = p4tracking.c_ex;
-        vector<size_t> nei_ids;
+        vector<size_t> nei_ids(0);
         extractNeighborIds(cellSegment.cell_label_maps, i, nei_ids);
+        movieInfo.nodes[i].neighbors.reserve(nei_ids.size());
+        movieInfo.nodes[i].preNeighbors.reserve(0); //initialized preNeighbor
         if (nei_ids.size() < 1){
             continue;
         }
@@ -2255,7 +2293,8 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
                     //curr_node_idx (1) fails to be split and (2) none of its parents can link to it (cost > obzCost)
                     // such case, we merge two parents
                     if(mergedRegionGrow(cellSegment, seeds, newCells)){
-                        uptCell_idxs.push_back(curr_node_idx);
+                        uptCell_idxs.push_back(seeds[0]);
+                        uptCell_idxs.push_back(seeds[1]);
                         // for the un-seperable region, we do not want to frequently check them; so remove the gaps between them
                         int frame = movieInfo.frames[seeds[0]];
                         setValMat(cellSegment.cell_label_maps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
@@ -2445,7 +2484,7 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
             }
         }else{ // split success
             // 1. nullify the current region
-            nullifyCellOrNode(node_idx);
+            // nullifyCellOrNode(node_idx); // leave it to movieIinfo_update
             // 2. save the two new regions in
             simpleNodeInfo newC1, newC2;
             newCells.push_back(newC1);
@@ -2496,7 +2535,7 @@ bool cellTrackingMain::mergedRegionGrow(cellSegmentMain &cellSegment, size_t see
             newCells[newCells.size() - 1].voxIdx = movieInfo.voxIdx[seeds[0]];
             newCells[newCells.size() - 1].voxIdx.insert(newCells[newCells.size() - 1].voxIdx.end(),
                     movieInfo.voxIdx[seeds[0]].begin(), movieInfo.voxIdx[seeds[0]].end());
-            nullifyCellOrNode(seeds);
+            //nullifyCellOrNode(seeds); //leave it to movieInfo_update
             return true;
         }else{
             return false;
@@ -2530,6 +2569,15 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
     if(vec_unique(uptCell_idxs)){
         qFatal("There is duplicated updating! check first func: regionRefresh() first");
     }
+    vector<unordered_set<size_t>> uptCell_framewise (cellSegment.number_cells.size());
+    //vector<unordered_set<size_t>> newCells_framewise (cellSegment.number_cells.size());
+    FOREACH_i(uptCell_idxs){
+        int frame = movieInfo.frames[uptCell_idxs[i]];
+        uptCell_framewise[frame].insert(uptCell_idxs[i]);
+    }
+//    FOREACH_i(newCells){
+//    }
+
     if(p4tracking.stableNodeTest){
 
     }

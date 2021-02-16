@@ -142,7 +142,7 @@ struct nodeRelation{
     float dist_c2n, dist_n2c; // current to neighbor in next frames or in counter direction
     long overlap_size;
     float link_cost;
-    void operator=(nodeRelation in){
+    void operator=(nodeRelation &in){
         this->node_id = in.node_id;
         this->dist_c2n = in.dist_c2n;
         this->dist_n2c = in.dist_n2c;
@@ -185,7 +185,7 @@ struct nodeInfo{
     std::vector<nodeRelation> preNeighbors; // candidate parents: it will not save dist_c2n and dist_n2c
     int stable_status;
 
-    void operator=(nodeInfo in){
+    void operator=(nodeInfo &in){
         this->node_id = in.node_id;
         for(int i=0;i<in.parent_num;i++) {
             this->parents[i] = in.parents[i];
@@ -203,7 +203,7 @@ struct nodeInfo{
         this->out_cost = in.out_cost;
         this->detect_confidence = in.detect_confidence;
         this->stable_status = in.stable_status;
-        this->neighbors.resize(in.neighbors.size())
+        this->neighbors.resize(in.neighbors.size());
         for(int i=0; i<in.neighbors.size(); i++) this->neighbors[i] = in.neighbors[i];
         for(int i=0; i<in.preNeighbors.size(); i++) this->preNeighbors[i] = in.preNeighbors[i];
     }
