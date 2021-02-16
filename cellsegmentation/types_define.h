@@ -167,6 +167,7 @@ struct splitMergeNodeInfo{
 // save the newly found cells and refresh the data after all
 struct simpleNodeInfo{
     int frame;
+    unsigned char threshold;
     std::vector<size_t> voxIdx;
 };
 

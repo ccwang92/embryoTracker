@@ -56,9 +56,10 @@ private:
     bool isBestNeighbor(size_t n1, size_t n2, float &cost);
     bool findBestNeighbor(size_t n1, size_t &out_n, float &cost, int target_frame);
     void infinitifyCellRelation(size_t n1, size_t n2);
-    void nullifyCellOrNode(size_t node_idx); //
-    void nullifyCellOrNode(size_t node_idx[]); //
-    void nullifyCellOrNode(vector<size_t> node_idx); //
+    void nullifyCellOrNode(size_t node_idx, cellSegmentMain *cellSegment = nullptr); //
+    void nullifyCellOrNode(size_t node_idx[], cellSegmentMain *cellSegment = nullptr); //
+    void nullifyCellOrNode(vector<size_t> node_idx, cellSegmentMain *cellSegment = nullptr); //
+    void appendNewCellOrNode(cellSegmentMain &cellSegment, simpleNodeInfo &newCell, size_t append_loc_idx);
 private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
 
@@ -104,7 +105,7 @@ private: // remaining for split/merge module
     bool testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSegment, vector<unordered_set<size_t>> left_or_right_cells);
     bool mergeValidTest(size_t curr_node_id, size_t seedRegs4split[2]);
 
-    void addOneNewCell(cellSegmentMain &cellSegment, vector<size_t> voxIdx, int frame);
+
     bool handleNonSplitReg_link2oneSeed(size_t node_idx, size_t seeds[2]);
     bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], vector<simpleNodeInfo> &newCells);
 

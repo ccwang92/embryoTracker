@@ -2409,27 +2409,66 @@ void cellTrackingMain::infinitifyCellRelation(size_t n1, size_t n2){
         }
     }
 }
-//!!!!!!!!!!! TODO: have not finished the implementation !!!!!!!!!!!!!!!!!!!!**/
-void cellTrackingMain::addOneNewCell(cellSegmentMain &cellSegment, vector<size_t> voxIdx, int frame){
-//    nodeInfo n1;
-//    n1.node_id = movieInfo.frames.size() + 1;
-//    n1.stable_status = NOT_STABLE;
-//    movieInfo.frames.push_back(frame);
-//    movieInfo.voxIdx.push_back(voxIdx);
+/**
+ * @brief appendNewCellOrNode:append a new cell to the frame
+ * @param cellSegment
+ * @param newCells
+ * @param append_loc_idx: the location to append in voxIdx
+ */
+void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleNodeInfo &newCell,
+                                           size_t append_loc_idx){
+    // 1. update movieInfo
+    int frame = newCell.frame;
+    int labelInLabelMap;
+    if (frame>0) labelInLabelMap = append_loc_idx - cumulative_cell_nums[frame-1];
+    else labelInLabelMap = append_loc_idx;
 
-//    vector<int> y, x, z;
-//    vec_ind2sub(voxIdx, y, x, z, cellSegment.cell_label_maps[0].size);
-//    movieInfo.vox_y.push_back(y);
-//    movieInfo.vox_x.push_back(x);
-//    movieInfo.vox_z.push_back(z);
-//    cellSegment.cell_label_maps
+    movieInfo.frames[append_loc_idx] = newCell.frame;
+    movieInfo.voxIdx[append_loc_idx] = newCell.voxIdx;
+    movieInfo.labelInMap[append_loc_idx] = labelInLabelMap;
+
+    vector<int> y, x, z;
+    vec_ind2sub(newCell.voxIdx, y, x, z, cellSegment.cell_label_maps[0].size);
+    movieInfo.vox_y[append_loc_idx] = y;
+    movieInfo.vox_x[append_loc_idx] = x;
+    movieInfo.vox_z[append_loc_idx] = z;
+
+    movieInfo.xCoord[append_loc_idx] = vec_mean(x);
+    movieInfo.yCoord[append_loc_idx] = vec_mean(y);
+    movieInfo.zCoord[append_loc_idx] = vec_mean(z);
+
+    movieInfo.start_coord_xyz[append_loc_idx] = {vec_min(x), vec_min(y), vec_min(z)};
+    movieInfo.range_xyz[append_loc_idx] = {vec_max(x)-movieInfo.start_coord_xyz[append_loc_idx][0],
+                                           vec_max(y)-movieInfo.start_coord_xyz[append_loc_idx][1],
+                                           vec_max(z)-movieInfo.start_coord_xyz[append_loc_idx][2]};
+    nodeInfo n;
+    n.node_id = append_loc_idx;
+    n.in_cost = p4tracking.c_en;
+    n.out_cost = p4tracking.c_ex;
+    n.detect_confidence = p4tracking.observationCost;
+    n.stable_status = NOT_STABLE;
+
+    vector<size_t> nei_ids(0);
+    extractNeighborIds(cellSegment.cell_label_maps, i, nei_ids);
+    movieInfo.nodes[i].neighbors.reserve(nei_ids.size());
+    movieInfo.nodes[i].preNeighbors.reserve(0); //initialized preNeighbor
+    // 2. update cellSegment
+    cellSegment.cell_label_maps
 
 }
 /**
- * @brief nullifyCellOrNode: nullify a cell or a node from movieInfo
+ * @brief nullifyCellOrNode: nullify a cell or a node from movieInfo and cellSegment
  * @param node_idx
  */
-void cellTrackingMain::nullifyCellOrNode(size_t node_idx){
+void cellTrackingMain::nullifyCellOrNode(size_t node_idx, cellSegmentMain *cellSegment){
+    // 1. remove from cell_label_maps (threshold_maps may be not needed)
+    // NOTE: we do not need to decrease cell_num since the max cell label in the frame is not changed (not for sure)
+    if(cellSegment != nullptr){
+        int frame = movieInfo.frames[node_idx];
+        setValMat(cellSegment->cell_label_maps[frame], CV_32S, movieInfo.voxIdx[node_idx], 0);
+        setValMat(cellSegment->threshold_maps[frame], CV_32F, movieInfo.voxIdx[node_idx], 0);
+    }
+    // 2. nullify movieInfo
     movieInfo.voxIdx[node_idx].resize(0);
     movieInfo.vox_y[node_idx].resize(0);
     movieInfo.vox_x[node_idx].resize(0);
@@ -2451,6 +2490,7 @@ void cellTrackingMain::nullifyCellOrNode(size_t node_idx){
             }
         }
     }
+    movieInfo.overall_neighbor_num -= movieInfo.nodes[node_idx].neighbors.size();
     movieInfo.nodes[node_idx].neighbors.resize(0);
 
     for(nodeRelation pn : movieInfo.nodes[node_idx].preNeighbors){
@@ -2465,16 +2505,17 @@ void cellTrackingMain::nullifyCellOrNode(size_t node_idx){
         }
     }
     movieInfo.nodes[node_idx].preNeighbors.resize(0);
+
 }
-void cellTrackingMain::nullifyCellOrNode(size_t node_idx[]){
+void cellTrackingMain::nullifyCellOrNode(size_t node_idx[], cellSegmentMain *cellSegment){
     int num = sizeof(node_idx)/sizeof(node_idx[0]);
     for(int i=0; i<num; i++){
-        nullifyCellOrNode(node_idx[i]);
+        nullifyCellOrNode(node_idx[i], cellSegment);
     }
 }
-void cellTrackingMain::nullifyCellOrNode(vector<size_t> node_idx){
+void cellTrackingMain::nullifyCellOrNode(vector<size_t> node_idx, cellSegmentMain *cellSegment){
     for(size_t n : node_idx){
-        nullifyCellOrNode(n);
+        nullifyCellOrNode(n, cellSegment);
     }
 }
 /**
@@ -2567,7 +2608,15 @@ bool cellTrackingMain::mergedRegionGrow(cellSegmentMain &cellSegment, size_t see
             newCells[newCells.size() - 1].frame = curr_frame;
             newCells[newCells.size() - 1].voxIdx = movieInfo.voxIdx[seeds[0]];
             newCells[newCells.size() - 1].voxIdx.insert(newCells[newCells.size() - 1].voxIdx.end(),
-                    movieInfo.voxIdx[seeds[0]].begin(), movieInfo.voxIdx[seeds[0]].end());
+                    movieInfo.voxIdx[seeds[1]].begin(), movieInfo.voxIdx[seeds[1]].end());
+
+            float r1 = ((float)movieInfo.voxIdx[seeds[0]].size()) / newCells[newCells.size() - 1].voxIdx.size();
+            float r2 = ((float)movieInfo.voxIdx[seeds[1]].size()) / newCells[newCells.size() - 1].voxIdx.size();
+            newCells[newCells.size() - 1].threshold = (unsigned char)(
+                        r1 * cellSegment.threshold_maps[curr_frame].at<unsigned char>(movieInfo.voxIdx[seeds[0]][0]) +
+                    r2 * cellSegment.threshold_maps[curr_frame].at<unsigned char>(movieInfo.voxIdx[seeds[1]][0])
+                    );
+
             //nullifyCellOrNode(seeds); //leave it to movieInfo_update
             return true;
         }else{
