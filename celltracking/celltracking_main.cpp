@@ -2427,11 +2427,44 @@ void cellTrackingMain::addOneNewCell(cellSegmentMain &cellSegment, vector<size_t
 }
 /**
  * @brief nullifyCellOrNode: nullify a cell or a node from movieInfo
- * NOTE: not necessary to remove from the array at current stage
  * @param node_idx
  */
 void cellTrackingMain::nullifyCellOrNode(size_t node_idx){
-    movieInfo.nodes[node_idx].node_id = -1;
+    movieInfo.voxIdx[node_idx].resize(0);
+    movieInfo.vox_y[node_idx].resize(0);
+    movieInfo.vox_x[node_idx].resize(0);
+    movieInfo.vox_z[node_idx].resize(0);
+    movieInfo.xCoord[node_idx] = -INFINITY;
+    movieInfo.yCoord[node_idx] = -INFINITY;
+    movieInfo.zCoord[node_idx] = -INFINITY;
+    movieInfo.start_coord_xyz[node_idx] = {-1,-1,-1};
+    movieInfo.range_xyz[node_idx] = {0,0,0};
+
+    for(nodeRelation n : movieInfo.nodes[node_idx].neighbors){
+        for(nodeRelation &pn : movieInfo.nodes[n.node_id].preNeighbors){
+            if(pn.node_id == node_idx){
+                pn.dist_c2n = INFINITY;
+                pn.dist_n2c = INFINITY;
+                pn.link_cost = INFINITY;
+                pn.overlap_size = 0;
+                break;
+            }
+        }
+    }
+    movieInfo.nodes[node_idx].neighbors.resize(0);
+
+    for(nodeRelation pn : movieInfo.nodes[node_idx].preNeighbors){
+        for(nodeRelation &n : movieInfo.nodes[pn.node_id].neighbors){
+            if(n.node_id == node_idx){
+                n.dist_c2n = INFINITY;
+                n.dist_n2c = INFINITY;
+                n.link_cost = INFINITY;
+                n.overlap_size = 0;
+                break;
+            }
+        }
+    }
+    movieInfo.nodes[node_idx].preNeighbors.resize(0);
 }
 void cellTrackingMain::nullifyCellOrNode(size_t node_idx[]){
     int num = sizeof(node_idx)/sizeof(node_idx[0]);
