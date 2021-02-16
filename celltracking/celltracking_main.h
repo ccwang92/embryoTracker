@@ -38,6 +38,7 @@ private:
     void calCell2neighborDistance(vector<float> &nn_dist);
     float distance2cost(float distance, float alpha, float beta, float punish);
     void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
+    void extractPreNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs);
     void mccTracker_one2one();
     void mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_merge_node_info);
     void track2parentKid();
@@ -108,7 +109,7 @@ private: // remaining for split/merge module
 
 
     bool handleNonSplitReg_link2oneSeed(size_t node_idx, size_t seeds[2]);
-    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], vector<simpleNodeInfo> &newCells);
+    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], bool oneSeedIsGood, vector<simpleNodeInfo> &newCells);
 
     bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<simpleNodeInfo> &newCells);
 private:    // TODO: missing cell module

@@ -494,7 +494,6 @@ void cellTrackingMain::reCalculateCellsDistances(vector<float> &nn_dist){
  * @return
  */
 void cellTrackingMain::calCell2neighborDistance(vector<float> &nn_dist){
-
     if (movieInfo.tracks.empty()){ // if there is no track info, use all node with nearest neighbor
         reCalculateCellsDistances(nn_dist);
     }else{ // if there are tracks, use long tracks
@@ -553,6 +552,8 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
     // start a naive linking
     mccTracker_one2one(); // jumpCost are updated, so the distance will
     driftCorrection(); // update frame drifting
+    reCalculateCellsDistances(nn_dist);
+    nn_dist.clear(); //problematic: needs re-think here
     calCell2neighborDistance(nn_dist); // the neighbor from tracking reuslts
     updateGammaParam(nn_dist);
     updateArcCost();
@@ -566,7 +567,28 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
  */
 void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs){
     if(movieInfo.frames[cell_idx] == (int)cell_label_maps.size()) return;
-    for (size_t i = movieInfo.frames[cell_idx] + 1; i < cell_label_maps.size(); i++){
+    for (size_t i = movieInfo.frames[cell_idx] + 1; i <= MIN(cell_label_maps.size()-1, movieInfo.frames[cell_idx]+p4tracking.k); i++){
+        unordered_set<int> nei_labels;
+        FOREACH_j(movieInfo.voxIdx[cell_idx]){
+            if (cell_label_maps[i].at<int>(movieInfo.voxIdx[cell_idx][j])>0){
+                nei_labels.insert(cell_label_maps[i].at<int>(movieInfo.voxIdx[cell_idx][j]));
+            }
+        }
+        for(auto it : nei_labels){
+            nei_idxs.push_back(it + cumulative_cell_nums[i - 1]);
+        }
+    }
+}
+
+/**
+ * @brief extractPreNeighborIds: for a given node idx, get its possible pre-neighbors
+ * @param cell_label_maps
+ * @param node_idx
+ * @param nei_idxs
+ */
+void cellTrackingMain::extractPreNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs){
+    if(movieInfo.frames[cell_idx] == (int)0) return;
+    for (size_t i = movieInfo.frames[cell_idx] - 1; i >= MAX(0, movieInfo.frames[cell_idx]-p4tracking.k); i--){
         unordered_set<int> nei_labels;
         FOREACH_j(movieInfo.voxIdx[cell_idx]){
             if (cell_label_maps[i].at<int>(movieInfo.voxIdx[cell_idx][j])>0){
@@ -2302,15 +2324,18 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
                     }
                 }
             }else if(split_flag){
-                if(!separateRegion(cellSegment, curr_node_idx, seeds, newCells)){
+                bool oneSeedIsGood;
+                if(!separateRegion(cellSegment, curr_node_idx, seeds, oneSeedIsGood, newCells)){
                     //curr_node_idx (1) fails to be split and (2) none of its parents can link to it (cost > obzCost)
                     // such case, we merge two parents
-                    if(mergedRegionGrow(cellSegment, seeds, newCells)){
-                        uptCell_idxs.push_back(seeds[0]);
-                        uptCell_idxs.push_back(seeds[1]);
-                        // for the un-seperable region, we do not want to frequently check them; so remove the gaps between them
-                        int frame = movieInfo.frames[seeds[0]];
-                        setValMat(cellSegment.cell_label_maps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
+                    if(!oneSeedIsGood){ // if there is one seed is good, we have linked the region to one of the seed
+                        if(mergedRegionGrow(cellSegment, seeds, newCells)){
+                            uptCell_idxs.push_back(seeds[0]);
+                            uptCell_idxs.push_back(seeds[1]);
+                            // for the un-seperable region, we do not want to frequently check them; so remove the gaps between them
+                            int frame = movieInfo.frames[seeds[0]];
+                            setValMat(cellSegment.cell_label_maps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
+                        }
                     }
                 }else{
                     uptCell_idxs.push_back(curr_node_idx);
@@ -2460,20 +2485,83 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
     n.out_cost = p4tracking.c_ex;
     n.detect_confidence = p4tracking.observationCost;
     n.stable_status = NOT_STABLE;
-
+    // update the new neighbors
     vector<size_t> nei_ids(0);
     extractNeighborIds(cellSegment.cell_label_maps, append_loc_idx, nei_ids);
     movieInfo.nodes[append_loc_idx].neighbors.reserve(nei_ids.size());
-    movieInfo.nodes[append_loc_idx].preNeighbors.reserve(0); //initialized preNeighbor
-
-    for(nodeRelation &neighbor : movieInfo.nodes[append_loc_idx].neighbors){
-
-        neighbor.link_cost = distance2cost(MAX(neighbor.dist_c2n, neighbor.dist_n2c),
+    for(int i=0; i<nei_ids.size(); i++){
+        movieInfo.nodes[append_loc_idx].neighbors[i].node_id = nei_ids[i];
+        float max_dist = voxelwise_avg_distance(append_loc_idx, nei_ids[i],
+                                                movieInfo.nodes[append_loc_idx].neighbors[i].dist_c2n,
+                                                movieInfo.nodes[append_loc_idx].neighbors[i].dist_n2c);
+        movieInfo.nodes[append_loc_idx].neighbors[i].link_cost = distance2cost(max_dist,
                                            movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+
+        movieInfo.nodes[append_loc_idx].neighbors[i].overlap_size = cellOverlapSize(append_loc_idx, nei_ids[i],
+                                                                                    cellSegment);
+        bool existing_flag = false;
+        for(nodeRelation &preNei : movieInfo.nodes[nei_ids[i]].preNeighbors){
+            if(preNei.node_id == append_loc_idx){
+                preNei.dist_n2c = movieInfo.nodes[append_loc_idx].neighbors[i].dist_c2n;
+                preNei.dist_c2n = movieInfo.nodes[append_loc_idx].neighbors[i].dist_n2c;
+                preNei.link_cost = movieInfo.nodes[append_loc_idx].neighbors[i].link_cost;
+                preNei.overlap_size = movieInfo.nodes[append_loc_idx].neighbors[i].overlap_size;
+                existing_flag = true;
+                break;
+            }
+        }
+        if(!existing_flag){
+            nodeRelation newPreNei;
+            newPreNei.node_id = append_loc_idx;
+            newPreNei.dist_n2c = movieInfo.nodes[append_loc_idx].neighbors[i].dist_c2n;
+            newPreNei.dist_c2n = movieInfo.nodes[append_loc_idx].neighbors[i].dist_n2c;
+            newPreNei.link_cost = movieInfo.nodes[append_loc_idx].neighbors[i].link_cost;
+            newPreNei.overlap_size = movieInfo.nodes[append_loc_idx].neighbors[i].overlap_size;
+            movieInfo.nodes[nei_ids[i]].preNeighbors.push_back(newPreNei);
+        }
+    }
+    // update the preNeighbors
+    vector<size_t> preNei_ids(0);
+    extractPreNeighborIds(cellSegment.cell_label_maps, append_loc_idx, preNei_ids);
+    movieInfo.nodes[append_loc_idx].preNeighbors.reserve(preNei_ids.size());
+    for(int i=0; i<preNei_ids.size(); i++){
+        movieInfo.nodes[append_loc_idx].preNeighbors[i].node_id = preNei_ids[i];
+        float max_dist = voxelwise_avg_distance(append_loc_idx, preNei_ids[i],
+                                                movieInfo.nodes[append_loc_idx].preNeighbors[i].dist_c2n,
+                                                movieInfo.nodes[append_loc_idx].preNeighbors[i].dist_n2c);
+        movieInfo.nodes[append_loc_idx].preNeighbors[i].link_cost = distance2cost(max_dist,
+                                           movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+
+        movieInfo.nodes[append_loc_idx].preNeighbors[i].overlap_size = cellOverlapSize(append_loc_idx, preNei_ids[i],
+                                                                                    cellSegment);
+        bool existing_flag = false;
+        for(nodeRelation &nei : movieInfo.nodes[preNei_ids[i]].neighbors){
+            if(nei.node_id == append_loc_idx){
+                nei.dist_n2c = movieInfo.nodes[append_loc_idx].neighbors[i].dist_c2n;
+                nei.dist_c2n = movieInfo.nodes[append_loc_idx].neighbors[i].dist_n2c;
+                nei.link_cost = movieInfo.nodes[append_loc_idx].neighbors[i].link_cost;
+                nei.overlap_size = movieInfo.nodes[append_loc_idx].neighbors[i].overlap_size;
+                existing_flag = true;
+                break;
+            }
+        }
+        if(!existing_flag){
+            nodeRelation newNei;
+            newNei.node_id = append_loc_idx;
+            newNei.dist_n2c = movieInfo.nodes[append_loc_idx].neighbors[i].dist_c2n;
+            newNei.dist_c2n = movieInfo.nodes[append_loc_idx].neighbors[i].dist_n2c;
+            newNei.link_cost = movieInfo.nodes[append_loc_idx].neighbors[i].link_cost;
+            newNei.overlap_size = movieInfo.nodes[append_loc_idx].neighbors[i].overlap_size;
+            movieInfo.nodes[preNei_ids[i]].neighbors.push_back(newNei);
+        }
     }
     // 2. update cellSegment
-    cellSegment.cell_label_maps
-
+    setValMat(cellSegment.cell_label_maps[frame], CV_32S, newCell.voxIdx, labelInLabelMap);
+    setValMat(cellSegment.threshold_maps[frame], CV_32F, newCell.voxIdx, newCell.threshold);
+    if(labelInLabelMap > cellSegment.number_cells[frame]){
+        assert(labelInLabelMap == cellSegment.number_cells[frame]+1);
+        cellSegment.number_cells[frame] = labelInLabelMap;
+    }
 }
 /**
  * @brief nullifyCellOrNode: nullify a cell or a node from movieInfo and cellSegment
@@ -2544,10 +2632,11 @@ void cellTrackingMain::nullifyCellOrNode(vector<size_t> node_idx, cellSegmentMai
  * @param seeds
  */
 bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
-                                      size_t seeds[2], vector<simpleNodeInfo> &newCells){
+                                      size_t seeds[2], bool oneSeedIsGood, vector<simpleNodeInfo> &newCells){
     //newCells.resize(0);
     // first check that the regions is valid
     if(isValid(node_idx, &cellSegment)){
+        oneSeedIsGood = false;
         bool split_success = false;
         vector<vector<size_t>> splitRegs(2);
         float reg4seeds2splitRes_costs[2];
@@ -2571,10 +2660,9 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
         }
         if(!split_success){ // fail to split: let's check if merge is a possible solution
             if(handleNonSplitReg_link2oneSeed(node_idx, seeds)){
-                return true;
-            }else{
-                return false;
+                oneSeedIsGood = true;
             }
+            return false;
         }else{ // split success
             // 1. nullify the current region
             // nullifyCellOrNode(node_idx); // leave it to movieIinfo_update
@@ -2675,12 +2763,17 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
     FOREACH_i(uptCell_idxs){
         int frame = movieInfo.frames[uptCell_idxs[i]];
         uptCell_framewise[frame].insert(uptCell_idxs[i]);
+        nullifyCellOrNode(uptCell_idxs[i], &cellSegment);
     }
-//    FOREACH_i(newCells){
-//    }
-
-    if(p4tracking.stableNodeTest){
-
+    for(simpleNodeInfo &sNi : newCells){
+        size_t new_idx;
+        if(uptCell_framewise[sNi.frame].size() > 0){
+            new_idx = *uptCell_framewise[sNi.frame].erase(uptCell_framewise[sNi.frame].begin());
+        }else{
+            new_idx = cellSegment.number_cells[sNi.frame] + 1;
+            new_idx += sNi.frame>0 ? cumulative_cell_nums[sNi.frame-1]:0;
+        }
+        appendNewCellOrNode(cellSegment, sNi, new_idx);
     }
     // TODO: there should be an update related to missing cell re-detect (named: node_tested_st_end_jump)
 
