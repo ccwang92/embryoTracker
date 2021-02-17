@@ -81,6 +81,7 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
         }
     }
     movieInfo.nodes.reserve(movieInfo.xCoord.size());
+    movieInfo.node_tested_st_end_jump.reserve(movieInfo.xCoord.size());
     increment = 0;
     FOREACH_i(cellSegment.number_cells){
         increment += i>0? 2*cellSegment.number_cells[i]:0;
@@ -102,6 +103,13 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
     for(int i = 0; i < cellSegment.number_cells.size(); i++){
         validGapMaps = Mat(cellSegment.cell_label_maps[i].dims, cellSegment.cell_label_maps[i].size,
                            CV_8U, Scalar(255));
+    }
+
+    for(missingCellTestPassed &mct : movieInfo.node_tested_st_end_jump){
+        mct.jump_tested = false;
+        mct.track_head_tested = false;
+        mct.track_tail_tested = false;
+        mct.region_id_jumped_to = 0;
     }
 }
 /**
@@ -2840,5 +2848,68 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
 }
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
     // step 1. link cells allowing jump but no split/merge
+    mccTracker_one2one();
+    // step 2. re-detect missed cells (manipulate existing cells if needed)
+    vector<simpleNodeInfo> newCells;
+    vector<size_t> uptCell_idxs;
+    retrieve_missing_cells(cellSegment, newCells, uptCell_idxs);
+
+    // step 3. update movieInfo/cellSegment based on the newly detected cells or removed cells
+    movieInfo_update(cellSegment, newCells, uptCell_idxs);
+}
+/**
+ * @brief retrieve_missing_cells:
+ * @param cellSegment
+ */
+void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+                                              vector<size_t> &uptCell_idxs){
+    // check the cell one by one
+    for(size_t i=0; i<movieInfo.nodes.size(); i++){
+        if(i % 1000 == 0){
+            qDebug("processing %ld / %ld nodes.", i, movieInfo.nodes.size());
+        }
+        int cur_frame = movieInfo.frames[i];
+        if(movieInfo.nodes[i].kid_num > 0){
+            assert(movieInfo.nodes[i].kid_num == 1);
+            size_t kid_idx = movieInfo.nodes[i].kids[0];
+            if(movieInfo.frames[kid_idx] - cur_frame > 1){
+                if (!(movieInfo.node_tested_st_end_jump[i].jump_tested
+                        && movieInfo.node_tested_st_end_jump[i].region_id_jumped_to == kid_idx)){
+                    if(!deal_single_missing_case(cellSegment, newCells, uptCell_idxs, i, MISS_AS_JUMP)){
+                        movieInfo.node_tested_st_end_jump[i].jump_tested = true;
+                        movieInfo.node_tested_st_end_jump[i].region_id_jumped_to = kid_idx;
+                    }
+                }
+            }
+        }
+        if(p4tracking.detect_missing_head_tail){
+            // tail extending
+            if(movieInfo.nodes[i].kid_num == 0 && movieInfo.nodes[i].parent_num > 0 &&
+                    cur_frame < cellSegment.number_cells.size() &&
+                    !movieInfo.node_tested_st_end_jump[i].track_tail_tested){
+                if(!deal_single_missing_case(cellSegment, newCells, uptCell_idxs, i, MISS_AT_TRACK_END)){
+                    movieInfo.node_tested_st_end_jump[i].track_tail_tested = true;
+                }
+            }
+            // head extending
+            if(movieInfo.nodes[i].parent_num == 0 && movieInfo.nodes[i].kid_num > 0 &&
+                    cur_frame > 0 && !movieInfo.node_tested_st_end_jump[i].track_head_tested){
+                if(!deal_single_missing_case(cellSegment, newCells, uptCell_idxs, i, MISS_AT_TRACK_START)){
+                    movieInfo.node_tested_st_end_jump[i].track_head_tested = true;
+                }
+            }
+        }
+
+    }
+}
+/**
+ * @brief deal_single_missing_case: single case of missing retrieval
+ * @param cellSegment
+ * @param newCells
+ * @param uptCell_idxs
+ * @param missing_type
+ */
+bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+                                                vector<size_t> &uptCell_idxs, size_t cur_node_idx, int missing_type){
 
 }

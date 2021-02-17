@@ -49,6 +49,7 @@ enum segmentStableStatus {NOT_STABLE = -1, STABLE_TRACK_HEAD, STABLE_TRACK_MID, 
 enum parentsKidsConsistentFlag {CONSISTENCY_NOT_SURE = 0, PARENTS_KIDS_CONSISTENT, PARENTS_KIDS_NOT_CONSISTENT};
 enum merge_split_decisions {SPLIT_BY_KIDS = 0, SPLIT_BY_PARENTS, MERGE_PARENTS, MERGE_KIDS, MERGE_BOTH_PARENTS_KIDS, MERGE_SPLIT_NOT_SURE};
 
+enum missingCellLocations {MISS_AT_TRACK_START=0, MISS_AT_TRACK_END, MISS_AS_JUMP};
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)

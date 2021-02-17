@@ -232,6 +232,19 @@ struct combinedCellsCensus{
     std::vector<int> range_xyz;
     std::vector<int> start_coord_xyz;
 };
+/**
+ * @brief The missingCellTestPassed struct saves the testing results of a given region in 3 scenarios:
+ * 1. the region is at head of a track and we test if it could be extend one region more
+ * 2. the region is at tail of a track and ....
+ * 3. the region jump to another region in a following non-consecutive frame, we test if the missing cell could be
+ * retrieved.
+ */
+struct missingCellTestPassed{
+    bool track_head_tested;
+    bool track_tail_tested;
+    bool jump_tested;
+    size_t region_id_jumped_to;
+};
 
 struct allCellsCensus{
     std::vector<float> xCoord, yCoord, zCoord;
@@ -249,7 +262,7 @@ struct allCellsCensus{
     std::vector<nodeInfo> nodes;
     std::vector<std::vector<size_t>> tracks; //a set of node_ids
     std::vector<float[3]> track_arcs_avg_mid_std;
-
+    std::vector<missingCellTestPassed> node_tested_st_end_jump;
 //    std::vector<nodeInfoInTrack> particle2track; //particle2track in matlab
 //    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents
 };

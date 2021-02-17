@@ -2,7 +2,6 @@
 #define CELLTRACKINGMAIN_H
 #include "../cellsegmentation/cellsegment_main.h"
 
-
 class cellTrackingMain
 {
 public:
@@ -115,7 +114,10 @@ private: // remaining for split/merge module
     bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<simpleNodeInfo> &newCells);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
-
+    void retrieve_missing_cells(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+                                vector<size_t> &uptCell_idxs);
+    bool deal_single_missing_case(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+                                  vector<size_t> &uptCell_idxs, size_t cur_node_idx, int missing_type);
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
 private:
