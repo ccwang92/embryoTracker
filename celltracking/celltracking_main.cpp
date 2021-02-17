@@ -431,9 +431,9 @@ void cellTrackingMain::combineCellsIntoOneRegion(vector<size_t> &cell_idxes, com
 }
 
 /**
- * @brief updatePreNeighborInfo: update the information of candidate parents of a node
+ * @brief initPreNeighborInfo: initialize the information of candidate parents of a node
  */
-void cellTrackingMain::updatePreNeighborInfo(){
+void cellTrackingMain::initPreNeighborInfo(){
     //// update the preNeighbors information
     for (nodeInfo n : movieInfo.nodes){
         for (nodeRelation neighbor : n.neighbors){
@@ -442,6 +442,38 @@ void cellTrackingMain::updatePreNeighborInfo(){
             tmp.link_cost = neighbor.link_cost;
             tmp.overlap_size = neighbor.overlap_size;
             movieInfo.nodes[neighbor.node_id].preNeighbors.push_back(tmp); //pre-nei has no dist_c2n or dist_n2c
+        }
+    }
+}
+
+/**
+ * @brief updatePreNeighborInfo: update the information of candidate parents of a node
+ */
+void cellTrackingMain::updatePreNeighborInfo(bool link_cost_only = true){
+    //// update the preNeighbors information
+    if(link_cost_only){
+        for (nodeInfo n : movieInfo.nodes){
+            for (nodeRelation neighbor : n.neighbors){
+                for(nodeRelation &preNei : movieInfo.nodes[neighbor.node_id].preNeighbors){
+                    if (preNei.node_id == n.node_id){
+                        preNei.link_cost = neighbor.link_cost;
+                        break;
+                    }
+                }
+            }
+        }
+    }else{
+        for (nodeInfo n : movieInfo.nodes){
+            for (nodeRelation neighbor : n.neighbors){
+                for(nodeRelation &preNei : movieInfo.nodes[neighbor.node_id].preNeighbors){
+                    if (preNei.node_id == n.node_id){
+                        preNei.dist_c2n = neighbor.dist_n2c;
+                        preNei.dist_n2c = neighbor.dist_c2n;
+                        preNei.link_cost = neighbor.link_cost;
+                        break;
+                    }
+                }
+            }
         }
     }
 }
@@ -464,38 +496,48 @@ size_t cellTrackingMain::cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &
  * @param punish
  * @return
  */
-float cellTrackingMain::distance2cost(float distance, float alpha, float beta, float punish = 1){
+float cellTrackingMain::distance2cost(float distance, float punish=1){
+    //assert(frame_diff>0 && frame_diff)
+    float alpha = movieInfo.ovGammaParam[0];
+    float beta = movieInfo.ovGammaParam[1];
+    //float punish = p4tracking.jumpCost[frame_diff-1];
     float p = gammacdf(distance, alpha, beta);
     float cost = normInv(p * punish / 2);
     return cost*cost;
 }
 
-void cellTrackingMain::reCalculateCellsDistances(vector<float> &nn_dist){
-    float max_dist;
-    nn_dist.resize(movieInfo.nodes.size());
-    size_t nn_dist_cnt = 0;
+void cellTrackingMain::reCalculateCellsDistances(){
     FOREACH_i(movieInfo.nodes){
-        nn_dist[nn_dist_cnt] = INFINITY;
         FOREACH_j(movieInfo.nodes[i].neighbors){
             // cal the distance between two nodes
-            max_dist = voxelwise_avg_distance(i, movieInfo.nodes[i].neighbors[j].node_id,
+            voxelwise_avg_distance(i, movieInfo.nodes[i].neighbors[j].node_id,
                                               movieInfo.nodes[i].neighbors[j].dist_c2n,
                                             movieInfo.nodes[i].neighbors[j].dist_n2c);
-            if (max_dist < nn_dist[nn_dist_cnt]){
-                nn_dist[nn_dist_cnt] = max_dist;
-            }
         }
-        nn_dist_cnt ++;
     }
-    nn_dist.resize(nn_dist_cnt);
 }
 /**
- * @brief calCell2neighborDistance: get the cell-cell voxelwise distance
+ * @brief calCellFootprintsDistance: get the cell-cell voxelwise distance
  * @return
  */
-void cellTrackingMain::calCell2neighborDistance(vector<float> &nn_dist){
+void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
     if (movieInfo.tracks.empty()){ // if there is no track info, use all node with nearest neighbor
-        reCalculateCellsDistances(nn_dist);
+        //reCalculateCellsDistances(nn_dist);
+        float max_dist;
+        nn_dist.resize(movieInfo.nodes.size());
+        size_t nn_dist_cnt = 0;
+        FOREACH_i(movieInfo.nodes){
+            nn_dist[nn_dist_cnt] = INFINITY;
+            FOREACH_j(movieInfo.nodes[i].neighbors){
+                // cal the distance between two nodes
+                max_dist = movieInfo.nodes[i].neighbors[j].link_cost;
+                if (max_dist < nn_dist[nn_dist_cnt]){
+                    nn_dist[nn_dist_cnt] = max_dist;
+                }
+            }
+            nn_dist_cnt ++;
+        }
+        nn_dist.resize(nn_dist_cnt);
     }else{ // if there are tracks, use long tracks
         float max_dist;
         nn_dist.resize(movieInfo.nodes.size());
@@ -541,21 +583,27 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
         movieInfo.frame_shift_xyz[i] = {0, 0, 0};
     }
     // calculate the distances between each cell and its neighbors
-    vector<float> nn_dist;
-    calCell2neighborDistance(nn_dist); // the nearest neighbor
-    updateGammaParam(nn_dist);
-    updateArcCost(); // calculate the link cost from given new gamma parameter
+    updateGammaParam();
+    bool update_preNei_cost = false; // preNei has not been initilized
+    updateArcCost(update_preNei_cost); // calculate the link cost from given new gamma parameter
+    initPreNeighborInfo(); // preNei initilized
     // initialize all node as not stable
     FOREACH_i(movieInfo.nodes){
         movieInfo.nodes[i].stable_status = NOT_STABLE;
     }
     // start a naive linking
-    mccTracker_one2one(); // jumpCost are updated, so the distance will
+    bool tracking4jumpCost_and_driftCorrection_Only = true;
+    mccTracker_one2one(tracking4jumpCost_and_driftCorrection_Only); // jumpCost are updated, so the distance will
+
+    /**
+     * These 3 functions will not be called again, which means the drift and cell-cell distance and Gamma
+     * parameters will be fixed in the following test.
+     */
     driftCorrection(); // update frame drifting
-    reCalculateCellsDistances(nn_dist);
-    nn_dist.clear(); //problematic: needs re-think here
-    calCell2neighborDistance(nn_dist); // the neighbor from tracking reuslts
-    updateGammaParam(nn_dist);
+    reCalculateCellsDistances();
+    updateGammaParam();
+
+    // update arc cost and stable status with the parameters (these generally are conducted in mccTracker_one2one).
     updateArcCost();
     stableSegmentFixed();
 }
@@ -603,7 +651,7 @@ void cellTrackingMain::extractPreNeighborIds(vector<Mat> &cell_label_maps, size_
 /**
  * @brief mccTracker_one2one: build the graph without split and merge settings, but allows jump
  */
-void cellTrackingMain::mccTracker_one2one(){
+void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     //      We directly use the interface I wrote for python with the following function name               //
     // long long* pyCS2(long *msz, double *mtail, double *mhead, double *mlow, double *macap, double *mcost)//
@@ -675,16 +723,19 @@ void cellTrackingMain::mccTracker_one2one(){
             }
         }
     }
-    // update parent and kids given tracks
-    track2parentKid();
 
     // update the jumpCost in p4tracking if no split/merge allowed
     updateJumpCost();
-    // by the way, also update stable segmentations
-    stableSegmentFixed();
-    if (false){
-        //TODO: re-link jump-over cells, this will only be called in the last iteration
+    if(!get_jumpCost_only){ // means this time of tracking is just to estimate jump cost and/or drift
+        // update parent and kids given tracks
+        track2parentKid();
+        updateArcCost();
+        // by the way, also update stable segmentations
+        stableSegmentFixed();
+        if (false){
+            //TODO: re-link jump-over cells, this will only be called in the last iteration
 
+        }
     }
 
     delete[] mtail;
@@ -977,15 +1028,21 @@ void cellTrackingMain::driftCorrection(){
         movieInfo.frame_shift_xyz[i][2] /= samples4driftCumulate[curr_frame];
     }
 }
-void cellTrackingMain::updateGammaParam(vector<float> &nn_dist){
+void cellTrackingMain::updateGammaParam(){
+    vector<float> nn_dist;
+    calCellFootprintsDistance(nn_dist); // the nearest neighbor
     truncatedGammafit(nn_dist, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
 }
-void cellTrackingMain::updateArcCost(){
+void cellTrackingMain::updateArcCost(bool updatePreNei){
     for(nodeInfo n : movieInfo.nodes){
         for(nodeRelation &neighbor : n.neighbors){
             neighbor.link_cost = distance2cost(MAX(neighbor.dist_c2n, neighbor.dist_n2c),
-                                               movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+                                               p4tracking.jumpCost[movieInfo.frames[neighbor.node_id] - movieInfo.frames[n.node_id]-1]);
         }
+    }
+    if(updatePreNei){
+        bool update_cost_only = true;
+        updatePreNeighborInfo(update_cost_only);
     }
 }
 
@@ -1340,7 +1397,7 @@ int cellTrackingMain::parentsKidsConsistency(size_t node_id){
     float dummy_c2n, dummy_n2c;
     float merged_distance = voxelwise_avg_distance(movieInfo.nodes[node_id].parents, movieInfo.nodes[node_id].kids,
                                                    dummy_c2n, dummy_n2c);
-    float merged_cost = distance2cost(merged_distance, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+    float merged_cost = distance2cost(merged_distance, 1.0); // adjacent frame, no need to add punishment
 
     if (merged_cost >= abs(p4tracking.observationCost)){
         return CONSISTENCY_NOT_SURE;
@@ -1352,7 +1409,7 @@ int cellTrackingMain::parentsKidsConsistency(size_t node_id){
         for(size_t k : movieInfo.nodes[node_id].kids){
             for(nodeRelation nr : movieInfo.nodes[p].neighbors){
                 if (nr.node_id == k){
-                    map_2x2[cnt] = distance2cost(nr.dist_c2n, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+                    map_2x2[cnt] = distance2cost(nr.dist_c2n, 1.0);
                 }
                 cnt++;
             }
@@ -1776,8 +1833,10 @@ bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2
         float dummy_c2n, dummy_n2c;
         reg4seeds2splitRes_costs[0] = voxelwise_avg_distance(reg2split, reg2split_frame, splitRegs[0], reg4seeds_frame,
                 cellSegment.cell_label_maps[0].size, dummy_c2n, dummy_n2c);
+        reg4seeds2splitRes_costs[0] = distance2cost(reg4seeds2splitRes_costs[0], p4tracking.jumpCost[0]); // adjacent frames
         reg4seeds2splitRes_costs[1] = voxelwise_avg_distance(reg2split, reg2split_frame, splitRegs[1], reg4seeds_frame,
                 cellSegment.cell_label_maps[0].size, dummy_c2n, dummy_n2c);
+        reg4seeds2splitRes_costs[1] = distance2cost(reg4seeds2splitRes_costs[1], p4tracking.jumpCost[0]);
         if(MAX(reg4seeds2splitRes_costs[0], reg4seeds2splitRes_costs[1]) < abs(p4tracking.observationCost)){
             return true;
         }else{
@@ -1903,7 +1962,7 @@ bool cellTrackingMain::mergeValidTest(size_t curr_node_id, size_t seedRegs4split
 
             float dummy_c2n, dummy_n2c;
             float maxDistance = voxelwise_avg_distance(root_node2, pre_bases, dummy_c2n, dummy_n2c);
-            if(distance2cost(maxDistance, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]) < p4tracking.c_ex){
+            if(distance2cost(maxDistance, p4tracking.jumpCost[0]) < p4tracking.c_ex){
                 return true;
             }else{
                 return false;
@@ -2494,8 +2553,8 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
         float max_dist = voxelwise_avg_distance(append_loc_idx, nei_ids[i],
                                                 movieInfo.nodes[append_loc_idx].neighbors[i].dist_c2n,
                                                 movieInfo.nodes[append_loc_idx].neighbors[i].dist_n2c);
-        movieInfo.nodes[append_loc_idx].neighbors[i].link_cost = distance2cost(max_dist,
-                                           movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+        int frame_diff = movieInfo.frames[nei_ids[i]] - newCell.frame;
+        movieInfo.nodes[append_loc_idx].neighbors[i].link_cost = distance2cost(max_dist, p4tracking.jumpCost[frame_diff-1]);
 
         movieInfo.nodes[append_loc_idx].neighbors[i].overlap_size = cellOverlapSize(append_loc_idx, nei_ids[i],
                                                                                     cellSegment);
@@ -2529,8 +2588,8 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
         float max_dist = voxelwise_avg_distance(append_loc_idx, preNei_ids[i],
                                                 movieInfo.nodes[append_loc_idx].preNeighbors[i].dist_c2n,
                                                 movieInfo.nodes[append_loc_idx].preNeighbors[i].dist_n2c);
-        movieInfo.nodes[append_loc_idx].preNeighbors[i].link_cost = distance2cost(max_dist,
-                                           movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+        int frame_diff = newCell.frame - movieInfo.frames[preNei_ids[i]];
+        movieInfo.nodes[append_loc_idx].preNeighbors[i].link_cost = distance2cost(max_dist, p4tracking.jumpCost[frame_diff-1]);
 
         movieInfo.nodes[append_loc_idx].preNeighbors[i].overlap_size = cellOverlapSize(append_loc_idx, preNei_ids[i],
                                                                                     cellSegment);
@@ -2780,5 +2839,6 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
 
 }
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
+    // step 1. link cells allowing jump but no split/merge
 
 }

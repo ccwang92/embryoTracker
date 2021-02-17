@@ -32,14 +32,15 @@ private:
     float voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int curr_frame,
                                  vector<size_t> &nei_voxIdx, int nei_frame,
                                  int data3d_sz[3], float &c2n, float &n2c);
-    void updatePreNeighborInfo();
+    void initPreNeighborInfo();
+    void updatePreNeighborInfo(bool link_cost_only);
     size_t cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &cellSegment);
-    void reCalculateCellsDistances(vector<float> &nn_dist);
-    void calCell2neighborDistance(vector<float> &nn_dist);
-    float distance2cost(float distance, float alpha, float beta, float punish);
+    void reCalculateCellsDistances();
+    void calCellFootprintsDistance(vector<float> &nn_dist);
+    float distance2cost(float distance, float punish);
     void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
     void extractPreNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs);
-    void mccTracker_one2one();
+    void mccTracker_one2one(bool get_jumpCost_only = false);
     void mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_merge_node_info);
     void track2parentKid();
     void refreshTracks(); //remove the empty tracks
@@ -48,8 +49,8 @@ private:
     void updateJumpCost();
     // functions to update cost given new gamma fitting results
     void driftCorrection();
-    void updateGammaParam(vector<float> &nn_dist);
-    void updateArcCost();
+    void updateGammaParam();
+    void updateArcCost(bool updatePreNei=true);
     void getArcCostOne2OneTrack(size_t track_id, vector<float> &arc_costs);
     void stableSegmentFixed();
     void movieInfoUpate();
@@ -143,9 +144,9 @@ public:
         p4tracking.c_ex = p4tracking.c_en;
         p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex); // make sure detections are all included
         p4tracking.jumpCost.resize(p4tracking.k);
-        p4tracking.jumpCost[0] = -1;
-        p4tracking.jumpCost[1] = -1;
-        p4tracking.jumpCost[2] = -1;
+        p4tracking.jumpCost[0] = 1;
+        p4tracking.jumpCost[1] = 1;
+        p4tracking.jumpCost[2] = 1;
         p4tracking.varEstMethod = 1; // 0 for median and 1 for independent
         p4tracking.costCalMethod= ccm_CHI1SQUARE; // chi1Square:use 1df chi-squre, fisher: 2df chi-square,zscore: use z-score
         p4tracking.validtrackLength4var = 5;// tracks with smaller length will not be used to cal variance
