@@ -2159,8 +2159,8 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
     float dummy_costs[2];
     reg4seeds[0] = movieInfo.voxIdx[bases[0]];
     reg4seeds[1] = movieInfo.voxIdx[bases[1]];
-    bool sectTest = bisectValidTest(cellSegment, movieInfo.voxIdx[curr_node_id], movieInfo.frames[curr_node_id],
-                                    reg4seeds, movieInfo.frames[bases[0]], false, dummy_splitRegs, *dummy_costs);
+    bool sectTest = bisectValidTest(cellSegment, curr_node_id, movieInfo.voxIdx[curr_node_id], movieInfo.frames[curr_node_id],
+                                    reg4seeds, movieInfo.frames[bases[0]], false, true, dummy_splitRegs, dummy_costs);
     if(sectTest){
         if (one2multiple_flag) return SPLIT_BY_KIDS;
         else return SPLIT_BY_PARENTS;
@@ -2745,7 +2745,7 @@ void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
     regionRefresh(cellSegment, newCells, uptCell_idxs);
 
     // 3. update movieInfo/cellSegment based on the newly detected cells or removed cells
-
+    movieInfo_update(cellSegment, newCells, uptCell_idxs);
 }
 /**
  * @brief movieInfo_update:update movieInfo/cellSegment based on the newly detected cells or removed cells
