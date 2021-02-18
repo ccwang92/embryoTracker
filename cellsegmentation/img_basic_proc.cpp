@@ -2400,6 +2400,37 @@ void bwareaopenMat(Mat1b &fgMap, Mat1b &fgMap_new, size_t minSz, int connect){
 
     fgMap_new = tmp > 0;
 }
+/**
+ * @brief idx2tightBwMap: build a binary mat to save the idx
+ * @param idx
+ * @param org_sz_yxz
+ * @param bwMap
+ */
+void idx2tightBwMap(vector<size_t> idx, int org_sz_yxz[3], Mat1b &bwMap, int *start_yxz){
+    vector<int> y,x,z;
+    vec_ind2sub(idx, y, x, z, org_sz_yxz);
+    start_yxz[0] = vec_min(y);
+    start_yxz[1] = vec_min(x);
+    start_yxz[2] = vec_min(z);
+    y = vec_Minus(y, start_yxz[0]);
+    x = vec_Minus(x, start_yxz[1]);
+    z = vec_Minus(z, start_yxz[2]);
+
+    int mat_size[] = {vec_max(y)+1, vec_max(x)+1, vec_max(z)+1};
+
+    bwMap.zeros(3, mat_size);
+    vector<size_t> idx_new;
+    vec_sub2ind(idx_new, y, x, z, mat_size);
+    for(size_t i : idx_new){
+        bwMap.at<unsigned char>(i) = 255;
+    }
+}
+
+void idx2tightBwMap(vector<size_t> idx, MatSize org_sz_yxz, Mat1b &bwMap, int *start_yxz){
+    int sz[] = {org_sz_yxz[0], org_sz_yxz[1], org_sz_yxz[2]};
+    idx2tightBwMap(idx, sz, bwMap, start_yxz);
+}
+
 /** adjacentRegions: return the region adjacent to curr_label
  * if no test_ada_label is input, return all the adj_labels, other wise only return true or false indicating 
  * if test_ajd_label is indeed adjacent to curr_label.

@@ -98,7 +98,7 @@ void volumeErode(Mat *src3d, Mat &dst3d, int *radiusValues, int dilation_type);
 void volumeWrite(Mat *src3d, string filename);
 
 void validSingleRegionExtract(Mat &vol3d, Mat *binary_mask, int connect);
-int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask);
+int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask = nullptr);
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
@@ -136,7 +136,8 @@ void coordinateTransfer(vector<size_t> &in_idx, int org_sz_yxz[3],
 void coordinateTransfer(vector<size_t> &in_idx, MatSize org_sz_yxz,
             vector<size_t> &out_idx, int crop_start_yxz[3], MatSize crop_sz_yxz);
 void bwareaopenMat(Mat1b &fgMap, Mat1b &fgMap_new, size_t minSz, int connect);
-
+void idx2tightBwMap(vector<size_t> idx, int org_sz_yxz[3], Mat1b &bwMap, int *start_yxz);
+void idx2tightBwMap(vector<size_t> idx, MatSize org_sz_yxz, Mat1b &bwMap, int *start_yxz);
 
 
 

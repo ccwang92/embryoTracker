@@ -2911,5 +2911,73 @@ void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vect
  */
 bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
                                                 vector<size_t> &uptCell_idxs, size_t cur_node_idx, int missing_type){
+    vector<int> missing_frames;
+    vector<size_t> seed_loc_idx;
+    size_t parent_idx = cur_node_idx;
+    size_t kid_idx = missing_type == MISS_AS_JUMP ? movieInfo.nodes[parent_idx].kids[0] : 0;
+    extractSeeedFromGivenCell(cellSegment, missing_type, parent_idx, kid_idx, missing_frames, seed_loc_idx);
 
+    // start the big game for missing cell retrieve
+}
+
+bool cellTrackingMain::extractSeeedFromGivenCell(cellSegmentMain &cellSegment, int missing_type,
+                                                 size_t parent_idx, size_t kid_idx, vector<int> &missing_frames,
+                                                 vector<size_t> &seed_loc_idx){
+    long sz_single_frame = cellSegment.data_rows_cols_slices[0]*
+            cellSegment.data_rows_cols_slices[1]*cellSegment.data_rows_cols_slices[2];
+    missing_frames.resize(0); // there can be two jumped frames
+    unsigned char threshold;
+    seed_loc_idx.resize(0);
+    if (missing_type == MISS_AS_JUMP){
+        for(int f = movieInfo.frames[parent_idx] + 1; f < movieInfo.frames[kid_idx]; f++){
+            missing_frames.push_back(f);
+        }
+        seed_loc_idx = intersection(movieInfo.voxIdx[parent_idx], movieInfo.voxIdx[kid_idx]);
+    }else if(missing_type == MISS_AT_TRACK_START){
+        missing_frames = {movieInfo.frames[parent_idx] - 1};
+        threshold =
+                cellSegment.threshold_maps[movieInfo.frames[parent_idx]].at<unsigned char>(movieInfo.voxIdx[parent_idx][0]);
+        assert(threshold > 0);
+        unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*missing_frames[0]; // sub-matrix pointer
+        Mat single_frame(3, cellSegment.normalized_data4d.size, CV_8U, ind);
+        for(size_t i : movieInfo.voxIdx[parent_idx]){
+            if(single_frame.at<unsigned char>(i) > threshold){
+                seed_loc_idx.push_back(i);
+            }
+        }
+    }else if(missing_type == MISS_AT_TRACK_END){
+        missing_frames = {movieInfo.frames[kid_idx] + 1};
+        threshold =
+                cellSegment.threshold_maps[movieInfo.frames[kid_idx]].at<unsigned char>(movieInfo.voxIdx[kid_idx][0]);
+        assert(threshold > 0);
+        unsigned char *ind2 = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*missing_frames[0]; // sub-matrix pointer
+        Mat single_frame2(3, cellSegment.normalized_data4d.size, CV_8U, ind2);
+        for(size_t i : movieInfo.voxIdx[kid_idx]){
+            if(single_frame2.at<unsigned char>(i) > threshold){
+                seed_loc_idx.push_back(i);
+            }
+        }
+    }else{
+        qFatal("unKNOWN missing_type");
+    }
+
+    if (seed_loc_idx.size() == 0){
+        return false;
+    }else{
+        // pick the largest one
+        Mat1b tightBw;
+        int start_yxz[3];
+        idx2tightBwMap(seed_loc_idx, cellSegment.normalized_data4d.size, tightBw, start_yxz);
+        Mat1i label_map;
+        int n = connectedComponents3d(&tightBw, label_map, 6);
+        if (n > 1){
+            int kept = largestRegionIdExtract(&label_map, n);
+            vector<size_t> kept_idx;
+            extractVoxIdxGivenId(&label_map, kept_idx, kept);
+            seed_loc_idx.clear();
+            coordinateTransfer(kept_idx, tightBw.size,
+                        seed_loc_idx, start_yxz, cellSegment.normalized_data4d.size);
+        }
+        return true;
+    }
 }

@@ -118,6 +118,10 @@ private:    // TODO: missing cell module
                                 vector<size_t> &uptCell_idxs);
     bool deal_single_missing_case(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
                                   vector<size_t> &uptCell_idxs, size_t cur_node_idx, int missing_type);
+
+    bool extractSeeedFromGivenCell(cellSegmentMain &cellSegment, int missing_type,
+                                   size_t parent_idx, size_t kid_idx, vector<int> &missing_frames,
+                                   vector<size_t> &seed_loc_idx);
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
 private:
