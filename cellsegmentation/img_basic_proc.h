@@ -103,6 +103,23 @@ template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool s
     }
     return out;
 }
+
+template <typename T> vector<size_t> vec_atrange(vector<size_t> &idx, vector<T> &values, T ub, T lb, bool strict){
+    assert(ub>=lb && idx.size()==values.size());
+    vector<size_t> out;
+    if (strict){
+        for (size_t i = 0; i < values.size(); i++){
+            if(values[i] > lb && values[i] < ub)
+                out.push_back(idx[i]);
+        }
+    }else{
+        for (size_t i = 0; i < values.size(); i++){
+            if(values[i] >= lb && values[i] <= ub)
+                out.push_back(idx[i]);
+        }
+    }
+    return out;
+}
 template <typename T> T normalCDF(T x, T m, T s)
 {
     T a = (x - m) / s;
@@ -868,4 +885,35 @@ template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter 
     }
 
     return output;
+}
+
+template <typename T> vector<T> extractValsGivenIdx_type(Mat *vol3d, vector<size_t> idx, int datatype){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    vector<T> fg_vals;
+    if (datatype == CV_8U){
+        FOREACH_i(idx){
+            fg_vals.push_back(vol3d->at<unsigned char>(idx[i]));
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i(idx){
+            fg_vals.push_back(vol3d->at<float>(idx[i]));
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i(idx){
+            fg_vals.push_back(vol3d->at<int>(idx[i]));
+        }
+    }
+    return fg_vals;
+}
+
+template <typename T> unordered_map<T, size_t> frequecy_cnt(vector<T> &vec){
+    unordered_map<T, size_t> map;
+    for(T x : vec){
+        if (map.find(x) != map.end()){
+            map[x] += 1;
+        }else{
+            map[x] = 1;
+        }
+    }
+    return map;
 }

@@ -2915,12 +2915,186 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
     vector<size_t> seed_loc_idx;
     size_t parent_idx = cur_node_idx;
     size_t kid_idx = missing_type == MISS_AS_JUMP ? movieInfo.nodes[parent_idx].kids[0] : 0;
-    extractSeeedFromGivenCell(cellSegment, missing_type, parent_idx, kid_idx, missing_frames, seed_loc_idx);
+    extractSeedFromGivenCell(cellSegment, missing_type, parent_idx, kid_idx, missing_frames, seed_loc_idx);
 
     // start the big game for missing cell retrieve
+    for(int frame : missing_frames){
+        vector<int> seed_loc_existing_labels = extractValsGivenIdx_type<int>(&cellSegment.cell_label_maps[frame], seed_loc_idx, CV_32S);
+        vector<size_t> valid_seed_loc_idx = vec_atrange(seed_loc_idx, seed_loc_existing_labels, 0, 0, false);
+        size_t min_seed_sz = cellSegment.p4segVol.min_seed_size;
+        if(!p4tracking.addCellMissingPart){
+            min_seed_sz = max(min_seed_sz, (1+seed_loc_idx.size())/2);
+            if(valid_seed_loc_idx.size() < min_seed_sz){
+                valid_seed_loc_idx.clear();
+                checkSeedCoveredByExistingCell(cellSegment, missing_type, parent_idx, kid_idx, frame, min_seed_sz,
+                                               seed_loc_idx, seed_loc_existing_labels, valid_seed_loc_idx);
+            }
+        }
+
+
+    }
+}
+/**
+ * @brief checkSeedCoveredByExistingCell: when retrieve missing cell, the seed we get may already be covered by an
+ * existing cell. It is worthy to check if the cell is real or an
+ * over-merged one, because it clearly cannot be linked to the cell represented by the seed.
+ * @param cellSegment
+ * @param missing_type
+ * @param parent_idx
+ * @param kid_idx
+ * @param missing_frame
+ * @param in_seed_loc_idx
+ * @param out_seed_loc_idx
+ */
+bool cellTrackingMain::checkSeedCoveredByExistingCell(cellSegmentMain &cellSegment, int missing_type,
+                                    size_t parent_idx, size_t kid_idx, int missing_frame, size_t min_seed_sz,
+                                    vector<size_t> &in_seed_loc_idx, vector<int> &seed_loc_existing_labels,
+                                    vector<size_t> &out_seed_loc_idx){
+    out_seed_loc_idx.resize(0);
+    // conditon 1. the existing cell overlapped with seed is an orphan.
+    vector<int>overlapped_labels = vec_atrange(seed_loc_existing_labels, (int)INFINITY, 0, true);
+    unordered_map<int, size_t> freq_map = frequecy_cnt(overlapped_labels);
+    unordered_set<int> labels_can_be_removed;
+    //labels_can_be_removed.insert(0);
+    for(auto it : freq_map){
+        size_t curr_exist_idx = it.first;
+        curr_exist_idx += missing_frame == 0? 0:cumulative_cell_nums[missing_frame-1];
+        if(movieInfo.nodes[curr_exist_idx].parent_num == 0 && movieInfo.nodes[curr_exist_idx].kid_num == 0){
+            labels_can_be_removed.insert(it.first);
+        }
+    }
+    if(labels_can_be_removed.size() > 1){
+        for(size_t i=0; i<in_seed_loc_idx.size(); i++){
+            int label = seed_loc_existing_labels[i];
+            if (label==0 || labels_can_be_removed.find(label) != labels_can_be_removed.end()){
+                out_seed_loc_idx.push_back(in_seed_loc_idx[i]);
+            }
+        }
+        if(out_seed_loc_idx.size() >= min_seed_sz){
+            return true;
+        }
+    }
+    // condition 2, test if the largest existing overlapped cell is indeed a merged region.
+    size_t max_overlapped_sz = 0;
+    int max_overlapped_cell_label;
+    for(unordered_map<int, size_t>::iterator it = freq_map.begin(); it != freq_map.end(); it ++){
+        if(it->second > max_overlapped_sz){
+            max_overlapped_cell_label = it->first;
+            max_overlapped_sz = it->second;
+        }
+    }
+    if(max_overlapped_sz + out_seed_loc_idx.size() < min_seed_sz){
+        out_seed_loc_idx.clear();
+        return false;
+    }
+    size_t candidate_cell_idx = max_overlapped_cell_label;
+    candidate_cell_idx += missing_frame == 0? 0:cumulative_cell_nums[missing_frame-1];
+
+    //if(missing_type != MISS_AT_TRACK_START)
 }
 
-bool cellTrackingMain::extractSeeedFromGivenCell(cellSegmentMain &cellSegment, int missing_type,
+/**
+ * @brief extractSeedInGivenCell: extract all the seeds that contained in current cell
+ * seedBase indicate which frame should we consider
+ * @param cellSegment
+ * @param missing_type
+ * @param parent_idx
+ * @param kid_idx
+ * @param seed_loc_idx
+ * @return
+ */
+bool cellTrackingMain::extractSeedInGivenCell(cellSegmentMain &cellSegment, bool parent_flag, size_t givenCell,
+                                              size_t cell4seed, vector<pair<size_t, int>> seeds_missing_type, vector<vector<size_t>> &seeds_loc_idx){
+    int frame4seed = movieInfo.frames[cell4seed];
+    int frame4givenCell = movieInfo.frames[givenCell];
+    if(parent_flag){
+        if(movieInfo.nodes[givenCell].parent_num > 0 &&
+                frame4seed == movieInfo.frames[movieInfo.nodes[givenCell].parents[0]]){
+            // If the given cell has a proper parent/kid in the frame for seed detection,
+            // we should not remove the given cell. Thus no need to extract seed anymore.
+            return false;
+        }
+    }else if(!parent_flag){
+        if(movieInfo.nodes[givenCell].kid_num > 0 &&
+                frame4seed == movieInfo.frames[movieInfo.nodes[givenCell].kids[0]]){
+            // If the given cell has a proper parent/kid in the frame for seed detection,
+            // we should not remove the given cell. Thus no need to extract seed anymore.
+            return false;
+        }
+    }
+    // Now the given cell has no valid linking in frame frame4seed, we can test if more than two seeds are there.
+//    [possible_cells, neis_PorK_frame] = ...
+//            extractParentsOrKidsGivenCell(...
+//            movieInfo, cell_id, test_frame, frame4detect_cell_family, parent_flag);
+    vector<size_t> givenCell_Neis;
+    if(parent_flag){
+        for(nodeRelation nr : movieInfo.nodes[givenCell].neighbors){
+            if(movieInfo.frames[nr.node_id] == frame4seed){
+                givenCell_Neis.push_back(nr.node_id);
+            }
+        }
+    }else{
+        for(nodeRelation nr : movieInfo.nodes[givenCell].preNeighbors){
+            if(movieInfo.frames[nr.node_id] == frame4seed){
+                givenCell_Neis.push_back(nr.node_id);
+            }
+        }
+    }
+    vector<size_t> candidate_included_cells(0);
+    for(size_t nei : givenCell_Neis){
+        size_t cur_nei_best_buddy;
+        float cur_nei_best_buddy_cost;
+        if(movieInfo.nodes[nei].nodeId2trackId>=0 &&
+                findBestNeighbor(nei, cur_nei_best_buddy, cur_nei_best_buddy_cost, frame4givenCell) &&
+                cur_nei_best_buddy == givenCell){
+            // one more thing: nei should not have a valid parent/kid in frame4givenCell
+            if(parent_flag){
+                if(movieInfo.nodes[nei].kid_num == 0 ||
+                        movieInfo.frames[movieInfo.nodes[nei].kids[0]] != frame4givenCell){
+                    candidate_included_cells.push_back(nei);
+                }
+            }else{
+                if(movieInfo.nodes[nei].parent_num == 0 ||
+                        movieInfo.frames[movieInfo.nodes[nei].parents[0]] != frame4givenCell){
+                    candidate_included_cells.push_back(nei);
+                }
+            }
+        }
+    }
+    //if only 2 cell, then no need to process here; if more than 2 cell, split/merge test cannot handle
+    if(candidate_included_cells.size() < 3){
+        return false;
+    }
+    seeds_loc_idx.resize(0);
+    seeds_missing_type.resize(0);
+    for(size_t candidate : candidate_included_cells){
+        if(parent_flag){
+            if (movieInfo.nodes[candidate].kid_num > 0){
+                seeds_missing_type.push_back(make_pair(candidate, MISS_AS_JUMP));
+            }else{
+                seeds_missing_type.push_back(make_pair(candidate, MISS_AT_TRACK_END));
+            }
+        }else{
+            if (movieInfo.nodes[candidate].parent_num > 0){
+                seeds_missing_type.push_back(make_pair(movieInfo.nodes[candidate].parents[0], MISS_AS_JUMP));
+            }else{
+                seeds_missing_type.push_back(make_pair(candidate, MISS_AT_TRACK_START));
+            }
+        }
+    }
+}
+/**
+ * @brief extractSeedFromGivenCell: given a cell, extract the seed region (for its parent/kid cells)
+ * in adjacent frames based on it.
+ * @param cellSegment
+ * @param missing_type
+ * @param parent_idx
+ * @param kid_idx
+ * @param missing_frames
+ * @param seed_loc_idx
+ * @return
+ */
+bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, int missing_type,
                                                  size_t parent_idx, size_t kid_idx, vector<int> &missing_frames,
                                                  vector<size_t> &seed_loc_idx){
     long sz_single_frame = cellSegment.data_rows_cols_slices[0]*
