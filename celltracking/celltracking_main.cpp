@@ -3152,11 +3152,39 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
             }
         }
     }else{ // there indeed an adjacent cell
-        vector<size_t> append_idxPlus = movieInfo.voxIdx[ajd_cell_idx];
+        vector<size_t> append_idxPlus = movieInfo.voxIdx[ajd_cell_idx[0]];
         append_idxPlus.insert(append_idxPlus.end(), new_cell_idx.begin(), new_cell_idx.end());
+        if(movieInfo.nodes[ajd_cell_idx[0]].parent_num > 0 &&
+                movieInfo.nodes[ajd_cell_idx[0]].kid_num > 0){
+            float mergeCost1, mergeCost2;
+            bool merge_link_pk_valid = parentOrKidValidLinkTest(append_idxPlus, new_cell_frame,
+                                                                parentKid_idx, missing_type, sz, mergeCost1, mergeCost2);
+            if(merge_link_pk_valid){
+                // MORE::!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                res = make_pair(2,1); // TODO: need to be MORE accurate!
+            }else if(parentKidLink_valid){
+                res = make_pair(1,1); // TODO: need to be MORE accurate!
+            }else{
+                res = make_pair(2,0);
+            }
+        }else{//case 3 and 5
+            // multiParentsKidsValidLinkTest
+            // mergeSplitBothValid
 
+        }
 
     }
+}
+// the following two functions' logic is simple
+void cellTrackingMain::multiParentsKidsValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                     size_t node_idx, MatSize sz, float &cost){
+
+}
+// call bisect to decide if a region can be split and also be merged
+void cellTrackingMain::mergeSplitBothValid(cellSegmentMain &cellSegment, bool parent_flag, size_t givenCell,
+                                           int cell4seed_frame, vector<pair<size_t, int>> seeds_missing_type,
+                                           vector<vector<size_t>> &seeds_loc_idx){
+
 }
 /**
  * @brief checkSeedCoveredByExistingCell: when retrieve missing cell, the seed we get may already be covered by an
