@@ -3078,7 +3078,84 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 adj_cell_id[0] += frame == 0 ? 0:cumulative_cell_nums[frame-1];
             }
         }
-        newlyAddedCellValidTest()
+        //newlyAddedCellValidTest()
+    }
+}
+//% there are multiple cases that are valid for an newly found cell
+//% 1. a1->miss->a3
+//% 2. a1->miss,b->a3
+//% 3. a1,b1->miss,b2->a3,b3
+//% 4. a1,b1->miss->a3,b3
+//% 5. a1+b1->miss,b2->a3+b3
+//% 6. a1->miss+noise_bright_region->a3 (try split)
+//% 7. a1+b1->a2+b2_half,half_missing->a3,b3
+//% PS: '+' means merged region, ',' means independent region
+//% case 1 and 4 has not region to merge
+void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, singleCellSeed &seed, vector<size_t> &new_cell_idx,
+                                               int new_cell_frame, vector<size_t> ajd_cell_idx, size_t parentKid_idx[2],
+                                                int missing_type, MatSize sz, pair<int, int> res){
+    float baseCost1, baseCost2;
+    bool parentKidLink_valid = parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx, missing_type, sz, baseCost1, baseCost2);
+    if(ajd_cell_idx.size() == 0){
+        if(parentKidLink_valid){
+            res = make_pair(1,1);
+        }else{/*% first check case 6: the region can be split by principal
+                                    % curvauture. The processing steps are exactly the same as the
+                                    % function 'segmentCurrentRegion.m'.*/
+            Mat1i label_map = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_32S);
+            Mat1b fgMap = seed.idMap>0;
+            Mat1b seedMap = fgMap - seed.gap3dMap;
+            int numCC = connectedComponents3d(&seedMap, label_map, cellSegment.p4segVol.neiMap);
+            vector<vector<size_t>> seeds_idxes(numCC);
+            extractVoxIdxList(&label_map, seeds_idxes, numCC);
+            bool overlap_with_seed = false, not_overlap_with_seed = false;
+            Mat1i label_map_new = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_32S);
+            for(auto &it : seeds_idxes){
+                if(it.size() > cellSegment.p4segVol.min_seed_size){
+                    bool overlapped = false;
+                    for(size_t tmp_idx : it){
+                        if(seed.seedMap.at<unsigned char>(tmp_idx) > 0){
+                            overlapped = true;
+                            break;
+                        }
+                    }
+                    if(overlapped){
+                        overlap_with_seed = true;
+                        setValMat(label_map_new, CV_8U, it, 1);
+                    }else{
+                        setValMat(label_map_new, CV_8U, it, 2);
+                        not_overlap_with_seed = true;
+                    }
+                }
+            }
+            if(not_overlap_with_seed && overlap_with_seed){
+                bool bg2sink = false;
+                label_map = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_32S);
+                regionGrow(&label_map_new, 2, label_map, &seed.scoreMap, &fgMap,
+                           cellSegment.p4segVol.growConnectInRefine, cellSegment.p4segVol.graph_cost_design, bg2sink);
+                vector<size_t> tmp_idx, new_cell_idx;
+                extractVoxIdxGivenId(&label_map, tmp_idx, 1);
+                int crop_start_yxz[] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start,
+                                        -seed.crop_range_yxz[2].start};
+                coordinateTransfer(tmp_idx, fgMap.size, new_cell_idx,
+                                   crop_start_yxz, cellSegment.cell_label_maps[new_cell_frame].size);
+                parentKidLink_valid = parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx, missing_type, sz);
+            }
+            if(parentKidLink_valid){
+                res = make_pair(6,1);
+            }else if(missing_type == MISS_AS_JUMP){
+                //case 4: TOO RARE, so we only check it loosely with a strict criterion
+                //adj_pk_vec = multiNeis_check(parent_kid_vec, append_idx, movieInfo, refine_res);
+
+            }else{
+                res = make_pair(1,0);
+            }
+        }
+    }else{ // there indeed an adjacent cell
+        vector<size_t> append_idxPlus = movieInfo.voxIdx[ajd_cell_idx];
+        append_idxPlus.insert(append_idxPlus.end(), new_cell_idx.begin(), new_cell_idx.end());
+
+
     }
 }
 /**
@@ -3376,19 +3453,35 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
  * @return
  */
 bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz){
+    float dummy_cost;
     if(missing_type == MISS_AS_JUMP){
-        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz) &&
-                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz);
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, dummy_cost) &&
+                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
     }else if(missing_type == MISS_AT_TRACK_START){
-        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz);
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
     }else{
-        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz);
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz,dummy_cost);
     }
 }
-bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz){
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz, float &cost){
     float dummy_c2n, dummy_n2c;
     float dist = voxelwise_avg_distance(new_cell_idx, new_cell_frame,
-                                        movieInfo.voxIdx[node_idx], nei_frame, sz, dummy_c2n, dummy_c2n);
-    float cost = distance2cost(dist);
+                                        movieInfo.voxIdx[node_idx], movieInfo.frames[node_idx], sz, dummy_c2n, dummy_c2n);
+    cost = distance2cost(dist);
     return (cost<abs(p4tracking.observationCost));
 }
+
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz,
+                                                float &cost1, float &cost2){
+    cost1 = INFINITY;
+    cost2 = INFINITY;
+    if(missing_type == MISS_AS_JUMP){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, cost1) &&
+                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, cost2);
+    }else if(missing_type == MISS_AT_TRACK_START){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, cost1);
+    }else{
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, cost2);
+    }
+}
+

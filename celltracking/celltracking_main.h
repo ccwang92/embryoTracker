@@ -133,7 +133,9 @@ private:    // TODO: missing cell module
                                 int cell4seed_frame, vector<pair<size_t, int>> seeds_missing_type,
                                 vector<vector<size_t>> &seeds_loc_idx);
     bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz);
-    bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz);
+    bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz,
+                                                    float &cost1, float &cost2);
+    bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz, float &cost);
 
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);

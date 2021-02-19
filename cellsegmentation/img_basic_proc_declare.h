@@ -106,7 +106,7 @@ bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
 vector<float> extractValsGivenMask(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
 vector<float> extractValsGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
-template <typename T> vector<T> extractValsGivenMask(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
+template <typename T> vector<T> extractValsGivenMask_type(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
 template <typename T> vector<T> extractValsGivenIdx_type(Mat *vol3d, vector<size_t> idx, int datatype);
 
 double extractSumGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
