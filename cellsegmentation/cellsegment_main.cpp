@@ -6,7 +6,7 @@
 using namespace cv;
 using namespace std;
 //using namespace volproc;
-enum boundary_touched { NO_TOUCH = 0, XY_TOUCH = 1, Z_TOUCH = 2, XYZ_TOUCH = 3};
+
 cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSize[5]/*(x,y,z,c,t)*/)
 {
     init_parameter();
@@ -515,7 +515,6 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
         removeOtherSeedsInfgMap(cellSegFromSynQuant, seed, p4segVol);
         qInfo("after remove other seeds, fgmap empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
-
     }
     //// 3. segment fgMap into idMap based on gaps from principal curvature
     //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);

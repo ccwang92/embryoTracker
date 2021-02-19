@@ -886,7 +886,30 @@ template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter 
 
     return output;
 }
-
+template <typename T> vector<T> extractValsGivenMask_type(Mat *vol3d, int datatype, Mat *src3d, float threshold_in){
+    assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
+    vector<T> fg_vals;
+    if (datatype == CV_8U){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<unsigned char>(i) > threshold_in){
+                fg_vals.push_back(vol3d->at<unsigned char>(i));
+            }
+        }
+    }else if (datatype == CV_32F){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<unsigned char>(i) > threshold_in){
+                fg_vals.push_back(vol3d->at<float>(i));
+            }
+        }
+    }else if (datatype == CV_32S){
+        FOREACH_i_ptrMAT(src3d){
+            if(src3d->at<unsigned char>(i) > threshold_in){
+                fg_vals.push_back(vol3d->at<int>(i));
+            }
+        }
+    }
+    return fg_vals;
+}
 template <typename T> vector<T> extractValsGivenIdx_type(Mat *vol3d, vector<size_t> idx, int datatype){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
     vector<T> fg_vals;

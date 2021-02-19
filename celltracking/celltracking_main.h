@@ -126,7 +126,15 @@ private:    // TODO: missing cell module
     bool checkSeedCoveredByExistingCell(cellSegmentMain &cellSegment, int missing_type,
                                         size_t parent_idx, size_t kid_idx, int missing_frame, size_t min_seed_sz,
                                         vector<size_t> &in_seed_loc_idx, vector<int> &seed_loc_existing_labels,
-                                        vector<size_t> &out_seed_loc_idx);
+                                        unordered_set<size_t> &cell_idx_can_be_removed,
+                                        vector<pair<size_t, int>> &seeds_missing_type,
+                                        vector<vector<size_t>> &seeds_loc_idx);
+    bool extractSeedInGivenCell(cellSegmentMain &cellSegment, bool parent_flag, size_t givenCell,
+                                int cell4seed_frame, vector<pair<size_t, int>> seeds_missing_type,
+                                vector<vector<size_t>> &seeds_loc_idx);
+    bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz);
+    bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz);
+
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
 private:

@@ -2915,10 +2915,19 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
     vector<size_t> seed_loc_idx;
     size_t parent_idx = cur_node_idx;
     size_t kid_idx = missing_type == MISS_AS_JUMP ? movieInfo.nodes[parent_idx].kids[0] : 0;
+    if (missing_type == MISS_AT_TRACK_START){
+        size_t tmp = parent_idx;
+        parent_idx = kid_idx;
+        kid_idx = tmp;
+    }
     extractSeedFromGivenCell(cellSegment, missing_type, parent_idx, kid_idx, missing_frames, seed_loc_idx);
 
     // start the big game for missing cell retrieve
     for(int frame : missing_frames){
+        vector<vector<size_t>> valid_seeds_loc_idx(0);
+        vector<pair<size_t, int>> seeds_missing_type (0);
+        unordered_set<size_t> cell_idx_can_be_removed (0);
+        //vector<nodeRelation> removed_cells (0);
         vector<int> seed_loc_existing_labels = extractValsGivenIdx_type<int>(&cellSegment.cell_label_maps[frame], seed_loc_idx, CV_32S);
         vector<size_t> valid_seed_loc_idx = vec_atrange(seed_loc_idx, seed_loc_existing_labels, 0, 0, false);
         size_t min_seed_sz = cellSegment.p4segVol.min_seed_size;
@@ -2927,11 +2936,149 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
             if(valid_seed_loc_idx.size() < min_seed_sz){
                 valid_seed_loc_idx.clear();
                 checkSeedCoveredByExistingCell(cellSegment, missing_type, parent_idx, kid_idx, frame, min_seed_sz,
-                                               seed_loc_idx, seed_loc_existing_labels, valid_seed_loc_idx);
+                                               seed_loc_idx, seed_loc_existing_labels, cell_idx_can_be_removed,
+                                               seeds_missing_type, valid_seeds_loc_idx);
+                if(cell_idx_can_be_removed.size() > 0){
+                    for(auto it : cell_idx_can_be_removed){// nullify the region in label maps
+                        setValMat(cellSegment.cell_label_maps[frame], CV_32S, movieInfo.voxIdx[it], 0);
+                        setValMat(cellSegment.threshold_maps[frame], CV_32F, movieInfo.voxIdx[it], 0);
+                    }
+                }
+            }else{
+                valid_seeds_loc_idx.push_back(valid_seed_loc_idx);
+                seeds_missing_type.push_back(make_pair(cur_node_idx, missing_type));
+            }
+        }else if(valid_seed_loc_idx.size() >= min_seed_sz){
+            valid_seeds_loc_idx.push_back(valid_seed_loc_idx);
+            seeds_missing_type.push_back(make_pair(cur_node_idx, missing_type));
+        }else{
+            continue;
+        }
+        vector<size_t> seed_idx4fgRefine;
+        for(int i=0; i<valid_seeds_loc_idx.size(); i++){
+            seed_idx4fgRefine.insert(seed_idx4fgRefine.end(), valid_seeds_loc_idx[i].begin(),
+                                     valid_seeds_loc_idx[i].end());
+        }
+        int seed_label4fgRefine = cellSegment.number_cells[frame] + 1;
+        setValMat(cellSegment.cell_label_maps[frame], CV_32S, seed_idx4fgRefine, seed_label4fgRefine);
+
+        if(!redetectCellinTrackingwithSeed()){
+            if(cell_idx_can_be_removed.size() > 0){
+                for(auto it : cell_idx_can_be_removed){
+                    setValMat(cellSegment.cell_label_maps[frame], CV_32S, movieInfo.voxIdx[it], 0);
+                    setValMat(cellSegment.threshold_maps[frame], CV_32F, movieInfo.voxIdx[it], 0);
+                }
             }
         }
+    }
+}
 
+bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegment, vector<size_t> seed_idx4fgRefine,
+                                    int seed_label_in_map, int frame, vector<vector<size_t>> valid_seeds_loc_idx,
+                                                      size_t parentKid_idx[2], int missing_type, vector<simpleNodeInfo> &newCells){
+    long sz_single_frame = cellSegment.data_rows_cols_slices[0]*
+            cellSegment.data_rows_cols_slices[1]*cellSegment.data_rows_cols_slices[2];
+    unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*frame; // sub-matrix pointer
+    Mat data_grayim3d(3, cellSegment.normalized_data4d.size, CV_8U, ind);
+    singleCellSeed seed;
+    cellSegment.cropSeed(seed_label_in_map, seed_idx4fgRefine, &data_grayim3d, nullptr, &cellSegment.cell_label_maps[frame],
+            frame, seed, cellSegment.p4segVol);
+    int touchBnd = cellSegment.refineSeed2Region(seed, cellSegment.p4odStats, cellSegment.p4segVol);
 
+    if(touchBnd != NO_TOUCH){ // region too small
+        if(touchBnd == XY_TOUCH || touchBnd == XYZ_TOUCH){
+            cellSegment.p4segVol.shift_yxz[0] *=2;
+            cellSegment.p4segVol.shift_yxz[1] *=2;
+        }
+        if(touchBnd == Z_TOUCH || touchBnd == XYZ_TOUCH){
+            cellSegment.p4segVol.shift_yxz[2] *=2;
+        }
+        Range new_range[3];
+        getRange(seed.y, cellSegment.p4segVol.shift_yxz[0], cellSegment.cell_label_maps[frame].size[0], new_range[0]);
+        getRange(seed.x, cellSegment.p4segVol.shift_yxz[1], cellSegment.cell_label_maps[frame].size[1], new_range[1]);
+        getRange(seed.z, cellSegment.p4segVol.shift_yxz[2], cellSegment.cell_label_maps[frame].size[2], new_range[2]);
+        if(new_range[0].size() > seed.validSearchAreaMap.size[0] ||
+                new_range[1].size() > seed.validSearchAreaMap.size[1] ||
+                new_range[2].size() > seed.validSearchAreaMap.size[2]){
+
+            cellSegment.cropSeed(seed_label_in_map, seed_idx4fgRefine, &data_grayim3d, nullptr,
+                                 &cellSegment.cell_label_maps[frame], frame, seed, cellSegment.p4segVol);
+            cellSegment.refineSeed2Region(seed, cellSegment.p4odStats, cellSegment.p4segVol);
+        }
+        cellSegment.reset_shift();
+    }
+    if(seed.bestFgThreshold == 0 || isempty(seed.outputIdMap, CV_32S)){
+        return false;
+    }
+    if(valid_seeds_loc_idx.size() > 0){
+        /** step 1. split the fg into different cells */
+        Mat1i label_map = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_32S);
+        for(int i=0; i<valid_seeds_loc_idx.size(); i++){
+            for(size_t tmp_idx : valid_seeds_loc_idx[i]){
+                label_map.at<int>(tmp_idx) = i+1;
+            }
+        }
+        Mat1b fgMap = seed.idMap>0;
+        Mat1i grownSeedMap2d, grownSeedMap3d;
+        bool bg2sink = true;
+        //ccShowSliceLabelMat(seedMap);
+        regionGrow(&label_map, 2, grownSeedMap2d, &seed.score2d, &fgMap,
+                   cellSegment.p4segVol.growConnectInTest, cellSegment.p4segVol.graph_cost_design, bg2sink);
+        //ccShowSliceLabelMat(grownSeedMap2d);
+        bg2sink = false;
+        regionGrow(&grownSeedMap2d, 2, grownSeedMap3d, &seed.scoreMap, &fgMap,
+                   cellSegment.p4segVol.growConnectInRefine, cellSegment.p4segVol.graph_cost_design, bg2sink);
+        //ccShowSliceLabelMat(grownSeedMap3d);
+        //grownSeedMap3d.copyTo(seed.idMap);
+
+        /** step 2. extract idx and save them into newCells*/
+        vector<vector<size_t>> newCells_idx_small(valid_seeds_loc_idx.size());
+        extractVoxIdxList(&grownSeedMap3d, newCells_idx_small, (int)valid_seeds_loc_idx.size());
+//        void coordinateTransfer(vector<size_t> &in_idx, int org_sz_yxz[3],
+//                    vector<size_t> &out_idx, int crop_start_yxz[3], int crop_sz_yxz[3]);
+//        void coordinateTransfer(vector<size_t> &in_idx, MatSize org_sz_yxz,
+//                    vector<size_t> &out_idx, int crop_start_yxz[3], MatSize crop_sz_yxz);
+        int crop_start_yxz[] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start,
+                                -seed.crop_range_yxz[2].start};
+        bool indeed_add_cell = false;
+        for(int i=0; i<newCells_idx_small.size(); i++){
+            simpleNodeInfo tmp;
+            tmp.frame = frame;
+            coordinateTransfer(newCells_idx_small[i], grownSeedMap3d.size, tmp.voxIdx,
+                               crop_start_yxz, cellSegment.cell_label_maps[frame].size);
+            if(parentOrKidValidLinkTest(tmp.voxIdx, frame, parentKid_idx, missing_type, cellSegment.cell_label_maps[frame].size)){
+                newCells.push_back(tmp);
+                indeed_add_cell = true;
+            }
+        }
+        return indeed_add_cell;
+    }else{
+        // check the neighboring cells, should we combine them?
+        /** step 1. find neighboring cells */
+        vector<size_t> adj_cell_ids;
+        Mat1b fgMap = seed.idMap>0, fgMap_dilate;
+        int dilate_sz[] = {1,1,0};
+        volumeDilate(&fgMap, fgMap_dilate, dilate_sz, MORPH_CROSS);
+        fgMap_dilate = fgMap_dilate - fgMap;
+        vector<size_t> adj_cells_idx;
+        vector<int> adj_cells_labels = extractValsGivenMask_type<int>(&seed.idMap, CV_32S, &fgMap_dilate, 0);
+        unordered_map<int, size_t> adj_cells_adj_sz = frequecy_cnt(adj_cells_labels);
+        vector<size_t> adj_cell_id(0);
+        if(adj_cells_adj_sz.size() > 0){
+            size_t tmp_max_size = 0;
+            int adj_cell_label = -1;
+            for(auto it : adj_cells_adj_sz){
+                if (it.first!=0 && it.second > tmp_max_size){
+                    tmp_max_size = it.second;
+                    adj_cell_label = it.first;
+                }
+            }
+            if(adj_cell_label > 0){
+                adj_cell_id.push_back(adj_cell_label);
+                adj_cell_id[0] += frame == 0 ? 0:cumulative_cell_nums[frame-1];
+            }
+        }
+        newlyAddedCellValidTest()
     }
 }
 /**
@@ -2949,8 +3096,10 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
 bool cellTrackingMain::checkSeedCoveredByExistingCell(cellSegmentMain &cellSegment, int missing_type,
                                     size_t parent_idx, size_t kid_idx, int missing_frame, size_t min_seed_sz,
                                     vector<size_t> &in_seed_loc_idx, vector<int> &seed_loc_existing_labels,
-                                    vector<size_t> &out_seed_loc_idx){
-    out_seed_loc_idx.resize(0);
+                                    unordered_set<size_t> &cell_idx_can_be_removed,
+                                    vector<pair<size_t, int>> &seeds_missing_type,
+                                    vector<vector<size_t>> &seeds_loc_idx){
+    vector<size_t> out_seed_loc_idx (0);
     // conditon 1. the existing cell overlapped with seed is an orphan.
     vector<int>overlapped_labels = vec_atrange(seed_loc_existing_labels, (int)INFINITY, 0, true);
     unordered_map<int, size_t> freq_map = frequecy_cnt(overlapped_labels);
@@ -2971,6 +3120,16 @@ bool cellTrackingMain::checkSeedCoveredByExistingCell(cellSegmentMain &cellSegme
             }
         }
         if(out_seed_loc_idx.size() >= min_seed_sz){
+            if(missing_type == MISS_AT_TRACK_START){
+                seeds_missing_type.push_back(make_pair(kid_idx, missing_type));
+            }else{
+                seeds_missing_type.push_back(make_pair(parent_idx, missing_type));
+            }
+            seeds_loc_idx.push_back(out_seed_loc_idx);
+            size_t append_idx = missing_frame == 0? 0:cumulative_cell_nums[missing_frame-1];
+            for(size_t it : labels_can_be_removed){
+                cell_idx_can_be_removed.insert(it+append_idx);
+            }
             return true;
         }
     }
@@ -2984,13 +3143,29 @@ bool cellTrackingMain::checkSeedCoveredByExistingCell(cellSegmentMain &cellSegme
         }
     }
     if(max_overlapped_sz + out_seed_loc_idx.size() < min_seed_sz){
-        out_seed_loc_idx.clear();
         return false;
     }
     size_t candidate_cell_idx = max_overlapped_cell_label;
     candidate_cell_idx += missing_frame == 0? 0:cumulative_cell_nums[missing_frame-1];
 
-    //if(missing_type != MISS_AT_TRACK_START)
+//    vector<pair<size_t, int>> seeds_missing_type;
+//    vector<vector<size_t>> seeds_loc_idx;
+    bool seeds_found = false;
+    if(missing_type != MISS_AT_TRACK_START){
+        bool parent_flag = true;
+        seeds_found = extractSeedInGivenCell(cellSegment, parent_flag, candidate_cell_idx, movieInfo.frames[parent_idx],
+                               seeds_missing_type, seeds_loc_idx);
+    }
+    if(!seeds_found && missing_type != MISS_AT_TRACK_END){
+        bool parent_flag = false;
+        seeds_found = extractSeedInGivenCell(cellSegment, parent_flag, candidate_cell_idx, movieInfo.frames[kid_idx],
+                               seeds_missing_type, seeds_loc_idx);
+    }
+    if(!seeds_found){
+        return false;
+    }
+    cell_idx_can_be_removed.insert(candidate_cell_idx);
+    return true;
 }
 
 /**
@@ -3004,8 +3179,9 @@ bool cellTrackingMain::checkSeedCoveredByExistingCell(cellSegmentMain &cellSegme
  * @return
  */
 bool cellTrackingMain::extractSeedInGivenCell(cellSegmentMain &cellSegment, bool parent_flag, size_t givenCell,
-                                              size_t cell4seed, vector<pair<size_t, int>> seeds_missing_type, vector<vector<size_t>> &seeds_loc_idx){
-    int frame4seed = movieInfo.frames[cell4seed];
+                                              int cell4seed_frame, vector<pair<size_t, int>> seeds_missing_type,
+                                              vector<vector<size_t>> &seeds_loc_idx){
+    int frame4seed = cell4seed_frame;
     int frame4givenCell = movieInfo.frames[givenCell];
     if(parent_flag){
         if(movieInfo.nodes[givenCell].parent_num > 0 &&
@@ -3067,21 +3243,57 @@ bool cellTrackingMain::extractSeedInGivenCell(cellSegmentMain &cellSegment, bool
     }
     seeds_loc_idx.resize(0);
     seeds_missing_type.resize(0);
+    int givenCell_label = movieInfo.labelInMap[givenCell];
     for(size_t candidate : candidate_included_cells){
+        pair<size_t, int> curr_seeds_missing_type;
         if(parent_flag){
             if (movieInfo.nodes[candidate].kid_num > 0){
-                seeds_missing_type.push_back(make_pair(candidate, MISS_AS_JUMP));
+                curr_seeds_missing_type = make_pair(candidate, MISS_AS_JUMP);
             }else{
-                seeds_missing_type.push_back(make_pair(candidate, MISS_AT_TRACK_END));
+                curr_seeds_missing_type = make_pair(candidate, MISS_AT_TRACK_END);
             }
         }else{
             if (movieInfo.nodes[candidate].parent_num > 0){
-                seeds_missing_type.push_back(make_pair(movieInfo.nodes[candidate].parents[0], MISS_AS_JUMP));
+                curr_seeds_missing_type = make_pair(movieInfo.nodes[candidate].parents[0], MISS_AS_JUMP);
             }else{
-                seeds_missing_type.push_back(make_pair(candidate, MISS_AT_TRACK_START));
+                curr_seeds_missing_type = make_pair(candidate, MISS_AT_TRACK_START);
             }
         }
+
+        int missing_type = curr_seeds_missing_type.second;
+        vector<int> dummry_missing_frames;
+        vector<size_t> cur_seed_loc_idx;
+        size_t parent_idx, kid_idx;
+        if (missing_type == MISS_AS_JUMP){
+            parent_idx = curr_seeds_missing_type.first;
+            kid_idx = movieInfo.nodes[parent_idx].parents[0];
+        }else if(missing_type == MISS_AT_TRACK_START){
+            parent_idx = -1;
+            kid_idx = curr_seeds_missing_type.first;
+        }else{
+            parent_idx = curr_seeds_missing_type.first;
+            kid_idx = -1;
+        }
+        extractSeedFromGivenCell(cellSegment, missing_type, parent_idx, kid_idx, dummry_missing_frames, cur_seed_loc_idx);
+        vector<size_t> cur_seed_loc_idx_valid;
+        for(size_t one_seed_idx : cur_seed_loc_idx){
+            if(cellSegment.cell_label_maps[frame4givenCell].at<int>(one_seed_idx) == 0 ||
+                    cellSegment.cell_label_maps[frame4givenCell].at<int>(one_seed_idx) == givenCell_label){
+                cur_seed_loc_idx_valid.push_back(one_seed_idx);
+            }
+        }
+        if(cur_seed_loc_idx_valid.size() *2 >= MAX(cur_seed_loc_idx.size(), cellSegment.p4segVol.min_seed_size*2)){
+            seeds_loc_idx.push_back(cur_seed_loc_idx_valid);
+            seeds_missing_type.push_back(curr_seeds_missing_type);
+        }
     }
+    if(seeds_loc_idx.size() < 3){
+        seeds_loc_idx.clear();
+        seeds_missing_type.clear();
+        return false;
+    }
+
+    return true;
 }
 /**
  * @brief extractSeedFromGivenCell: given a cell, extract the seed region (for its parent/kid cells)
@@ -3154,4 +3366,29 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
         }
         return true;
     }
+}
+/**
+ * @brief parentOrKidValidLinkTest: given a newly detected cell, see if it could be linked to existing cells
+ * @param new_cell_idx
+ * @param new_cell_frame
+ * @param parent_idx
+ * @param kid_idx
+ * @return
+ */
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz){
+    if(missing_type == MISS_AS_JUMP){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz) &&
+                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz);
+    }else if(missing_type == MISS_AT_TRACK_START){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz);
+    }else{
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz);
+    }
+}
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz){
+    float dummy_c2n, dummy_n2c;
+    float dist = voxelwise_avg_distance(new_cell_idx, new_cell_frame,
+                                        movieInfo.voxIdx[node_idx], nei_frame, sz, dummy_c2n, dummy_c2n);
+    float cost = distance2cost(dist);
+    return (cost<abs(p4tracking.observationCost));
 }
