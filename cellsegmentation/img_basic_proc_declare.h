@@ -106,8 +106,6 @@ bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
 vector<float> extractValsGivenMask(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
 vector<float> extractValsGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
-template <typename T> vector<T> extractValsGivenMask_type(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
-template <typename T> vector<T> extractValsGivenIdx_type(Mat *vol3d, vector<size_t> idx, int datatype);
 
 double extractSumGivenIdx(Mat *vol3d, vector<size_t> idx, int datatype);
 bool findUnrelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst3d);
@@ -244,6 +242,9 @@ template <typename T> vector<T> intersection(vector<T> &v1, vector<T> &v2);
 template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter first, Iter last);
 
 template <typename T> unordered_map<T, size_t> frequecy_cnt(vector<T> &vec);
+
+template <typename T> vector<T> extractValsGivenMask_type(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
+template <typename T> vector<T> extractValsGivenIdx_type(Mat *vol3d, vector<size_t> idx, int datatype);
 #endif // IMG_BASIC_PROC_H
 
 
