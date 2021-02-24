@@ -191,6 +191,7 @@ template <typename T> vector<T> vec_pointMultiply(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_Minus(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_Minus(vector<T> v1, T s2);
 template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2);
+template <typename T> vector<T> vec_Add(vector<T> &v1, T s2);
 template <typename T> vector<T> vec_pointDivide(vector<T> v1, vector<T> v2);
 template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, bool strict = true);
 template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bool strict = true);

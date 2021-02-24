@@ -3145,7 +3145,19 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
                 res = make_pair(6,1);
             }else if(missing_type == MISS_AS_JUMP){
                 //case 4: TOO RARE, so we only check it loosely with a strict criterion
-                //adj_pk_vec = multiNeis_check(parent_kid_vec, append_idx, movieInfo, refine_res);
+                vector<size_t> adj_pk_vec(2);
+                if(multiNeis_check(cellSegment, parentKid_idx[0], parentKid_idx[1], new_cell_idx, adj_pk_vec)){
+                    vector<vector<size_t>> double_p_k_idx (2);
+                    double_p_k_idx[0] = {parentKid_idx[0], adj_pk_vec[0]};
+                    double_p_k_idx[1] = {parentKid_idx[1], adj_pk_vec[1]};
+                    if(parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, double_p_k_idx, missing_type, sz)){
+                        res = make_pair(4,1);
+                    }else{
+                        res = make_pair(4,0);
+                    }
+                }else{
+                    res = make_pair(4,0);
+                }
 
             }else{
                 res = make_pair(1,0);
@@ -3175,12 +3187,33 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
 
     }
 }
-// the following two functions' logic is simple
+//check if the newly detected cell indeed corresponds to two cells in previous or latter frame.
+// we only check the case of two cells
+bool cellTrackingMain::multiNeis_check(cellSegmentMain &cellSegment, size_t exist_parent_idx,
+                                       size_t exist_kid_idx, vector<size_t> &new_cell_idx, vector<size_t> &new_p_k_pair){
+    int f = movieInfo.frames[exist_parent_idx];
+    vector<size_t> labels = extractValsGivenIdx_type<size_t>(&cellSegment.cell_label_maps[f], new_cell_idx, CV_32S);
+    labels = vec_Add(labels, cumulative_cell_nums[f-1]);
+    vector<size_t, size_t> freq = frequecy_cnt(labels);
+    if (freq.size() < 2) return false;
+    size_t max_2nd, max_2nd_sz = 0;
+    for (auto p : freq){
+        if (p.first > 0 && p.first != exist_parent_idx && p.second > max_2nd_sz){
+            max_2nd = p.first;
+        }
+    }
+    if (movieInfo.nodes[max_2nd].kid_num!=1 ||
+            movieInfo.frames[movieInfo.nodes[max_2nd].kids[0]]!=movieInfo.frames[exist_kid_idx]) return false;
+
+    new_p_k_pair.resize(2);
+    new_p_k_pair[0] = max_2nd;
+    new_p_k_pair[1] = movieInfo.nodes[max_2nd].kids[0];
+}
 void cellTrackingMain::multiParentsKidsValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
                                                      size_t node_idx, MatSize sz, float &cost){
 
 }
-// call bisect to decide if a region can be split and also be merged
+// Both parents can link to both kids and if merged, they also can link each other
 void cellTrackingMain::mergeSplitBothValid(cellSegmentMain &cellSegment, bool parent_flag, size_t givenCell,
                                            int cell4seed_frame, vector<pair<size_t, int>> seeds_missing_type,
                                            vector<vector<size_t>> &seeds_loc_idx){
@@ -3491,6 +3524,17 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
         return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz,dummy_cost);
     }
 }
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<vector<size_t>> parentKid_idx, int missing_type, MatSize sz){
+    float dummy_cost;
+    if(missing_type == MISS_AS_JUMP){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, dummy_cost) &&
+                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
+    }else if(missing_type == MISS_AT_TRACK_START){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
+    }else{
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz,dummy_cost);
+    }
+}
 bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz, float &cost){
     float dummy_c2n, dummy_n2c;
     float dist = voxelwise_avg_distance(new_cell_idx, new_cell_frame,
@@ -3512,4 +3556,27 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
         return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, cost2);
     }
 }
-
+// if input parents or kids are more than one
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<vector<size_t>> parentKid_idx, int missing_type, MatSize sz){
+    float dummy_cost;
+    if(missing_type == MISS_AS_JUMP){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, dummy_cost) &&
+                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
+    }else if(missing_type == MISS_AT_TRACK_START){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
+    }else{
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz,dummy_cost);
+    }
+}
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<size_t> node_idx, MatSize sz, float &cost){
+    float dummy_c2n, dummy_n2c;
+    vector<size_t> node_loc_idx;
+    FOREACH_i(node_idx){
+        node_loc_idx.reserve(node_loc_idx.size() + movieInfo.voxIdx[node_idx[i]].size());
+        node_loc_idx.insert(node_loc_idx.end(), movieInfo.voxIdx[node_idx[i]].begin(), movieInfo.voxIdx[node_idx[i]].end());
+    }
+    float dist = voxelwise_avg_distance(new_cell_idx, new_cell_frame,
+                                        node_loc_idx, movieInfo.frames[node_idx[0]], sz, dummy_c2n, dummy_c2n);
+    cost = distance2cost(dist);
+    return (cost<abs(p4tracking.observationCost));
+}

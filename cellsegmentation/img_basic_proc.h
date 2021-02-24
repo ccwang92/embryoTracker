@@ -49,6 +49,11 @@ template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2){
     }
     return out;
 }
+template <typename T> vector<T> vec_Add(vector<T> &v1, T s2){
+    vector<T> v2(v1.size());
+    transform(v1.begin(), v1.end(), v2.begin(), [s2](T x){return x+s2;});
+    return;
+}
 template <typename T> vector<T> vec_pointDivide(vector<T> v1, vector<T> v2){
     assert(v1.size() == v2.size());
     vector<T> out(v1.size());
@@ -866,7 +871,7 @@ template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter 
 
     std::vector<type_t> arr (first, last);
 
-    std::sort(arr.begin(), arr.end() );
+    std::sort(arr.begin(), arr.end());
 
     type_t output = type_t();
     int final_frequency = 0;
@@ -892,19 +897,19 @@ template <typename T> vector<T> extractValsGivenMask_type(Mat *vol3d, int dataty
     if (datatype == CV_8U){
         FOREACH_i_ptrMAT(src3d){
             if(src3d->at<unsigned char>(i) > threshold_in){
-                fg_vals.push_back(vol3d->at<unsigned char>(i));
+                fg_vals.push_back((T)vol3d->at<unsigned char>(i));
             }
         }
     }else if (datatype == CV_32F){
         FOREACH_i_ptrMAT(src3d){
             if(src3d->at<unsigned char>(i) > threshold_in){
-                fg_vals.push_back(vol3d->at<float>(i));
+                fg_vals.push_back((T)vol3d->at<float>(i));
             }
         }
     }else if (datatype == CV_32S){
         FOREACH_i_ptrMAT(src3d){
             if(src3d->at<unsigned char>(i) > threshold_in){
-                fg_vals.push_back(vol3d->at<int>(i));
+                fg_vals.push_back((T)vol3d->at<int>(i));
             }
         }
     }
@@ -915,15 +920,15 @@ template <typename T> vector<T> extractValsGivenIdx_type(Mat *vol3d, vector<size
     vector<T> fg_vals;
     if (datatype == CV_8U){
         FOREACH_i(idx){
-            fg_vals.push_back(vol3d->at<unsigned char>(idx[i]));
+            fg_vals.push_back((T)vol3d->at<unsigned char>(idx[i]));
         }
     }else if (datatype == CV_32F){
         FOREACH_i(idx){
-            fg_vals.push_back(vol3d->at<float>(idx[i]));
+            fg_vals.push_back((T)vol3d->at<float>(idx[i]));
         }
     }else if (datatype == CV_32S){
         FOREACH_i(idx){
-            fg_vals.push_back(vol3d->at<int>(idx[i]));
+            fg_vals.push_back((T)vol3d->at<int>(idx[i]));
         }
     }
     return fg_vals;
