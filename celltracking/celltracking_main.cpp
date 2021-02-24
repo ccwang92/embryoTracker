@@ -3128,21 +3128,23 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
                     }
                 }
             }
+            vector<size_t> new_cell_with_append_idx;
             if(not_overlap_with_seed && overlap_with_seed){
                 bool bg2sink = false;
                 label_map = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_32S);
                 regionGrow(&label_map_new, 2, label_map, &seed.scoreMap, &fgMap,
                            cellSegment.p4segVol.growConnectInRefine, cellSegment.p4segVol.graph_cost_design, bg2sink);
-                vector<size_t> tmp_idx, new_cell_idx;
+                vector<size_t> tmp_idx;
                 extractVoxIdxGivenId(&label_map, tmp_idx, 1);
                 int crop_start_yxz[] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start,
                                         -seed.crop_range_yxz[2].start};
-                coordinateTransfer(tmp_idx, fgMap.size, new_cell_idx,
+                coordinateTransfer(tmp_idx, fgMap.size, new_cell_with_append_idx,
                                    crop_start_yxz, cellSegment.cell_label_maps[new_cell_frame].size);
-                parentKidLink_valid = parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx, missing_type, sz);
+                parentKidLink_valid = parentOrKidValidLinkTest(new_cell_with_append_idx, new_cell_frame, parentKid_idx, missing_type, sz);
             }
             if(parentKidLink_valid){
                 res = make_pair(6,1);
+                new_cell_idx = new_cell_with_append_idx;
             }else if(missing_type == MISS_AS_JUMP){
                 //case 4: TOO RARE, so we only check it loosely with a strict criterion
                 vector<size_t> adj_pk_vec(2);
@@ -3163,8 +3165,9 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
                 res = make_pair(1,0);
             }
         }
-    }else{ // there indeed an adjacent cell
+    }else{ // there indeed an adjacent cell, case 2,3,5
         vector<size_t> append_idxPlus = movieInfo.voxIdx[ajd_cell_idx[0]];
+        append_idxPlus.reserve(append_idxPlus.size() + new_cell_idx.size());
         append_idxPlus.insert(append_idxPlus.end(), new_cell_idx.begin(), new_cell_idx.end());
         if(movieInfo.nodes[ajd_cell_idx[0]].parent_num > 0 &&
                 movieInfo.nodes[ajd_cell_idx[0]].kid_num > 0){
@@ -3172,17 +3175,66 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
             bool merge_link_pk_valid = parentOrKidValidLinkTest(append_idxPlus, new_cell_frame,
                                                                 parentKid_idx, missing_type, sz, mergeCost1, mergeCost2);
             if(merge_link_pk_valid){
-                // MORE::!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                res = make_pair(2,1); // TODO: need to be MORE accurate!
+                if(mergeCost1 <= baseCost1 && mergeCost2 <= baseCost2){
+                    res = make_pair(2,1); // merge is better than split
+                }else if(parentKidLink_valid){
+                    res = make_pair(1,1); // merge not as good as split
+                }else{
+                    res = make_pair(2,1); // merge is the only choice
+                }
             }else if(parentKidLink_valid){
-                res = make_pair(1,1); // TODO: need to be MORE accurate!
+                res = make_pair(1,1); // not merge is the only choice
             }else{
                 res = make_pair(2,0);
             }
-        }else{//case 3 and 5
-            // multiParentsKidsValidLinkTest
-            // mergeSplitBothValid
+        }else{//case 3 and 5: 3. a1,b1->miss,b2->a3,b3; 5. a1+b1->miss,b2->a3+b3
+            vector<size_t> both_parents; // to see if a1 and b1 both exist
+            vector<size_t> both_kids; // to see if a3 and b3 both exist
+            if(movieInfo.nodes[ajd_cell_idx[0]].parent_num > 0){
+                assert(movieInfo.nodes[ajd_cell_idx[0]].parent_num == 1); // should be exactly one
+                both_parents.push_back(movieInfo.nodes[ajd_cell_idx[0]].parents[0]);
+            }
+            if(missing_type != MISS_AT_TRACK_START){
+                both_parents.push_back(parentKid_idx[0]);
+            }
+            if(movieInfo.nodes[ajd_cell_idx[0]].kid_num > 0){
+                assert(movieInfo.nodes[ajd_cell_idx[0]].kid_num == 1); // should be exactly one
+                both_kids.push_back(movieInfo.nodes[ajd_cell_idx[0]].kids[0]);
+            }
+            if(missing_type != MISS_AT_TRACK_END){
+                both_kids.push_back(parentKid_idx[1]);
+            }
+            if(both_parents.size()==1 && both_kids.size()==1){
+                // scenario 5: both_parent can jump to both_kid; merged region can link to both of them.
+                size_t pk[] = {both_parents[0], both_kids[0]};
+                float p2cur_Cost, cur2k_Cost;
+                bool p2miss2k_valid = parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, pk,
+                                                               missing_type, sz, p2cur_Cost, cur2k_Cost);
+                // scenario 7: there is "another region" have not been considered.
+                // If we add that region, both parents->merged region->both kids+the "another region". or
+                // both parents+the "another region"->merged region->both kids
+                bool p2miss2k_and_one_more_valid = false;
+                if (p2miss2k_valid || multiParentsKidsValidLinkTest(cellSegment, both_parents[0], both_parents[1], new_cell_idx, new_cell_frame,
+                                                                    p2cur_Cost, cur2k_Cost)){
+                    res = make_pair(5,1);
 
+                }else if(parentKidLink_valid){
+                    res = make_pair(1,1);
+                }else{
+                    res = make_pair(5,0);
+                }
+            }else{
+                vector<vector<size_t>> double_p_k_idx(2);
+                double_p_k_idx[0] = both_parents;
+                double_p_k_idx[1] = both_kids;
+                bool p_valid = false, k_valid = false;
+                if(both_parents.size() == 2){
+
+                }
+                if(both_kids.size() == 2){
+
+                }
+            }
         }
 
     }
@@ -3209,15 +3261,88 @@ bool cellTrackingMain::multiNeis_check(cellSegmentMain &cellSegment, size_t exis
     new_p_k_pair[0] = max_2nd;
     new_p_k_pair[1] = movieInfo.nodes[max_2nd].kids[0];
 }
-void cellTrackingMain::multiParentsKidsValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
-                                                     size_t node_idx, MatSize sz, float &cost){
 
+/**
+ * @brief multiParentsKidsValidLinkTest: for scenario 7: a1->a2+missed->b3+c3 or a1+c1->a2+missed->b3.
+ * @param new_cell_idx
+ * @param new_cell_frame
+ * @param node_idx
+ * @param sz
+ * @param cost
+ */
+bool cellTrackingMain::multiParentsKidsValidLinkTest(cellSegmentMain &cellSegment, size_t exist_parent_idx,
+                                                     size_t exist_kid_idx, vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                     float cost1_lb, float cost2_lb){
+    if(movieInfo.nodes[exist_parent_idx].kid_num + movieInfo.nodes[exist_kid_idx].parent_num != 1){
+        // at most one of node has valid node in the new_cell_frame
+        return false;
+    }
+    float cost1 = INFINITY;
+    float cost2 = INFINITY;
+    if(movieInfo.nodes[exist_parent_idx].kid_num == 1){
+        size_t curr_node = movieInfo.nodes[exist_parent_idx].kids[0];
+        assert(movieInfo.frames[curr_node] == new_cell_frame);
+        if (movieInfo.nodes[exist_parent_idx].kid_cost[0] <= cost2_lb) return false;
+
+        size_t best_id, best_ov_sz = 0;
+        for(nodeRelation nr : movieInfo.nodes[curr_node].neighbors){
+            if (nr.node_id != exist_kid_idx &&
+                    movieInfo.frames[nr.node_id] == movieInfo.frames[exist_kid_idx]){
+                if (nr.overlap_size > best_ov_sz){
+                    best_ov_sz = nr.overlap_size;
+                    best_id = nr.node_id;
+                }
+            }
+        }
+        if(best_ov_sz > 0){
+            cost1 = 0;
+            vector<size_t> node_idx = {best_id, exist_kid_idx};
+            parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, node_idx,
+                                     cellSegment.cell_label_maps[0].size, cost2);
+        }
+    }else if (movieInfo.nodes[exist_kid_idx].parent_num == 1){
+        size_t curr_node = movieInfo.nodes[exist_kid_idx].parents[0];
+        assert(movieInfo.frames[curr_node] == new_cell_frame);
+        if (movieInfo.nodes[exist_kid_idx].parent_cost[0] <= cost2_lb) return false;
+        size_t best_id, best_ov_sz = 0;
+        for(nodeRelation nr : movieInfo.nodes[curr_node].preNeighbors){
+            if (nr.node_id != exist_parent_idx &&
+                    movieInfo.frames[nr.node_id] == movieInfo.frames[exist_parent_idx]){
+                if (nr.overlap_size > best_ov_sz){
+                    best_ov_sz = nr.overlap_size;
+                    best_id = nr.node_id;
+                }
+            }
+        }
+        if(best_ov_sz > 0){
+            cost2 = 0;
+            vector<size_t> node_idx = {best_id, exist_parent_idx};
+            parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, node_idx,
+                                     cellSegment.cell_label_maps[0].size, cost1);
+        }
+    }else{
+        qFatal("number of valid node is wrong");
+    }
+    if(MAX(cost1, cost2) < abs(p4tracking.observationCost)){
+        return true;
+    }else return false;
 }
 // Both parents can link to both kids and if merged, they also can link each other
-void cellTrackingMain::mergeSplitBothValid(cellSegmentMain &cellSegment, bool parent_flag, size_t givenCell,
-                                           int cell4seed_frame, vector<pair<size_t, int>> seeds_missing_type,
-                                           vector<vector<size_t>> &seeds_loc_idx){
+bool cellTrackingMain::mergeSplitBothValid(cellSegmentMain &cellSegment, bool parent_flag, vector<size_t> givenSeedCells,
+                                           vector<size_t> valid_loc_idx, int valid_loc_frame,
+                                           vector<vector<size_t>> &splitted_reg_loc_idx){
+    assert(givenSeedCells.size() == 2);
+    if (movieInfo.frames[givenSeedCells[0]] != movieInfo.frames[givenSeedCells[1]]) return false;
 
+    splitted_reg_loc_idx.resize(2);
+    // merge test
+    float dummy_cost;
+    if(parentOrKidValidLinkTest(valid_loc_idx, valid_loc_frame, givenSeedCells,
+                                cellSegment.cell_label_maps[0].size, dummy_cost)){
+
+    }else{
+        return false;
+    }
 }
 /**
  * @brief checkSeedCoveredByExistingCell: when retrieve missing cell, the seed we get may already be covered by an
@@ -3513,7 +3638,8 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
  * @param kid_idx
  * @return
  */
-bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz){
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                size_t parentKid_idx[2], int missing_type, MatSize sz){
     float dummy_cost;
     if(missing_type == MISS_AS_JUMP){
         return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, dummy_cost) &&
@@ -3523,27 +3649,10 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
     }else{
         return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz,dummy_cost);
     }
-}
-bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<vector<size_t>> parentKid_idx, int missing_type, MatSize sz){
-    float dummy_cost;
-    if(missing_type == MISS_AS_JUMP){
-        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, dummy_cost) &&
-                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
-    }else if(missing_type == MISS_AT_TRACK_START){
-        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, dummy_cost);
-    }else{
-        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz,dummy_cost);
-    }
-}
-bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t node_idx, MatSize sz, float &cost){
-    float dummy_c2n, dummy_n2c;
-    float dist = voxelwise_avg_distance(new_cell_idx, new_cell_frame,
-                                        movieInfo.voxIdx[node_idx], movieInfo.frames[node_idx], sz, dummy_c2n, dummy_c2n);
-    cost = distance2cost(dist);
-    return (cost<abs(p4tracking.observationCost));
 }
 
-bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, size_t parentKid_idx[2], int missing_type, MatSize sz,
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                size_t parentKid_idx[2], int missing_type, MatSize sz,
                                                 float &cost1, float &cost2){
     cost1 = INFINITY;
     cost2 = INFINITY;
@@ -3556,8 +3665,20 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
         return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, cost2);
     }
 }
+
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                size_t node_idx, MatSize sz, float &cost){
+    float dummy_c2n, dummy_n2c;
+    float dist = voxelwise_avg_distance(new_cell_idx, new_cell_frame,
+                                        movieInfo.voxIdx[node_idx], movieInfo.frames[node_idx], sz, dummy_c2n, dummy_c2n);
+    cost = distance2cost(dist);
+    return (cost<abs(p4tracking.observationCost));
+}
+
+
 // if input parents or kids are more than one
-bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<vector<size_t>> parentKid_idx, int missing_type, MatSize sz){
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                vector<vector<size_t>> parentKid_idx, int missing_type, MatSize sz){
     float dummy_cost;
     if(missing_type == MISS_AS_JUMP){
         return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, dummy_cost) &&
@@ -3568,7 +3689,24 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
         return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz,dummy_cost);
     }
 }
-bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<size_t> node_idx, MatSize sz, float &cost){
+
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                vector<vector<size_t>> parentKid_idx, int missing_type, MatSize sz,
+                                                float &cost1, float &cost2){
+    cost1 = INFINITY;
+    cost2 = INFINITY;
+    if(missing_type == MISS_AS_JUMP){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, cost1) &&
+                parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, cost2);
+    }else if(missing_type == MISS_AT_TRACK_START){
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[1], sz, cost1);
+    }else{
+        return parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx[0], sz, cost2);
+    }
+}
+
+bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                vector<size_t> node_idx, MatSize sz, float &cost){
     float dummy_c2n, dummy_n2c;
     vector<size_t> node_loc_idx;
     FOREACH_i(node_idx){
