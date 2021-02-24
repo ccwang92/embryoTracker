@@ -1716,7 +1716,17 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     }
 
     // start to build seed map
-    Mat1b fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
+    Mat1b fgMap;
+    if (reg2split_idx < movieInfo.labelInMap.size()){
+        fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
+    }else{ // input is not a valid region exist in the label map
+        fgMap = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_8U);
+        int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+        vector<size_t> tmp_idx;
+        coordinateTransfer(reg2split, single_frame->size, tmp_idx, crop_start, seed.idMap.size);
+        setValMat(fgMap, CV_8U, tmp_idx, 255);
+    }
+
     vector<vector<size_t>> seeds_idx(reg4seeds.size());
     int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
     FOREACH_i(reg4seeds){
@@ -1783,7 +1793,16 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     }
 
     // start to build seed map
-    Mat1b fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
+    Mat1b fgMap;
+    if (reg2split_idx < movieInfo.labelInMap.size()){
+        fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
+    }else{ // input is not a valid region exist in the label map
+        fgMap = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_8U);
+        int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+        vector<size_t> tmp_idx;
+        coordinateTransfer(reg2split, single_frame->size, tmp_idx, crop_start, seed.idMap.size);
+        setValMat(fgMap, CV_8U, tmp_idx, 255);
+    }
 
     /** ***** THIS the only difference between brute-force and gap-based method ******** **/
     vector<vector<size_t>> ref_seeds_idx(reg4seeds.size());
@@ -1817,6 +1836,7 @@ bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2
                                        int reg2split_frame, vector<vector<size_t>> reg4seeds, int reg4seeds_frame,
                                        bool gapBasedSplit, bool usePriorGapMap, vector<vector<size_t>> &splitRegs,
                                        float *reg4seeds2splitRes_costs){
+    splitRegs.clear();
     splitRegs.resize(reg4seeds.size());
 
 //    bool bisectRegion_gapGuided(cellSegmentMain &cellSegment, size_t reg2split_idx,
@@ -3093,8 +3113,9 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
 //% case 1 and 4 has not region to merge
 void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, singleCellSeed &seed, vector<size_t> &new_cell_idx,
                                                int new_cell_frame, vector<size_t> ajd_cell_idx, size_t parentKid_idx[2],
-                                                int missing_type, MatSize sz, pair<int, int> res){
+                                                int missing_type, MatSize sz, pair<int, int> res, vector<vector<size_t>> extra_new_cells_loc_idx){
     float baseCost1, baseCost2;
+    res = make_pair(0,0);
     bool parentKidLink_valid = parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx, missing_type, sz, baseCost1, baseCost2);
     if(ajd_cell_idx.size() == 0){
         if(parentKidLink_valid){
@@ -3229,10 +3250,36 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
                 double_p_k_idx[1] = both_kids;
                 bool p_valid = false, k_valid = false;
                 if(both_parents.size() == 2){
-
+                    p_valid = mergeSplitBothValid(cellSegment, true, both_parents, new_cell_idx,
+                                                  new_cell_frame, extra_new_cells_loc_idx);
+                    if(p_valid){
+                        if(extra_new_cells_loc_idx[0].size() == 0 || extra_new_cells_loc_idx[1].size() == 0 ){
+                            extra_new_cells_loc_idx.clear();
+                            res = make_pair(1, 1);
+                        }else{
+                            res = make_pair(3, 1);
+                        }
+                    }
                 }
-                if(both_kids.size() == 2){
+                if(!p_valid && both_kids.size() == 2){
+                    k_valid = mergeSplitBothValid(cellSegment, false, both_kids, new_cell_idx,
+                                                  new_cell_frame, extra_new_cells_loc_idx);
 
+                    if(k_valid){
+                        if(extra_new_cells_loc_idx[0].size() == 0 || extra_new_cells_loc_idx[1].size() == 0 ){
+                            extra_new_cells_loc_idx.clear();
+                            res = make_pair(1, 1);
+                        }else{
+                            res = make_pair(3, 1);
+                        }
+                    }
+                }
+                if(res.first == 0){
+                    if(parentKidLink_valid){
+                        res = make_pair(1, 1);
+                    }else{
+                        res = make_pair(3, 0);
+                    }
                 }
             }
         }
@@ -3335,11 +3382,65 @@ bool cellTrackingMain::mergeSplitBothValid(cellSegmentMain &cellSegment, bool pa
     if (movieInfo.frames[givenSeedCells[0]] != movieInfo.frames[givenSeedCells[1]]) return false;
 
     splitted_reg_loc_idx.resize(2);
+
     // merge test
+    vector<vector<size_t>> reg4seeds(2);
+    reg4seeds[0] = movieInfo.voxIdx[givenSeedCells[0]];
+    reg4seeds[1] = movieInfo.voxIdx[givenSeedCells[1]];
+    vector<size_t> both_seeds = reg4seeds[0];
+    both_seeds.reserve(both_seeds.size() + reg4seeds[1].size());
+    both_seeds.insert(both_seeds.end(), reg4seeds[1].begin(), reg4seeds[1].end());
+    int reg4seeds_frame = movieInfo.frames[givenSeedCells[0]];
     float dummy_cost;
     if(parentOrKidValidLinkTest(valid_loc_idx, valid_loc_frame, givenSeedCells,
                                 cellSegment.cell_label_maps[0].size, dummy_cost)){
+        bool gapBased = true, usePriorGapMap = false;
+        float dummy_cost[2];
+        if(bisectValidTest(cellSegment, movieInfo.labelInMap.size(), valid_loc_idx, valid_loc_frame,
+                           reg4seeds, reg4seeds_frame, gapBased, usePriorGapMap,
+                            splitted_reg_loc_idx, dummy_cost) ||
+                bisectValidTest(cellSegment, movieInfo.labelInMap.size(), valid_loc_idx, valid_loc_frame,
+                                           reg4seeds, reg4seeds_frame, !gapBased, usePriorGapMap,
+                                            splitted_reg_loc_idx, dummy_cost)){
+            long long oppo_side_nei[2] = {-1, -1};
+            if(parent_flag){
+                if (movieInfo.nodes[givenSeedCells[0]].kid_num == 1){
+                    oppo_side_nei[0] = movieInfo.nodes[givenSeedCells[0]].kids[0];
+                }
+                if (movieInfo.nodes[givenSeedCells[1]].kid_num == 1){
+                    oppo_side_nei[1] = movieInfo.nodes[givenSeedCells[1]].kids[0];
+                }
+            }else{
+                if (movieInfo.nodes[givenSeedCells[0]].parent_num == 1){
+                    oppo_side_nei[0] = movieInfo.nodes[givenSeedCells[0]].parents[0];
+                }
+                if (movieInfo.nodes[givenSeedCells[1]].kid_num == 1){
+                    oppo_side_nei[1] = movieInfo.nodes[givenSeedCells[1]].parents[0];
+                }
+            }
+            float oppo_seed1_valid = true, oppo_seed2_valid = true;
 
+            if(oppo_side_nei[0] == -1 && oppo_side_nei[1] == -1){
+                return true;
+            }else {
+                float dummy_cost;
+                if(oppo_side_nei[0] != -1){
+                    oppo_seed1_valid = parentOrKidValidLinkTest(splitted_reg_loc_idx[0], valid_loc_frame, oppo_side_nei[0],
+                            cellSegment.cell_label_maps[0].size, dummy_cost);
+                }
+                if(oppo_side_nei[1] != -1){
+                    oppo_seed2_valid = parentOrKidValidLinkTest(splitted_reg_loc_idx[1], valid_loc_frame, oppo_side_nei[1],
+                            cellSegment.cell_label_maps[0].size, dummy_cost);
+                }
+                if(oppo_seed1_valid && oppo_seed2_valid){
+                    return true;
+                }else{
+                    return false;
+                }
+            }
+        }else{
+            return false;
+        }
     }else{
         return false;
     }
