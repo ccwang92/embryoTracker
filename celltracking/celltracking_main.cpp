@@ -1065,7 +1065,7 @@ void cellTrackingMain::getArcCostOne2OneTrack(size_t track_id, vector<float> &ar
  * This function will only be called when we has one to one linking.
  */
 void cellTrackingMain::stableSegmentFixed(){
-    movieInfo.track_arcs_avg_mid_std.resize(movieInfo.tracks.size());
+    movieInfo.track_arcs_avg_mid_std.reserve(movieInfo.tracks.size());
     float max_cost = pow(normInv(0.5*p4tracking.jumpCost[0]/2), 2);
     int min_valid_node_cluster_sz = 5;
     FOREACH_i(movieInfo.tracks){
@@ -1584,7 +1584,7 @@ bool cellTrackingMain::seedsRefine_intensity(cellSegmentMain &cellSegment, vecto
     return true;
 }
 /**
- * @brief seedRefine_gap
+ * @brief seedRefine_gap: put seeds' location idx into a binary seed map
  * @param cellSegment
  * @param root_idx
  * @param root_frame
@@ -1594,6 +1594,7 @@ bool cellTrackingMain::seedsRefine_intensity(cellSegmentMain &cellSegment, vecto
  * @return
  */
 bool cellTrackingMain::seedsRefine_gap(Mat1b &possibleGaps, vector<vector<size_t>> &seeds_idx, Mat1i &outLabelMap){
+    assert(seeds_idx.size() > 0);
     outLabelMap = Mat(possibleGaps.dims, possibleGaps.size, CV_32S, Scalar(0));
     Mat1b noGaps;
     bitwise_not(possibleGaps, noGaps);
@@ -1604,10 +1605,10 @@ bool cellTrackingMain::seedsRefine_gap(Mat1b &possibleGaps, vector<vector<size_t
         if(isempty(tmp, CV_8U)){
             return false;
         }else{
-            setValMat(outLabelMap, CV_32S, tmp, i+1);
+            setValMat(outLabelMap, CV_32S, &tmp, (float)i+1);
         }
     }
-
+    return true;
 }
 
 /**
@@ -3374,7 +3375,7 @@ bool cellTrackingMain::multiNeis_check(cellSegmentMain &cellSegment, size_t exis
     int f = movieInfo.frames[exist_parent_idx];
     vector<size_t> labels = extractValsGivenIdx_type<size_t>(&cellSegment.cell_label_maps[f], new_cell_idx, CV_32S);
     labels = vec_Add(labels, cumulative_cell_nums[f-1]);
-    vector<size_t, size_t> freq = frequecy_cnt(labels);
+    unordered_map<size_t, size_t> freq = frequecy_cnt(labels);
     if (freq.size() < 2) return false;
     size_t max_2nd, max_2nd_sz = 0;
     for (auto p : freq){
@@ -3810,6 +3811,7 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
         return true;
     }
 }
+
 /**
  * @brief parentOrKidValidLinkTest: given a newly detected cell, see if it could be linked to existing cells
  * @param new_cell_idx

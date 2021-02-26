@@ -1,6 +1,6 @@
 #ifndef DT3D_HPP
 #define DT3D_HPP
-/* This function is a c++ version of edt_3dMex.cpp, which is from the matlab
+/* This function is a c/c++ version of edt_3dMex.cpp, which is from the matlab
  * version of the cell tracking framework.
  * Ideas are from Felzenszwalb and Huttenlocher's paper about distance
  * transform. Our distance transfrom follows the z->x->y function.
@@ -15,10 +15,14 @@
 //#include <mex.h>
 #include <algorithm>
 #include <limits>
+#include <math.h>
 
-const float INFINITY = std::numeric_limits<float>::max();
-
-float square(float x) {
+// For non-template functions, they should be put in .cpp or .c files. Otherwise,
+// we will encounter multiple definition errors.
+namespace dt4pair {
+// template T: float
+//const float INFINITY = std::numeric_limits<float>::max();
+template <typename T> T square(T x) {
     return x*x;
 }
 /*
@@ -28,7 +32,7 @@ float square(float x) {
  * n: the number of nan elements
  * stride: step size
  */
-void toNan(float *f,
+template <typename T> void toNan(T *f,
         const size_t n,
         const size_t stride)
 {
@@ -45,7 +49,7 @@ void toNan(float *f,
  * t: locations needed for distance transform: sorted
  * t_n: size of t
  */
-void dt(int *p,
+template <typename T> void dt(T *p,
         float *f,
         size_t n,
         float *d,
@@ -95,7 +99,7 @@ void dt(int *p,
  * t: locations needed for distance transform: sorted
  * t_n: size of t
  */
-void dt_noF(int *p,
+template <typename T> void dt_noF(T *p,
         size_t n,
         float *d,
         const size_t stride,
@@ -139,7 +143,7 @@ void dt_noF(int *p,
  * t: locations needed for distance transform: sorted
  * t_n: size of t
  */
-void dt_noF_faster(int *p,
+template <typename T> void dt_noF_faster(T *p,
         size_t n,
         float *d,
         const size_t stride,
@@ -164,7 +168,7 @@ void dt_noF_faster(int *p,
 }
 
 /*distance transform of 3d image */
-void dt3d(bool *ref_cell, size_t *s1_yxz, size_t *s2_yxz, float *shift, float *d2map_zxy)
+template <typename T> void dt3d(bool *ref_cell, size_t *s1_yxz, size_t *s2_yxz, T *shift, T *d2map_zxy)
 {
     /*printf("Reference cell: \n");
     for (int i=0; i<s1_yxz[0]; i++){
@@ -353,4 +357,6 @@ void dt3d(bool *ref_cell, size_t *s1_yxz, size_t *s2_yxz, float *shift, float *d
     delete [] f;
 
 }
+
+};
 #endif // DT3D_HPP

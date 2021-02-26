@@ -261,7 +261,7 @@ struct allCellsCensus{
     long long overall_neighbor_num;
     std::vector<nodeInfo> nodes;
     std::vector<std::vector<size_t>> tracks; //a set of node_ids
-    std::vector<float[3]> track_arcs_avg_mid_std;
+    std::vector<std::array<float,3>> track_arcs_avg_mid_std;
     std::vector<missingCellTestPassed> node_tested_st_end_jump;
 //    std::vector<nodeInfoInTrack> particle2track; //particle2track in matlab
 //    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents

@@ -213,7 +213,7 @@ template <typename T> vector<T> vec_log(vector<T> data);
 template <typename T> T vec_stddev(vector<T> const & func);
 template <typename T> T vec_variance(vector<T> const & func);
 template <typename T> float vec_mean(vector<T> const & func);
-template <typename T> float vec_median(vector<T> const & func);
+template <typename T> float vec_median(vector<T> & func);
 template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx);
 template <typename T> T vec_min(vector<T> const &func, size_t &min_val_idx);
 template <typename T> T vec_max(vector<T> const &func);

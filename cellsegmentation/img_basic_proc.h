@@ -52,7 +52,7 @@ template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2){
 template <typename T> vector<T> vec_Add(vector<T> &v1, T s2){
     vector<T> v2(v1.size());
     transform(v1.begin(), v1.end(), v2.begin(), [s2](T x){return x+s2;});
-    return;
+    return v2;
 }
 template <typename T> vector<T> vec_pointDivide(vector<T> v1, vector<T> v2){
     assert(v1.size() == v2.size());
@@ -367,24 +367,24 @@ template <typename T> float vec_mean(vector<T> const & func)
 {
     return (float)(accumulate(func.begin(), func.end(), 0.0) / func.size());
 }
-template <typename T> float vec_median(vector<T> const & len){
+template <typename T> float vec_median(vector<T> & len){
     assert(!len.empty());
     if (len.size() % 2 == 0) {
-        const auto median_it1 = len.begin() + len.size() / 2 - 1;
-        const auto median_it2 = len.begin() + len.size() / 2;
+        auto median_it1 = len.begin() + len.size() / 2 - 1;
+        auto median_it2 = len.begin() + len.size() / 2;
 
         std::nth_element(len.begin(), median_it1 , len.end());
-        const auto e1 = *median_it1;
+        auto e1 = *median_it1;
 
         std::nth_element(len.begin(), median_it2 , len.end());
-        const auto e2 = *median_it2;
+        auto e2 = *median_it2;
 
-        return (e1 + e2) / 2;
+        return ((float)e1 + e2) / 2;
 
     } else {
-        const auto median_it = len.begin() + len.size() / 2;
+        auto median_it = len.begin() + len.size() / 2;
         std::nth_element(len.begin(), median_it , len.end());
-        return *median_it;
+        return (float)*median_it;
     }
 }
 template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx){

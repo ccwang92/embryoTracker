@@ -2290,7 +2290,7 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
     size_t mov_l = mov_range_xyz[0]*mov_range_xyz[1]*mov_range_xyz[2];
     // ref cell to mov cell
     float *dist_voxwise = new float[mov_l];
-    dt3d(bw_ref_cell, ref_sz_yxz, mov_sz_yxz, shift_yxz, dist_voxwise);
+    dt4pair::dt3d(bw_ref_cell, ref_sz_yxz, mov_sz_yxz, shift_yxz, dist_voxwise);
     double dist_sum = 0;
     size_t valid_n = 0;
     for(size_t i = 0; i < mov_l; i++){
@@ -2305,7 +2305,7 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
     shift_yxz[0] = -shift_xyz[1];
     shift_yxz[1] = -shift_xyz[0];
     shift_yxz[2] = -shift_xyz[2];
-    dt3d(bw_mov_cell, mov_sz_yxz, ref_sz_yxz, shift_yxz, dist2_voxwise);
+    dt4pair::dt3d(bw_mov_cell, mov_sz_yxz, ref_sz_yxz, shift_yxz, dist2_voxwise);
     dist_sum = 0;
     valid_n = 0;
     for(size_t i = 0; i < ref_l; i++){
@@ -2418,7 +2418,7 @@ void idx2tightBwMap(vector<size_t> idx, int org_sz_yxz[3], Mat1b &bwMap, int *st
 
     int mat_size[] = {vec_max(y)+1, vec_max(x)+1, vec_max(z)+1};
 
-    bwMap.zeros(3, mat_size);
+    bwMap = Mat::zeros(3, mat_size, CV_8U);
     vector<size_t> idx_new;
     vec_sub2ind(idx_new, y, x, z, mat_size);
     for(size_t i : idx_new){
