@@ -3737,7 +3737,6 @@ bool cellTrackingMain::extractSeedInGivenCell(cellSegmentMain &cellSegment, bool
         seeds_missing_type.clear();
         return false;
     }
-
     return true;
 }
 /**
