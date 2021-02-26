@@ -945,3 +945,22 @@ template <typename T> unordered_map<T, size_t> frequecy_cnt(vector<T> &vec){
     }
     return map;
 }
+
+template <typename T> vector<T> vec_merge(vector<vector<T>> &vecs){
+    size_t all = 0;
+    FOREACH_i(vecs) all += vecs[i].size();
+    vector<T> out;
+    out.reserve(all);
+    FOREACH_i(vecs){
+        out.insert(out.end(), vecs[i].begin(), vecs[i].end());
+    }
+    return out;
+}
+
+template <typename T> vector<T> vec_merge(vector<T> &vec1, vector<T> &vec2){
+    size_t all = vec1.size() + vec2.size();
+    vector<T> out = vec1;
+    out.reserve(all);
+    out.insert(out.end(), vec2.begin(), vec2.end());
+    return out;
+}

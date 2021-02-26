@@ -2947,6 +2947,7 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
         vector<vector<size_t>> valid_seeds_loc_idx(0);
         vector<pair<size_t, int>> seeds_missing_type (0);
         unordered_set<size_t> cell_idx_can_be_removed (0);
+        vector<pair<size_t, float>> removed_cell_idx_threshold (0);
         //vector<nodeRelation> removed_cells (0);
         vector<int> seed_loc_existing_labels = extractValsGivenIdx_type<int>(&cellSegment.cell_label_maps[frame], seed_loc_idx, CV_32S);
         vector<size_t> valid_seed_loc_idx = vec_atrange(seed_loc_idx, seed_loc_existing_labels, 0, 0, false);
@@ -2958,8 +2959,11 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
                 checkSeedCoveredByExistingCell(cellSegment, missing_type, parent_idx, kid_idx, frame, min_seed_sz,
                                                seed_loc_idx, seed_loc_existing_labels, cell_idx_can_be_removed,
                                                seeds_missing_type, valid_seeds_loc_idx);
+                // NOTE: these removed cells may be too much, we may add them back later
                 if(cell_idx_can_be_removed.size() > 0){
                     for(auto it : cell_idx_can_be_removed){// nullify the region in label maps
+                        removed_cell_idx_threshold.push_back(make_pair(it,
+                                                 cellSegment.threshold_maps[frame].at<float>(movieInfo.voxIdx[it][0])));
                         setValMat(cellSegment.cell_label_maps[frame], CV_32S, movieInfo.voxIdx[it], 0);
                         setValMat(cellSegment.threshold_maps[frame], CV_32F, movieInfo.voxIdx[it], 0);
                     }
@@ -2981,21 +2985,42 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
         }
         int seed_label4fgRefine = cellSegment.number_cells[frame] + 1;
         setValMat(cellSegment.cell_label_maps[frame], CV_32S, seed_idx4fgRefine, seed_label4fgRefine);
-
-        if(!redetectCellinTrackingwithSeed()){
-            if(cell_idx_can_be_removed.size() > 0){
-                for(auto it : cell_idx_can_be_removed){
-                    setValMat(cellSegment.cell_label_maps[frame], CV_32S, movieInfo.voxIdx[it], 0);
-                    setValMat(cellSegment.threshold_maps[frame], CV_32F, movieInfo.voxIdx[it], 0);
+        vector<simpleNodeInfo> newCells_currentRun;
+        size_t parentKid_idx[] = {parent_idx, kid_idx};
+        if(!redetectCellinTrackingwithSeed(cellSegment, seed_idx4fgRefine, seed_label4fgRefine, frame,
+                                           valid_seeds_loc_idx, parentKid_idx, missing_type, newCells_currentRun, uptCell_idxs)){
+            if(removed_cell_idx_threshold.size() > 0){
+                for(auto it : removed_cell_idx_threshold){
+                    setValMat(cellSegment.cell_label_maps[frame], CV_32S, movieInfo.voxIdx[it.first], movieInfo.labelInMap[it.first]);
+                    setValMat(cellSegment.threshold_maps[frame], CV_32F, movieInfo.voxIdx[it.first], it.second);
                 }
             }
+//        }else{
+//            if(newCells_currentRun.size() == 1){
+
+//            }else{
+
+//            }
         }
     }
 }
-
+/**
+ * @brief redetectCellinTrackingwithSeed: contains 3 functions in matlab, which are redetectCellinTrackingwithSeed +
+ * testMissingCellGotFromOneSeed + testMissingCellGotFromMultiSeeds
+ * @param cellSegment
+ * @param seed_idx4fgRefine
+ * @param seed_label_in_map
+ * @param frame
+ * @param valid_seeds_loc_idx
+ * @param parentKid_idx
+ * @param missing_type
+ * @param newCells
+ * @return
+ */
 bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegment, vector<size_t> seed_idx4fgRefine,
                                     int seed_label_in_map, int frame, vector<vector<size_t>> valid_seeds_loc_idx,
-                                                      size_t parentKid_idx[2], int missing_type, vector<simpleNodeInfo> &newCells){
+                                    size_t parentKid_idx[2], int missing_type, vector<simpleNodeInfo> &newCells,
+                                    vector<size_t> &uptCell_idxs){
     long sz_single_frame = cellSegment.data_rows_cols_slices[0]*
             cellSegment.data_rows_cols_slices[1]*cellSegment.data_rows_cols_slices[2];
     unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*frame; // sub-matrix pointer
@@ -3030,7 +3055,11 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
     if(seed.bestFgThreshold == 0 || isempty(seed.outputIdMap, CV_32S)){
         return false;
     }
-    if(valid_seeds_loc_idx.size() > 0){
+
+    //// testMissingCellGotFromMultiSeeds: if we detected multiple cells with
+    ///  several seeds, we only test if they are compatible with its own
+    ///  parents/kids, if so, keep them, otherwise remove those bad ones.
+    if(valid_seeds_loc_idx.size() > 1){
         /** step 1. split the fg into different cells */
         Mat1i label_map = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_32S);
         for(int i=0; i<valid_seeds_loc_idx.size(); i++){
@@ -3050,7 +3079,6 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                    cellSegment.p4segVol.growConnectInRefine, cellSegment.p4segVol.graph_cost_design, bg2sink);
         //ccShowSliceLabelMat(grownSeedMap3d);
         //grownSeedMap3d.copyTo(seed.idMap);
-
         /** step 2. extract idx and save them into newCells*/
         vector<vector<size_t>> newCells_idx_small(valid_seeds_loc_idx.size());
         extractVoxIdxList(&grownSeedMap3d, newCells_idx_small, (int)valid_seeds_loc_idx.size());
@@ -3064,6 +3092,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
         for(int i=0; i<newCells_idx_small.size(); i++){
             simpleNodeInfo tmp;
             tmp.frame = frame;
+            tmp.threshold = seed.bestFgThreshold;
             coordinateTransfer(newCells_idx_small[i], grownSeedMap3d.size, tmp.voxIdx,
                                crop_start_yxz, cellSegment.cell_label_maps[frame].size);
             if(parentOrKidValidLinkTest(tmp.voxIdx, frame, parentKid_idx, missing_type, cellSegment.cell_label_maps[frame].size)){
@@ -3083,7 +3112,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
         vector<size_t> adj_cells_idx;
         vector<int> adj_cells_labels = extractValsGivenMask_type<int>(&seed.idMap, CV_32S, &fgMap_dilate, 0);
         unordered_map<int, size_t> adj_cells_adj_sz = frequecy_cnt(adj_cells_labels);
-        vector<size_t> adj_cell_id(0);
+        size_t adj_cell_id;
         if(adj_cells_adj_sz.size() > 0){
             size_t tmp_max_size = 0;
             int adj_cell_label = -1;
@@ -3094,11 +3123,62 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 }
             }
             if(adj_cell_label > 0){
-                adj_cell_id.push_back(adj_cell_label);
-                adj_cell_id[0] += frame == 0 ? 0:cumulative_cell_nums[frame-1];
+                adj_cell_id = adj_cell_label;
+                adj_cell_id += frame == 0 ? 0:cumulative_cell_nums[frame-1];
             }
         }
-        //newlyAddedCellValidTest()
+        vector<vector<size_t>> new_cells_loc_idx;
+        extractVoxIdxList(&seed.outputIdMap, new_cells_loc_idx, seed.outCell_num);
+        vector<size_t> new_cell_loc_idx, tmp = vec_merge(new_cells_loc_idx);
+        int crop_start_yxz[] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start,
+                                -seed.crop_range_yxz[2].start};
+        coordinateTransfer(tmp, seed.outputIdMap.size, new_cell_loc_idx,
+                           crop_start_yxz, cellSegment.cell_label_maps[frame].size);
+        vector<vector<size_t>> extra_new_cells_loc_idx;
+        pair<int, int> res = newlyAddedCellValidTest(cellSegment, seed, new_cell_loc_idx, frame,
+                                                     movieInfo.voxIdx[adj_cell_id], parentKid_idx,
+                                                     missing_type, extra_new_cells_loc_idx);
+        if(res.second == 0){
+            return false;
+        }else{
+            if(res.first == 2 || res.first == 5){
+                simpleNodeInfo tmp;
+                tmp.frame = frame;
+                tmp.threshold = seed.bestFgThreshold;
+                tmp.voxIdx = vec_merge(new_cell_loc_idx, movieInfo.voxIdx[adj_cell_id]);
+                newCells.push_back(tmp);
+
+                uptCell_idxs.push_back(adj_cell_id);
+                movieInfo.nodes[adj_cell_id].node_id = -1;
+            }else if(res.first == 3){
+                assert(extra_new_cells_loc_idx.size() == 2);
+                simpleNodeInfo tmp;
+                tmp.frame = frame;
+                tmp.threshold = cellSegment.threshold_maps[frame].at<unsigned char>(movieInfo.voxIdx[adj_cell_id][0]);
+                tmp.voxIdx = extra_new_cells_loc_idx[0];
+                newCells.push_back(tmp);
+                tmp.voxIdx = extra_new_cells_loc_idx[1];
+                tmp.threshold = seed.bestFgThreshold;
+                newCells.push_back(tmp);
+                uptCell_idxs.push_back(adj_cell_id);
+                movieInfo.nodes[adj_cell_id].node_id = -1;
+            }else if(res.first == 6){
+                assert(extra_new_cells_loc_idx.size() == 1);
+                simpleNodeInfo tmp;
+                tmp.frame = frame;
+                tmp.voxIdx = extra_new_cells_loc_idx[0];
+                tmp.threshold = seed.bestFgThreshold;
+                newCells.push_back(tmp);
+                uptCell_idxs.push_back(adj_cell_id);
+            }else{ // case 1 and 4, we can directly add the new cell
+                simpleNodeInfo tmp;
+                tmp.frame = frame;
+                tmp.voxIdx = new_cell_loc_idx;
+                tmp.threshold = seed.bestFgThreshold;
+                newCells.push_back(tmp);
+                uptCell_idxs.push_back(adj_cell_id);
+            }
+        }
     }
 }
 //% there are multiple cases that are valid for an newly found cell
@@ -3111,11 +3191,12 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
 //% 7. a1+b1->a2+b2_half,half_missing->a3,b3
 //% PS: '+' means merged region, ',' means independent region
 //% case 1 and 4 has not region to merge
-void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, singleCellSeed &seed, vector<size_t> &new_cell_idx,
+pair<int, int> cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, singleCellSeed &seed, vector<size_t> &new_cell_idx,
                                                int new_cell_frame, vector<size_t> ajd_cell_idx, size_t parentKid_idx[2],
-                                                int missing_type, MatSize sz, pair<int, int> res, vector<vector<size_t>> extra_new_cells_loc_idx){
+                                                int missing_type, vector<vector<size_t>> extra_new_cells_loc_idx){
     float baseCost1, baseCost2;
-    res = make_pair(0,0);
+    pair<int, int> res = make_pair(0,0);
+    MatSize sz = cellSegment.cell_label_maps[new_cell_frame].size;
     bool parentKidLink_valid = parentOrKidValidLinkTest(new_cell_idx, new_cell_frame, parentKid_idx, missing_type, sz, baseCost1, baseCost2);
     if(ajd_cell_idx.size() == 0){
         if(parentKidLink_valid){
@@ -3238,7 +3319,6 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
                 if (p2miss2k_valid || multiParentsKidsValidLinkTest(cellSegment, both_parents[0], both_parents[1], new_cell_idx, new_cell_frame,
                                                                     p2cur_Cost, cur2k_Cost)){
                     res = make_pair(5,1);
-
                 }else if(parentKidLink_valid){
                     res = make_pair(1,1);
                 }else{
@@ -3285,6 +3365,7 @@ void cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSegment, sin
         }
 
     }
+    return res;
 }
 //check if the newly detected cell indeed corresponds to two cells in previous or latter frame.
 // we only check the case of two cells

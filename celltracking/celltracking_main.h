@@ -141,6 +141,21 @@ private:    // TODO: missing cell module
     bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<vector<size_t>> parentKid_idx, int missing_type, MatSize sz,
                                                     float &cost1, float &cost2);
     bool parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, int new_cell_frame, vector<size_t> node_idx, MatSize sz, float &cost);
+
+    bool redetectCellinTrackingwithSeed(cellSegmentMain &cellSegment, vector<size_t> seed_idx4fgRefine, int seed_label_in_map, int frame,
+                                        vector<vector<size_t>> valid_seeds_loc_idx, size_t parentKid_idx[2], int missing_type,
+                                        vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+    pair<int, int> newlyAddedCellValidTest(cellSegmentMain &cellSegment, singleCellSeed &seed, vector<size_t> &new_cell_idx,
+                                                   int new_cell_frame, vector<size_t> ajd_cell_idx, size_t parentKid_idx[2],
+                                                    int missing_type, vector<vector<size_t>> extra_new_cells_loc_idx);
+    bool multiNeis_check(cellSegmentMain &cellSegment, size_t exist_parent_idx,
+                                           size_t exist_kid_idx, vector<size_t> &new_cell_idx, vector<size_t> &new_p_k_pair);
+    bool multiParentsKidsValidLinkTest(cellSegmentMain &cellSegment, size_t exist_parent_idx,
+                                                              size_t exist_kid_idx, vector<size_t> &new_cell_idx, int new_cell_frame,
+                                                              float cost1_lb, float cost2_lb);
+    bool mergeSplitBothValid(cellSegmentMain &cellSegment, bool parent_flag, vector<size_t> givenSeedCells,
+                                               vector<size_t> valid_loc_idx, int valid_loc_frame,
+                                               vector<vector<size_t>> &splitted_reg_loc_idx);
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
 private:

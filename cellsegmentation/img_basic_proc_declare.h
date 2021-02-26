@@ -246,6 +246,9 @@ template <typename T> unordered_map<T, size_t> frequecy_cnt(vector<T> &vec);
 
 template <typename T> vector<T> extractValsGivenMask_type(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
 template <typename T> vector<T> extractValsGivenIdx_type(Mat *vol3d, vector<size_t> idx, int datatype);
+
+template <typename T> vector<T> vec_merge(vector<vector<T>> &vecs);
+template <typename T> vector<T> vec_merge(vector<T> &vec1, vector<T> &vec2);
 #endif // IMG_BASIC_PROC_H
 
 
