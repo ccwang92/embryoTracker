@@ -3790,7 +3790,6 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
     }else{
         qFatal("unKNOWN missing_type");
     }
-
     if (seed_loc_idx.size() == 0){
         return false;
     }else{

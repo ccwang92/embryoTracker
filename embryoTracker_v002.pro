@@ -16,7 +16,6 @@ SOURCES += data_importer.cpp \
     cellsegmentation/maxflow_bk/maxflow.cpp \
     cellsegmentation/synquant_simple.cpp \
     celltracking/CINDA/src_c/cinda_funcs.c \
-    celltracking/CINDA/src_c/cinda_mex.c \
     celltracking/celltracking_main.cpp \
     main.cpp \
     mainwindow.cpp \
