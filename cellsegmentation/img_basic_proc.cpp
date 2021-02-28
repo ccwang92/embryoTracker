@@ -420,7 +420,6 @@ float calVarianceStablization(Mat *src3d, Mat & varMap, vector<float> &varTrend,
     //for (int i = 0; i < levels; i++) xx[0] = 0;
     fill(varTrend.begin(), varTrend.end(), 0);
 
-
     vector<vector<long>> numElements (levels);
     long testedElements = 0, validElements = 0;
     int cur_level = 0;

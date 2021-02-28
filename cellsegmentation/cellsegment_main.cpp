@@ -59,12 +59,20 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
-
 }
 
 void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget){
     long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
     curr_time_point = glWidget->curr_timePoint_in_canvas;
+    ///
+    /// \brief We fist test if there is saved binary file for use
+    ///
+
+
+
+    ///
+    /// \brief If no saved results, start from scratch to detect cells
+    ///
     unsigned char *ind = (unsigned char*)normalized_data4d.data + sz_single_frame*curr_time_point; // sub-matrix pointer
     Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
     if(!time_points_processed[curr_time_point]){
