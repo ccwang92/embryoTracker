@@ -73,42 +73,46 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
         QString label_file_name = fileNameNoExt + "_label_map_int32.bin";
         QFile label_file(label_file_name);
         if (!label_file.open(QIODevice::ReadOnly)) return;
-        cell_label_maps[curr_time_point] = Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data());
+        //QByteArray tmp = label_file.readAll();
+        // tmp is local variable, which will be released soon, so we need copyTo
+        Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data()).copyTo(cell_label_maps[curr_time_point]);
+        //cell_label_maps[curr_time_point] = Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data());
+        //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
         label_file.close();
 
         // read threshold data
         QString threshod_file_name = fileNameNoExt + "_threshold_map_uint8.bin";
         QFile threshold_file(threshod_file_name);
         if (!threshold_file.open(QIODevice::ReadOnly)) return;
-        threshold_maps[curr_time_point] = Mat(3, normalized_data4d.size, CV_8U, threshold_file.readAll().data());
+        Mat(3, normalized_data4d.size, CV_8U, threshold_file.readAll().data()).copyTo(threshold_maps[curr_time_point]);
         threshold_file.close();
 
         // read 2d principal map
         QString p2d_file_name = fileNameNoExt + "_principal2d_map_single.bin";
         QFile p2d_file(p2d_file_name);
         if (!p2d_file.open(QIODevice::ReadOnly)) return;
-        principalCurv2d[curr_time_point] = Mat(3, normalized_data4d.size, CV_32F, p2d_file.readAll().data());
+        Mat(3, normalized_data4d.size, CV_32F, p2d_file.readAll().data()).copyTo(principalCurv2d[curr_time_point]);
         p2d_file.close();
 
         // read 3d principal map
         QString p3d_file_name = fileNameNoExt + "_principal3d_map_single.bin";
         QFile p3d_file = QFile(p3d_file_name);
-        if (!threshold_file.open(QIODevice::ReadOnly)) return;
-        principalCurv3d[curr_time_point] = Mat(3, normalized_data4d.size, CV_32F, p3d_file.readAll().data());
+        if (!p3d_file.open(QIODevice::ReadOnly)) return;
+        Mat(3, normalized_data4d.size, CV_32F, p3d_file.readAll().data()).copyTo(principalCurv3d[curr_time_point]);
         p3d_file.close();
 
         // read variance map
         QString varmap_file_name = fileNameNoExt + "_var_map_single.bin";
         QFile varmap_file = QFile(varmap_file_name);
         if (!varmap_file.open(QIODevice::ReadOnly)) return;
-        varMaps[curr_time_point] = Mat(3, normalized_data4d.size, CV_32F, varmap_file.readAll().data());
+        Mat(3, normalized_data4d.size, CV_32F, varmap_file.readAll().data()).copyTo(varMaps[curr_time_point]);
         varmap_file.close();
 
         // read stablized variance map
         QString stbVarmap_file_name = fileNameNoExt + "_stb_var_map_single.bin";
         QFile stbVarmap_file = QFile(stbVarmap_file_name);
         if (!stbVarmap_file.open(QIODevice::ReadOnly)) return;
-        stblizedVarMaps[curr_time_point] = Mat(3, normalized_data4d.size, CV_32F, stbVarmap_file.readAll().data());
+        Mat(3, normalized_data4d.size, CV_32F, stbVarmap_file.readAll().data()).copyTo(stblizedVarMaps[curr_time_point]);
         stbVarmap_file.close();
 
         // read variance trend
@@ -116,12 +120,15 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
         QFile vartrend_file = QFile(vartrend_file_name);
         if (!vartrend_file.open(QIODevice::ReadOnly)) return;
         //QByteArray arr = vartrend_file.read(4);
-        QDataStream stream(vartrend_file.read(4)); // #0 element
-        stream.setFloatingPointPrecision(QDataStream::SinglePrecision); // for float, default is double
-        stream >> variances[curr_time_point];
+        QByteArray tmp_in = vartrend_file.read(4);
+//        QDataStream stream(tmp_in.data()); // #0 element
+//        stream.setFloatingPointPrecision(QDataStream::SinglePrecision); // for float, default is double
+//        stream >> variances[curr_time_point];
+        memcpy(&variances[curr_time_point], tmp_in.data(), tmp_in.size());
         QByteArray arr = vartrend_file.readAll();// #1-200 elements
-        varTrends[curr_time_point].reserve(arr.size() / 4);
+        varTrends[curr_time_point].resize(arr.size() / 4);
         memcpy(varTrends[curr_time_point].data(), arr.data(), arr.size());
+
         vartrend_file.close();
 
         // read stablized variance trend
@@ -130,7 +137,7 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
         if (!stbVartrend_file.open(QIODevice::ReadOnly)) return;
         //QByteArray arr = vartrend_file.read(4);
         QByteArray arr2 = stbVartrend_file.readAll();// #1-200 elements
-        stblizedVarTrends[curr_time_point].reserve(arr2.size() / 4 - 1);
+        stblizedVarTrends[curr_time_point].resize(arr2.size() / 4 - 1);
         memcpy(stblizedVarTrends[curr_time_point].data(), arr2.data()+4, arr2.size()); // skip the first element
         stbVartrend_file.close();
 
@@ -152,7 +159,7 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
         qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
     }
-
+    //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     //// display volume in canvas
     Mat4b rgb_mat4display;
     label2rgb3d(cell_label_maps[curr_time_point], *single_frame, rgb_mat4display);
