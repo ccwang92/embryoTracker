@@ -231,7 +231,7 @@ void MainWindow::debugAlgorithm()
         this->sendData4Segment();
     }
     //// send segmentation results for cell linking
-
+    this->sendData4Track();
 }
 void MainWindow::sendData4Segment()
 {

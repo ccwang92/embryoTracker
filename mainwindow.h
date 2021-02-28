@@ -69,7 +69,7 @@ public:
     void connectSignal();
 public:
     bool algorithmDebug = false;
-    QString debugDataPath = QString("/home/ccw/Desktop/embryo_res_folder/crop_embryo_data_500x500x30x40/images_downsample/1.tif");
+    QString debugDataPath = QString("/home/ccw/Desktop/embryo_res_folder/crop_embryo_data_500x500x30x40/images_downsample_5f/1.tif");
     //QString debugDataPath = QString("/home/ccw/Desktop/test_ims/16bit/embryo_TM481.tif");
     //QString debugDataPath = QString("/home/ccw/Desktop/test_ims/cropped_16bit4speed/embryo_TM481.tif");
     QAction * debugButton;
