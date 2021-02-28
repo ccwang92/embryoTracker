@@ -17,7 +17,7 @@ public:
         //if(data_rows_cols_slices) delete data_rows_cols_slices;
         //if(time_points_processed) delete time_points_processed;
     };
-    void processSingleFrameAndReturn(RayCastCanvas *glWidget);
+    void processSingleFrameAndReturn(RayCastCanvas *glWidget, QString fileName = "");
     //void processAllFramesAndReturn(RayCastCanvas *glWidget);
     void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
     void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,

@@ -17,9 +17,9 @@ bool DataImporter::importData(QString filename)
     {
         openFileNameLabel = filename;
         TimePackType timepacktype;
-        QStringList mylist = importSeriesFileList_addnumbersort(filename, timepacktype);
-
-        if (importGeneralImgSeries(mylist, timepacktype))
+        //QStringList mylist = importSeriesFileList_addnumbersort(filename, timepacktype);
+        filelist = importSeriesFileList_addnumbersort(filename, timepacktype);
+        if (importGeneralImgSeries(filelist, timepacktype))
         {
             //updateMinMax(0); // use the first frame to update the minmax intensity value
             //v3d_msg("File loaded!");

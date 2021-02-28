@@ -36,6 +36,7 @@ signals:
 
 public:
     bool debugMode = false;
+    QStringList filelist;
     QString openFileNameLabel = QString("");
     Image4DSimple* image4d = 0;
 

@@ -61,13 +61,79 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     assert(normalized_data4d.type() == CV_8U);
 }
 
-void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget){
+void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QString fileName){
     long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
     curr_time_point = glWidget->curr_timePoint_in_canvas;
     ///
     /// \brief We fist test if there is saved binary file for use
     ///
+    if(!fileName.isEmpty()){
+        QString fileNameNoExt = fileName.left(fileName.lastIndexOf('.'));
+        // read label data
+        QString label_file_name = fileNameNoExt + "_label_map_int32.bin";
+        QFile label_file(label_file_name);
+        if (!label_file.open(QIODevice::ReadOnly)) return;
+        cell_label_maps[curr_time_point] = Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data());
+        label_file.close();
 
+        // read threshold data
+        QString threshod_file_name = fileNameNoExt + "_threshold_map_uint8.bin";
+        QFile threshold_file(threshod_file_name);
+        if (!threshold_file.open(QIODevice::ReadOnly)) return;
+        threshold_maps[curr_time_point] = Mat(3, normalized_data4d.size, CV_8U, threshold_file.readAll().data());
+        threshold_file.close();
+
+        // read 2d principal map
+        QString p2d_file_name = fileNameNoExt + "_principal2d_map_single.bin";
+        QFile p2d_file(p2d_file_name);
+        if (!p2d_file.open(QIODevice::ReadOnly)) return;
+        principalCurv2d[curr_time_point] = Mat(3, normalized_data4d.size, CV_8U, p2d_file.readAll().data());
+        p2d_file.close();
+
+        // read 3d principal map
+        QString p3d_file_name = fileNameNoExt + "_principal3d_map_single.bin";
+        QFile p3d_file = QFile(p3d_file_name);
+        if (!threshold_file.open(QIODevice::ReadOnly)) return;
+        principalCurv3d[curr_time_point] = Mat(3, normalized_data4d.size, CV_8U, p3d_file.readAll().data());
+        p3d_file.close();
+
+        // read variance map
+        QString varmap_file_name = fileNameNoExt + "_principal3d_map_single.bin";
+        QFile varmap_file = QFile(varmap_file_name);
+        if (!varmap_file.open(QIODevice::ReadOnly)) return;
+        varMaps[curr_time_point] = Mat(3, normalized_data4d.size, CV_8U, varmap_file.readAll().data());
+        varmap_file.close();
+
+        // read stablized variance map
+        QString stbVarmap_file_name = fileNameNoExt + "_principal3d_map_single.bin";
+        QFile stbVarmap_file = QFile(stbVarmap_file_name);
+        if (!stbVarmap_file.open(QIODevice::ReadOnly)) return;
+        stblizedVarMaps[curr_time_point] = Mat(3, normalized_data4d.size, CV_8U, stbVarmap_file.readAll().data());
+        stbVarmap_file.close();
+
+        // read variance trend
+        QString vartrend_file_name = fileNameNoExt + "_principal3d_map_single.bin";
+        QFile vartrend_file = QFile(vartrend_file_name);
+        if (!vartrend_file.open(QIODevice::ReadOnly)) return;
+        //QByteArray arr = vartrend_file.read(4);
+        QDataStream stream(vartrend_file.read(4)); // #0 element
+        stream.setFloatingPointPrecision(QDataStream::SinglePrecision); // for float, default is double
+        stream >> variances[curr_time_point];
+        QByteArray arr = vartrend_file.readAll();// #1-200 elements
+        varTrends[curr_time_point].reserve(arr.size() / 4);
+        memcpy(varTrends[curr_time_point].data(), arr.data(), arr.size());
+        vartrend_file.close();
+
+        // read stablized variance trend
+        QString stbVartrend_file_name = fileNameNoExt + "_principal3d_map_single.bin";
+        QFile stbVartrend_file = QFile(stbVartrend_file_name);
+        if (!stbVartrend_file.open(QIODevice::ReadOnly)) return;
+        //QByteArray arr = vartrend_file.read(4);
+        QByteArray arr2 = stbVartrend_file.readAll();// #1-200 elements
+        stblizedVarTrends[curr_time_point].reserve(arr2.size() / 4 - 1);
+        memcpy(stblizedVarTrends[curr_time_point].data(), arr2.data()+4, arr2.size()); // skip the first element
+        stbVartrend_file.close();
+    }
 
 
     ///
