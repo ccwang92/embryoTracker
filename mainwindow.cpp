@@ -160,7 +160,7 @@ void MainWindow::connectSignal()
         connect(segmentCell3d, SIGNAL(triggered()), this, SLOT(sendData4Segment()));
     }
     if (trackCell3d){
-        connect(segmentCell3d, SIGNAL(triggered()), this, SLOT(sendData4Track()));
+        connect(trackCell3d, SIGNAL(triggered()), this, SLOT(sendData4Track()));
     }
     if (debugButton){
         connect(debugButton, SIGNAL(triggered()), this, SLOT(debugAlgorithm()));
