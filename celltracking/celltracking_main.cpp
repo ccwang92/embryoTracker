@@ -524,13 +524,14 @@ float cellTrackingMain::distance2cost(float distance, float punish=1){
 void cellTrackingMain::reCalculateCellsDistances(){
     FOREACH_i(movieInfo.nodes){
         FOREACH_j(movieInfo.nodes[i].neighbors){
-            if (i == 50 && movieInfo.nodes[i].neighbors[j].node_id == 237){
-                qDebug("cost not consistent");
-            }
             // cal the distance between two nodes
             voxelwise_avg_distance(i, movieInfo.nodes[i].neighbors[j].node_id,
                                               movieInfo.nodes[i].neighbors[j].dist_c2n,
                                             movieInfo.nodes[i].neighbors[j].dist_n2c);
+//            if (movieInfo.nodes[i].neighbors[j].dist_c2n == 0 ||
+//                    movieInfo.nodes[i].neighbors[j].dist_n2c == 0){
+//                qDebug("cost not consistent");
+//            }
         }
     }
 }
@@ -548,7 +549,8 @@ void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
             nn_dist[nn_dist_cnt] = INFINITY;
             FOREACH_j(movieInfo.nodes[i].neighbors){
                 // cal the distance between two nodes
-                cur_dist = movieInfo.nodes[i].neighbors[j].dist_c2n;
+                cur_dist = MAX(movieInfo.nodes[i].neighbors[j].dist_c2n,
+                               movieInfo.nodes[i].neighbors[j].dist_n2c);
                 if (cur_dist < nn_dist[nn_dist_cnt]){
                     nn_dist[nn_dist_cnt] = cur_dist;
                 }
@@ -572,7 +574,7 @@ void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
             for(size_t j=0; j<movieInfo.tracks[i].size()-1; j++){
                 for (nodeRelation nr : movieInfo.nodes[movieInfo.tracks[i][j]].neighbors){
                     if(nr.node_id == movieInfo.tracks[i][j+1]){
-                        nn_dist[nn_dist_cnt] = nr.dist_c2n;
+                        nn_dist[nn_dist_cnt] = MAX(nr.dist_c2n, nr.dist_n2c);
                         nn_dist_cnt ++;
                         break;
                     }

@@ -327,7 +327,7 @@ template <typename T> void gammafit(vector<T> data, T &a, T &b){
     a = 0.5 * (log(mean_val) - mean_log);
     T d, a_new;
     for(int i = 0 ; i < 10; i++){ // generally 5 iterations is enough
-        d = boost::math::digamma(a + 0.0001) - boost::math::digamma(a + 0.0001);
+        d = boost::math::digamma(a + 0.0001) - boost::math::digamma(a - 0.0001);
         d /= 0.0002;
         a_new = 1/(1/a + (mean_log - log(mean_val) + log(a) - boost::math::digamma(a)) / (a*a*(1/a - d)));
         if (abs(a_new - a) < 0.001){
@@ -342,17 +342,18 @@ template <typename T> void gammafit(vector<T> data, T &a, T &b){
 template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b){
     gammafit(data, a, b);
 }
-template <typename T> vector<T> vec_log(vector<T> data){
+template <typename T> vector<T> vec_log(vector<T> &data){
     vector<T> log_v(data.size());
     FOREACH_i(data) {
         if (data[i] < 0){
             qFatal("Taking a logarithm on negative value!");
         }else if(data[i] == 0){
-            log_v[i] = -log(INFINITY);
+            log_v[i] = -log((T)INFINITY);
         }else{
             log_v[i] = log(data[i]);
         }
     }
+    return log_v;
 }
 template <typename T> T vec_stddev(vector<T> const & func)
 {
