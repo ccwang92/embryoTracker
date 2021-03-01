@@ -33,9 +33,10 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
     /** KEY: we generate an overly large voxIdx in movieInfo */
     movieInfo.voxIdx.resize(2*curr_cell_idx.size()); // we assume each cell at most can be split once
     long long increment = 0;
+    long long cell_cnt = 0;
     for(int i : cellSegment.number_cells){
         for(size_t j=increment; j<(increment+i); j++){
-            movieInfo.voxIdx[j] = curr_cell_idx[i];
+            movieInfo.voxIdx[j] = curr_cell_idx[cell_cnt++];
         }
         for(size_t j=increment+i; j<(increment+2*i); j++){
             movieInfo.voxIdx[j].reserve(0);
@@ -498,6 +499,7 @@ size_t cellTrackingMain::cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &
         if(cellSegment.cell_label_maps[curr_frame].at<int>(k) == curr_cell_label){
             overlap_sz ++;
         }
+        //qDebug("val: %d",cellSegment.cell_label_maps[curr_frame].at<int>(k));
     }
     return overlap_sz;
 }
@@ -536,23 +538,23 @@ void cellTrackingMain::reCalculateCellsDistances(){
 void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
     if (movieInfo.tracks.empty()){ // if there is no track info, use all node with nearest neighbor
         //reCalculateCellsDistances(nn_dist);
-        float max_dist;
+        float min_dist;
         nn_dist.resize(movieInfo.nodes.size());
         size_t nn_dist_cnt = 0;
         FOREACH_i(movieInfo.nodes){
             nn_dist[nn_dist_cnt] = INFINITY;
             FOREACH_j(movieInfo.nodes[i].neighbors){
                 // cal the distance between two nodes
-                max_dist = movieInfo.nodes[i].neighbors[j].link_cost;
-                if (max_dist < nn_dist[nn_dist_cnt]){
-                    nn_dist[nn_dist_cnt] = max_dist;
+                min_dist = movieInfo.nodes[i].neighbors[j].dist_c2n;
+                if (min_dist < nn_dist[nn_dist_cnt]){
+                    nn_dist[nn_dist_cnt] = min_dist;
                 }
             }
             nn_dist_cnt ++;
         }
         nn_dist.resize(nn_dist_cnt);
     }else{ // if there are tracks, use long tracks
-        float max_dist;
+        float min_dist;
         nn_dist.resize(movieInfo.nodes.size());
         size_t nn_dist_cnt = 0;
         FOREACH_i(movieInfo.tracks){
@@ -560,8 +562,13 @@ void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
                 continue;
             }
             for(size_t j=0; j<movieInfo.tracks[i].size()-1; j++){
-                nn_dist[nn_dist_cnt] = movieInfo.nodes[movieInfo.tracks[i][j]].kid_cost[0];
-                nn_dist_cnt ++;
+                for (nodeRelation nr : movieInfo.nodes[movieInfo.tracks[i][j]].neighbors){
+                    if(nr.node_id == movieInfo.tracks[i][j+1]){
+                        nn_dist[nn_dist_cnt] = nr.dist_c2n;
+                        nn_dist_cnt ++;
+                        break;
+                    }
+                }
             }
         }
         nn_dist.resize(nn_dist_cnt);
@@ -596,6 +603,7 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
         movieInfo.frame_shift_xyz[i] = {0, 0, 0};
     }
     // calculate the distances between each cell and its neighbors
+    reCalculateCellsDistances();
     updateGammaParam();
     bool update_preNei_cost = false; // preNei has not been initilized
     updateArcCost(update_preNei_cost); // calculate the link cost from given new gamma parameter
@@ -637,6 +645,9 @@ void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t c
         }
         for(auto it : nei_labels){
             nei_idxs.push_back(it - 1 + cumulative_cell_nums[i - 1]);
+            vector<size_t> tmp = intersection(movieInfo.voxIdx[it - 1 + cumulative_cell_nums[i - 1]],
+                    movieInfo.voxIdx[cell_idx]);
+            qDebug("tmp size %ld", tmp.size());
         }
     }
 }
