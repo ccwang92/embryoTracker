@@ -345,10 +345,13 @@ template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b){
 template <typename T> vector<T> vec_log(vector<T> data){
     vector<T> log_v(data.size());
     FOREACH_i(data) {
-        if (data[i] <= 0){
+        if (data[i] < 0){
             qFatal("Taking a logarithm on negative value!");
+        }else if(data[i] == 0){
+            log_v[i] = -log(INFINITY);
+        }else{
+            log_v[i] = log(data[i]);
         }
-        log_v[i] = log(data[i]);
     }
 }
 template <typename T> T vec_stddev(vector<T> const & func)

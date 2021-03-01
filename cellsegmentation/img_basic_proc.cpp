@@ -2266,7 +2266,7 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
  */
 float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        bool *bw_mov_cell, vector<int> mov_range_xyz,
-                                                       vector<double> shift_xyz, vector<float> dist){
+                                                       vector<double> shift_xyz, vector<float> &dist){
     dist.resize(2);//distance from r1 to r2 and counter direction
     // use the slightly edited mex-version previously designed for matlab
     // for matlab, the matrix is saved in column-by-column
@@ -2287,7 +2287,7 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
 
     size_t ref_l = ref_range_xyz[0]*ref_range_xyz[1]*ref_range_xyz[2];
     size_t mov_l = mov_range_xyz[0]*mov_range_xyz[1]*mov_range_xyz[2];
-    // ref cell to mov cell
+    // mov cell to ref cell: n2c (neighbor to current)
     float *dist_voxwise = new float[mov_l];
     dt4pair::dt3d(bw_ref_cell, ref_sz_yxz, mov_sz_yxz, shift_yxz, dist_voxwise);
     double dist_sum = 0;
@@ -2298,8 +2298,8 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
             valid_n ++;
         }
     }
-    dist[0] = dist_sum / valid_n;
-    // mov cell to ref cell
+    dist[1] = dist_sum / valid_n;
+    // ref cell to mov cell: c2n (current to neighbor)
     float *dist2_voxwise = new float[ref_l];
     shift_yxz[0] = -shift_xyz[1];
     shift_yxz[1] = -shift_xyz[0];
@@ -2309,12 +2309,17 @@ float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
     valid_n = 0;
     for(size_t i = 0; i < ref_l; i++){
         if(bw_ref_cell[i]){
-            dist_sum += dist_voxwise[i];
+            dist_sum += dist2_voxwise[i];
             valid_n ++;
         }
     }
-    dist[1] = dist_sum / valid_n;
+    dist[0] = dist_sum / valid_n;
 
+    delete[] ref_sz_yxz;
+    delete[] mov_sz_yxz;
+    delete[] shift_yxz;
+    delete[] dist_voxwise;
+    delete[] dist2_voxwise;
     return MAX(dist[0], dist[1]);
 }
 

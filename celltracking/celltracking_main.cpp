@@ -70,9 +70,9 @@ void cellTrackingMain::cellInfoAccumuate(cellSegmentMain &cellSegment){
             movieInfo.start_coord_xyz[i][1] = vec_min(movieInfo.vox_y[i]);
             movieInfo.start_coord_xyz[i][2] = vec_min(movieInfo.vox_z[i]);
             //movieInfo.range_xyz[i].resize(3);
-            movieInfo.range_xyz[i][0] = vec_max(movieInfo.vox_x[i]) - movieInfo.range_xyz[i][0] + 1;
-            movieInfo.range_xyz[i][1] = vec_max(movieInfo.vox_y[i]) - movieInfo.range_xyz[i][1] + 1;
-            movieInfo.range_xyz[i][2] = vec_max(movieInfo.vox_z[i]) - movieInfo.range_xyz[i][2] + 1;
+            movieInfo.range_xyz[i][0] = vec_max(movieInfo.vox_x[i]) - movieInfo.start_coord_xyz[i][0] + 1;
+            movieInfo.range_xyz[i][1] = vec_max(movieInfo.vox_y[i]) - movieInfo.start_coord_xyz[i][1] + 1;
+            movieInfo.range_xyz[i][2] = vec_max(movieInfo.vox_z[i]) - movieInfo.start_coord_xyz[i][2] + 1;
         }else{
             movieInfo.vox_y[i].reserve(0);
             movieInfo.vox_x[i].reserve(0);
@@ -303,8 +303,8 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
         n2c = c2n;
         return INFINITY;
     }
-    bool *ref_cell = new bool[curr_voxIdx.size()];
-    memset(ref_cell, false, curr_voxIdx.size());
+    bool *ref_cell = new bool[curr_range_xyz[0] * curr_range_xyz[1] * curr_range_xyz[2]];
+    memset(ref_cell, false, curr_range_xyz[0] * curr_range_xyz[1] * curr_range_xyz[2]);
     size_t idx;
     size_t frame_sz = curr_range_xyz[0] * curr_range_xyz[1];
     for(size_t i = 0; i < curr_voxIdx.size(); i++){
@@ -313,8 +313,8 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
                 curr_vox_y[i] - curr_start_coord_xyz[1];
         ref_cell[idx] = true;
     }
-    bool *mov_cell = new bool[nei_voxIdx.size()];
-    memset(mov_cell, false, nei_voxIdx.size());
+    bool *mov_cell = new bool[nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2]];
+    memset(mov_cell, false, nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2]);
     frame_sz = nei_range_xyz[0] * nei_range_xyz[1];
     for(size_t i = 0; i < nei_voxIdx.size(); i++){
         idx = (nei_vox_z[i] - nei_start_coord_xyz[2]) * frame_sz +
@@ -524,6 +524,9 @@ float cellTrackingMain::distance2cost(float distance, float punish=1){
 void cellTrackingMain::reCalculateCellsDistances(){
     FOREACH_i(movieInfo.nodes){
         FOREACH_j(movieInfo.nodes[i].neighbors){
+            if (i == 50 && movieInfo.nodes[i].neighbors[j].node_id == 237){
+                qDebug("cost not consistent");
+            }
             // cal the distance between two nodes
             voxelwise_avg_distance(i, movieInfo.nodes[i].neighbors[j].node_id,
                                               movieInfo.nodes[i].neighbors[j].dist_c2n,
@@ -538,19 +541,24 @@ void cellTrackingMain::reCalculateCellsDistances(){
 void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
     if (movieInfo.tracks.empty()){ // if there is no track info, use all node with nearest neighbor
         //reCalculateCellsDistances(nn_dist);
-        float min_dist;
+        float cur_dist;
         nn_dist.resize(movieInfo.nodes.size());
         size_t nn_dist_cnt = 0;
         FOREACH_i(movieInfo.nodes){
             nn_dist[nn_dist_cnt] = INFINITY;
             FOREACH_j(movieInfo.nodes[i].neighbors){
                 // cal the distance between two nodes
-                min_dist = movieInfo.nodes[i].neighbors[j].dist_c2n;
-                if (min_dist < nn_dist[nn_dist_cnt]){
-                    nn_dist[nn_dist_cnt] = min_dist;
+                cur_dist = movieInfo.nodes[i].neighbors[j].dist_c2n;
+                if (cur_dist < nn_dist[nn_dist_cnt]){
+                    nn_dist[nn_dist_cnt] = cur_dist;
                 }
             }
-            nn_dist_cnt ++;
+            if(nn_dist[nn_dist_cnt] == 0){
+                qDebug("we found two cell exactly overlapped");
+            }
+            if(!isinf(nn_dist[nn_dist_cnt])){
+                nn_dist_cnt ++;
+            }
         }
         nn_dist.resize(nn_dist_cnt);
     }else{ // if there are tracks, use long tracks
@@ -594,6 +602,7 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
         }
         movieInfo.overall_neighbor_num += nei_ids.size();
         FOREACH_j(nei_ids){
+            movieInfo.nodes[i].neighbors[j].node_id = nei_ids[j];
             movieInfo.nodes[i].neighbors[j].overlap_size = cellOverlapSize(i, nei_ids[j], cellSegment);
         }
     }

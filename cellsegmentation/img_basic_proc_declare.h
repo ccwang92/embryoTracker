@@ -130,7 +130,7 @@ void subVolReplace(Mat &src, int datatype, Mat &subVol, float val, Range yxz_ran
 
 float distanceTransRegion2Region(bool *bw_ref_cell, vector<int> ref_range_xyz,
                                                        bool *bw_mov_cell, vector<int> mov_range_xyz,
-                                                       vector<double> shift_xyz, vector<float> dist);
+                                                       vector<double> shift_xyz, vector<float> &dist);
 void adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int curr_label, unordered_set<int> &adj_labels, int connect = 10);
 bool adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int test_adj_label, int connect = 10);
 void coordinateTransfer(vector<size_t> &in_idx, int org_sz_yxz[3],
