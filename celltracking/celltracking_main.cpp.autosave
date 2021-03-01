@@ -1000,7 +1000,7 @@ void cellTrackingMain::updateJumpCost(){
     size_t overall_arcs = 0;
     vector<size_t> jumpArcs(p4tracking.k);
     fill(jumpArcs.begin(), jumpArcs.end(), 0);
-    for(vector<size_t> track : movieInfo.tracks){
+    for(vector<size_t> &track : movieInfo.tracks){
         overall_arcs += track.size() - 1;
         for (size_t i = 1; i < track.size(); i++){
             jumpArcs[movieInfo.frames[track[i]] - movieInfo.frames[track[i-1]] - 1] ++;

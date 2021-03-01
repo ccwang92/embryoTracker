@@ -316,8 +316,8 @@ template <typename T> double chi2inv(T p, int df){
 template <typename T> double gammacdf(T x, T a, T b, bool upper){
     //double k = a;
     //double theta = 1/b;
-    if (upper) return 1 - boost::math::gamma_p((double)a, (double)x * b);
-    else return boost::math::gamma_p((double)a, (double)x*b);
+    if (upper) return 1 - boost::math::gamma_p((double)a, (double)x / b);
+    else return boost::math::gamma_p((double)a, (double)x/b);
 }
 // a super quick way for gamma fitting; reference: https://tminka.github.io/papers/minka-gamma.pdf
 template <typename T> void gammafit(vector<T> data, T &a, T &b){
