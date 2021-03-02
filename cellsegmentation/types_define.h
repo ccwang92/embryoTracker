@@ -180,7 +180,7 @@ struct nodeInfo{
     size_t kids[2];
     float kid_cost[2];
     int kid_num = 0;
-    size_t nodeId2trackId, nodeLocInTrack;
+    long long nodeId2trackId, nodeLocInTrack;
     float in_cost, out_cost, detect_confidence;
     std::vector<nodeRelation> neighbors; // candidate kids
     std::vector<nodeRelation> preNeighbors; // candidate parents: it will not save dist_c2n and dist_n2c

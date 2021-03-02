@@ -1,8 +1,9 @@
 ﻿#include "celltracking_main.h"
 #include "CINDA/src_c/cinda_funcs.c"
 
-cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment)
+cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode)
 {
+    debugMode = _debugMode;
     /////////////////////////////////////////////////
     //   step 1. initialize cell info              //
     /////////////////////////////////////////////////
@@ -407,7 +408,7 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int 
     int data_sz[3] = {data3d_sz[0], data3d_sz[1], data3d_sz[2]};
     return voxelwise_avg_distance(curr_voxIdx, curr_frame, nei_voxIdx, nei_frame, data_sz, c2n, n2c);
 }
-/**
+/** debug done
  * @brief combineCellsIntoOneRegion: make a region by joining several cells
  * @param cell_idxes
  * @param out_region_info
@@ -415,10 +416,11 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int 
 void cellTrackingMain::combineCellsIntoOneRegion(vector<size_t> &cell_idxes, combinedCellsCensus &out_region_info){
     out_region_info.frame = movieInfo.frames[cell_idxes[0]];
     out_region_info.start_coord_xyz.resize(3);
+    out_region_info.range_xyz.resize(3);
     fill(out_region_info.range_xyz.begin(), out_region_info.range_xyz.end(), -1);
 
     for(size_t n : cell_idxes){
-        if(out_region_info.voxIdx.size() == 0) continue;
+        if(movieInfo.voxIdx[n].size() == 0) continue;
         out_region_info.voxIdx.insert(out_region_info.voxIdx.end(), movieInfo.voxIdx[n].begin(), movieInfo.voxIdx[n].end());
         out_region_info.vox_x.insert(out_region_info.vox_x.end(), movieInfo.vox_x[n].begin(), movieInfo.vox_x[n].end());
         out_region_info.vox_y.insert(out_region_info.vox_y.end(), movieInfo.vox_y[n].begin(), movieInfo.vox_y[n].end());
@@ -620,7 +622,6 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
     updateGammaParam();
     bool update_preNei_cost = false; // preNei has not been initilized
     updateArcCost(update_preNei_cost); // calculate the link cost from given new gamma parameter
-    initPreNeighborInfo(); // preNei initilized
     // initialize all node as not stable
     FOREACH_i(movieInfo.nodes){
         movieInfo.nodes[i].stable_status = NOT_STABLE;
@@ -630,15 +631,17 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
     mccTracker_one2one(tracking4jumpCost_and_driftCorrection_Only); // jumpCost are updated, so the distance will
 
     /**
-     * These 3 functions will not be called again, which means the drift and cell-cell distance and Gamma
+     * These 4 functions will not be called again, which means the drift and cell-cell distance and Gamma
      * parameters will be fixed in the following test.
      */
     driftCorrection(); // update frame drifting
-    reCalculateCellsDistances();
+    reCalculateCellsDistances(); //this distance will not wholy update any more
     updateGammaParam();
-
+    initPreNeighborInfo(); // preNei initilized
     // update arc cost and stable status with the parameters (these generally are conducted in mccTracker_one2one).
     updateArcCost();
+    // we need to update parent and kids given tracks first
+    track2parentKid();
     stableSegmentFixed();
 }
 /**
@@ -989,6 +992,10 @@ void cellTrackingMain::mergeOvTracks(){
     refreshTracks();
 }
 void cellTrackingMain::node2trackUpt(){
+    for(nodeInfo &nf : movieInfo.nodes){
+        nf.nodeId2trackId = -1;
+        nf.nodeLocInTrack = -1;
+    }
     FOREACH_i(movieInfo.tracks){
         FOREACH_j(movieInfo.tracks[i]){
             movieInfo.nodes[movieInfo.tracks[i][j]].nodeId2trackId = i;
@@ -1000,7 +1007,7 @@ void cellTrackingMain::updateJumpCost(){
     size_t overall_arcs = 0;
     vector<size_t> jumpArcs(p4tracking.k);
     fill(jumpArcs.begin(), jumpArcs.end(), 0);
-    for(vector<size_t> track : movieInfo.tracks){
+    for(vector<size_t> &track : movieInfo.tracks){
         overall_arcs += track.size() - 1;
         for (size_t i = 1; i < track.size(); i++){
             jumpArcs[movieInfo.frames[track[i]] - movieInfo.frames[track[i-1]] - 1] ++;
@@ -1100,7 +1107,7 @@ void cellTrackingMain::getArcCostOne2OneTrack(size_t track_id, vector<float> &ar
 void cellTrackingMain::stableSegmentFixed(){
     movieInfo.track_arcs_avg_mid_std.resize(movieInfo.tracks.size());
     float max_cost = pow(normInv(0.5*p4tracking.jumpCost[0]/2), 2);
-    int min_valid_node_cluster_sz = 5;
+    int min_valid_node_cluster_sz = p4tracking.min_stable_node_cluster_sz;
     FOREACH_i(movieInfo.tracks){
         vector<float> arc_costs;
         getArcCostOne2OneTrack(i, arc_costs);
@@ -1113,7 +1120,7 @@ void cellTrackingMain::stableSegmentFixed(){
             if (arc_costs[j] <= max_cost){
                 end_id = j + 1;
             }else{
-                if (end_id - start_id + 1 >= min_valid_node_cluster_sz){
+                if ((end_id - start_id + 1) >= min_valid_node_cluster_sz){
                     for(size_t k = start_id + 1; k <= end_id - 1; k++){
                         movieInfo.nodes[movieInfo.tracks[i][k]].stable_status = STABLE_TRACK_MID;
                     }
@@ -1154,7 +1161,7 @@ void cellTrackingMain::stableSegmentFixed(){
         }
     }
 }
-/**
+/** debug done
  * @brief bestPeerCandidate: given a region id, find if there are two regions that can together fit into its territory
  * @param node_id
  * @param bestPeer
@@ -1163,33 +1170,41 @@ void cellTrackingMain::stableSegmentFixed(){
 float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_bestPeer, bool parent_flag){
     vector<size_t> peerCandidates(0);
     out_bestPeer.resize(0);
-    if(parent_flag && movieInfo.nodes[node_id].neighbors.size() >= 2){
-        float curr_cost;
-        bool currBest;
-        for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
-            curr_cost = neighbor.dist_c2n;
-            currBest = true;
-            for(nodeRelation preNeighbor : movieInfo.nodes[neighbor.node_id].preNeighbors){
-                if(curr_cost > preNeighbor.dist_c2n && preNeighbor.node_id != node_id){
-                    currBest = false;
-                    break;
+    if(parent_flag){
+        if (movieInfo.nodes[node_id].neighbors.size() >= 2){
+            int frame2test = movieInfo.frames[node_id] + 1;
+            float curr_cost;
+            bool currBest;
+            for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
+                if (movieInfo.frames[neighbor.node_id] != frame2test) continue;
+                curr_cost = neighbor.dist_c2n;
+                currBest = true;
+                for(nodeRelation preNeighbor : movieInfo.nodes[neighbor.node_id].preNeighbors){
+                    if(curr_cost > preNeighbor.dist_c2n && preNeighbor.node_id != node_id){
+                        currBest = false;
+                        break;
+                    }
                 }
+                if(currBest) peerCandidates.push_back(neighbor.node_id);
             }
-            if(currBest) peerCandidates.push_back(neighbor.node_id);
         }
-    }else if(movieInfo.nodes[node_id].preNeighbors.size() >= 2){
-        float curr_cost;
-        bool currBest;
-        for(nodeRelation preNeighbor : movieInfo.nodes[node_id].preNeighbors){
-            curr_cost = preNeighbor.dist_c2n;
-            currBest = true;
-            for(nodeRelation neighbor : movieInfo.nodes[preNeighbor.node_id].neighbors){
-                if(curr_cost > neighbor.dist_c2n && neighbor.node_id != node_id){
-                    currBest = false;
-                    break;
+    }else{
+        if(movieInfo.nodes[node_id].preNeighbors.size() >= 2){
+            int frame2test = movieInfo.frames[node_id] - 1;
+            float curr_cost;
+            bool currBest;
+            for(nodeRelation preNeighbor : movieInfo.nodes[node_id].preNeighbors){
+                if (movieInfo.frames[preNeighbor.node_id] != frame2test) continue;
+                curr_cost = preNeighbor.dist_c2n;
+                currBest = true;
+                for(nodeRelation neighbor : movieInfo.nodes[preNeighbor.node_id].neighbors){
+                    if(curr_cost > neighbor.dist_c2n && neighbor.node_id != node_id){
+                        currBest = false;
+                        break;
+                    }
                 }
+                if(currBest) peerCandidates.push_back(preNeighbor.node_id);
             }
-            if(currBest) peerCandidates.push_back(preNeighbor.node_id);
         }
     }
     if(peerCandidates.size() < 2){
@@ -1205,7 +1220,7 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
         FOREACH_i(peerCandidates){
             curr_peer[0] = peerCandidates[i];
             for(size_t j = i + 1; j < peerCandidates.size(); j ++){
-                curr_peer[0] = peerCandidates[j];
+                curr_peer[1] = peerCandidates[j];
                 curr_distance = voxelwise_avg_distance(node_id, curr_peer, dummy_c2n, dummy_n2c);
                 if(curr_distance < min_distance){
                     out_bestPeer = curr_peer;
@@ -1230,6 +1245,7 @@ void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool
     float merged_cost, min_exist_cost = INFINITY;
     vector<size_t> bestPeers(2);
     merged_cost = bestPeerCandidate(node_id, bestPeers, parents_test);
+    if(isinf(merged_cost)) return;
     if(parents_test){
         for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
             if(neighbor.dist_c2n < min_exist_cost){
@@ -1268,7 +1284,7 @@ void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool
         }
     }
 }
-/**
+/** debug done
  * @brief detectPeerRegions: test if two regions should be merged based on their common kid or parent region
  * @param merge_node_idx
  * @param split_node_idx
@@ -1277,6 +1293,7 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
                                          unordered_map<long, long> &node_id2split_merge_node_id){
     float cost_good2go; // the average cost of arcs in a track: only arc with larger cost will be test
     for(nodeInfo node : movieInfo.nodes){
+        if(node.nodeId2trackId < 0) continue; // for isolated node, does not consider
         cost_good2go = movieInfo.track_arcs_avg_mid_std[node.nodeId2trackId][0];
         if (cost_good2go > MIN(p4tracking.c_en, p4tracking.c_ex)){
             cost_good2go = 0;
