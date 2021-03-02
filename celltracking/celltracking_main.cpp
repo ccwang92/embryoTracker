@@ -1,4 +1,6 @@
 ﻿#include "celltracking_main.h"
+#include <stack>          // std::stack
+#include <deque>
 #include "CINDA/src_c/cinda_funcs.c"
 
 cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode)
@@ -321,7 +323,10 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
         idx = (nei_vox_z[i] - nei_start_coord_xyz[2]) * frame_sz +
                (nei_vox_x[i] - nei_start_coord_xyz[0]) * nei_range_xyz[1] +
                 nei_vox_y[i] - nei_start_coord_xyz[1];
-        mov_cell[idx] = true;
+        if(nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2] <= idx || idx < 0){
+            qDebug("Leaking memory");
+        }
+        mov_cell[idx] = true; // !!! NOTE: here may cause memory leaking
     }
     vector<float> dist(2);
     vector<double> shift_xyz(3); // the true shift from ref cell to mov cell (:nei_start-ref_start-drift)
@@ -430,18 +435,30 @@ void cellTrackingMain::combineCellsIntoOneRegion(vector<size_t> &cell_idxes, com
             out_region_info.range_xyz = movieInfo.range_xyz[n];
             out_region_info.start_coord_xyz =  movieInfo.start_coord_xyz[n];
         }else{
-            if(movieInfo.start_coord_xyz[n][0] < out_region_info.start_coord_xyz[0]){
-                out_region_info.range_xyz[0] += (out_region_info.start_coord_xyz[0] - movieInfo.start_coord_xyz[n][0]);
-                out_region_info.start_coord_xyz[0] = movieInfo.start_coord_xyz[n][0];
+            for (int i = 0; i < 3; i++){
+                if(movieInfo.start_coord_xyz[n][i] < out_region_info.start_coord_xyz[i]){
+                    out_region_info.range_xyz[i] += (out_region_info.start_coord_xyz[i] - movieInfo.start_coord_xyz[n][i]);
+                    out_region_info.start_coord_xyz[i] = movieInfo.start_coord_xyz[n][i];
+                }
+                if ((movieInfo.start_coord_xyz[n][i] + movieInfo.range_xyz[n][i]) >
+                        (out_region_info.start_coord_xyz[i] + out_region_info.range_xyz[i])){
+                    out_region_info.range_xyz[i] = (movieInfo.start_coord_xyz[n][i] + movieInfo.range_xyz[n][i] - 1) -
+                            out_region_info.start_coord_xyz[i] + 1;
+                }
             }
-            if(movieInfo.start_coord_xyz[n][1] < out_region_info.start_coord_xyz[1]){
-                out_region_info.range_xyz[1] += (out_region_info.start_coord_xyz[1] - movieInfo.start_coord_xyz[n][1]);
-                out_region_info.start_coord_xyz[1] = movieInfo.start_coord_xyz[n][1];
-            }
-            if(movieInfo.start_coord_xyz[n][2] < out_region_info.start_coord_xyz[2]){
-                out_region_info.range_xyz[2] += (out_region_info.start_coord_xyz[2] - movieInfo.start_coord_xyz[n][2]);
-                out_region_info.start_coord_xyz[2] = movieInfo.start_coord_xyz[n][2];
-            }
+//            if(movieInfo.start_coord_xyz[n][1] < out_region_info.start_coord_xyz[1]){
+//                out_region_info.range_xyz[1] += (out_region_info.start_coord_xyz[1] - movieInfo.start_coord_xyz[n][1]);
+//                out_region_info.start_coord_xyz[1] = movieInfo.start_coord_xyz[n][1];
+//            }
+//            if ((movieInfo.start_coord_xyz[n][1] + movieInfo.range_xyz[n][1]) >
+//                    (out_region_info.start_coord_xyz[1] + out_region_info.range_xyz[1])){
+//                out_region_info.range_xyz[1] = (movieInfo.start_coord_xyz[n][1] + movieInfo.range_xyz[n][1]) -
+//                        out_region_info.range_xyz[1] + 1;
+//            }
+//            if(movieInfo.start_coord_xyz[n][2] < out_region_info.start_coord_xyz[2]){
+//                out_region_info.range_xyz[2] += (out_region_info.start_coord_xyz[2] - movieInfo.start_coord_xyz[n][2]);
+//                out_region_info.start_coord_xyz[2] = movieInfo.start_coord_xyz[n][2];
+//            }
         }
     }
 }
@@ -749,6 +766,7 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
     // update movieInfo.tracks
     vector<long long> cost;
     vector<size_t> curr_track;
+    movieInfo.tracks.clear();
     for(long long i = 1; i < track_vec[0] + 1; i++){
         if(track_vec[i] > 0){
             curr_track.push_back(track_vec[i]);
@@ -770,6 +788,7 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
     updateJumpCost();
 
     if(!get_jumpCost_only){ // means this time of tracking is just to estimate jump cost and/or drift
+        node2trackUpt();
         // update parent and kids given tracks
         track2parentKid();
         updateArcCost();
@@ -826,34 +845,34 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
             if(sp_mg_info.parent_flag){
                 mtail[arc_cnt] = 2 * sp_mg_info.node_id + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.family_nodes[0] + 1;
-                mcost[arc_cnt] = round(sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = 2 * sp_mg_info.node_id + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.family_nodes[1] + 1;
-                mcost[arc_cnt] = round(sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = src_id;
                 mhead[arc_cnt] =  2 * sp_mg_info.node_id + 2;
-                mcost[arc_cnt] = round(sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 visited[sp_mg_info.node_id] = true;
             }else{
                 mtail[arc_cnt] = 2 * sp_mg_info.family_nodes[0] + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.node_id + 1;
-                mcost[arc_cnt] = round(sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = 2 * sp_mg_info.family_nodes[1] + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.node_id + 1;
-                mcost[arc_cnt] = round(sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = 2 * sp_mg_info.node_id + 1;
                 mhead[arc_cnt] =  src_id;
-                mcost[arc_cnt] = round(sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 visited[sp_mg_info.family_nodes[0]] = true;
@@ -862,24 +881,24 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
         }
     }
     for(nodeInfo node : movieInfo.nodes){
-        if(visited[node.node_id]){
-            continue;
-        }
         // in arc
         mtail[arc_cnt] = src_id;
         mhead[arc_cnt] =  2 * node.node_id + 1;
-        mcost[arc_cnt] = round(node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // observation arc
         mtail[arc_cnt] = 2 * node.node_id+1;
         mhead[arc_cnt] =  2 * node.node_id + 2;
-        mcost[arc_cnt] = round(p4tracking.observationCost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)p4tracking.observationCost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // out arc
         mhead[arc_cnt] = src_id;
         mtail[arc_cnt] =  2 * node.node_id+2;
-        mcost[arc_cnt] = round(node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
+        if(visited[node.node_id]){ // for those have split/merge arcs, not more neighbor-linking needed
+            continue;
+        }
         // link with neighbors
         if(link_adj_frs){
             int curr_frame = movieInfo.frames[node.node_id];
@@ -888,7 +907,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
                     if(neighbor.link_cost < linkCostUpBound){
                         mtail[arc_cnt] = 2 * node.node_id+2;
                         mhead[arc_cnt] =  2 * neighbor.node_id+1;
-                        mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                        mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                         arc_cnt ++;
                     }
                 }
@@ -898,7 +917,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
                 if(neighbor.link_cost < linkCostUpBound){
                     mtail[arc_cnt] = 2 * node.node_id+1;
                     mhead[arc_cnt] =  2 * neighbor.node_id+2;
-                    mcost[arc_cnt] = round(neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                    mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
                     arc_cnt ++;
                 }
             }
@@ -917,6 +936,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
     // update movieInfo.tracks
     vector<long long> cost;
     vector<size_t> curr_track;
+    movieInfo.tracks.clear();
     for(long long i = 1; i < track_vec[0] + 1; i++){
         if(track_vec[i] > 0){
             curr_track.push_back(track_vec[i]);
@@ -930,12 +950,13 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
             if (new_track.size() > 1){
                 movieInfo.tracks.push_back(new_track);
             }
+            curr_track.clear();
         }
     }
     // update parent and kids given tracks
     track2parentKid();
     if(m_append > 0){// merge tracks with overlapped nodes
-        mergeOvTracks();
+        mergeOvTracks2();
     }
 
     delete[] mtail;
@@ -957,6 +978,38 @@ void cellTrackingMain::refreshTracks(){
     new_tracks.resize(valid_num);
     movieInfo.tracks.clear();
     movieInfo.tracks = new_tracks;
+}
+/**
+ * @brief mergeOvTracks2: merge overlapped tracks and update node id to track information
+ */
+void cellTrackingMain::mergeOvTracks2(){
+    vector<std::vector<size_t>> new_tracks(movieInfo.tracks.size());
+    long valid_num = 0;
+    vector<bool> visited(movieInfo.nodes.size());
+    fill(visited.begin(), visited.end(), false);
+    FOREACH_i(movieInfo.nodes){
+        if(visited[i] || movieInfo.nodes[i].kid_num==0) continue;
+
+        vector<size_t> one_track;
+        deque<size_t> n_ids;
+        n_ids.push_back(i);
+        while(!n_ids.empty()){
+            one_track.push_back(n_ids.front());
+            for (int kk = 0; kk < movieInfo.nodes[i].kid_num; kk++){
+                if (!visited[movieInfo.nodes[i].kids[kk]]){
+                    n_ids.push_back(movieInfo.nodes[i].kids[kk]);
+                }
+            }
+            visited[n_ids.front()] = true;
+            n_ids.pop_front();
+        }
+        new_tracks.push_back(one_track);
+        valid_num ++;
+    }
+    new_tracks.resize(valid_num);
+    movieInfo.tracks.clear();
+    movieInfo.tracks = new_tracks;
+    node2trackUpt();
 }
 /**
  * @brief mergeOvTrack_node2trackUpt: merge overlapped tracks and update node id to track information
@@ -990,6 +1043,7 @@ void cellTrackingMain::mergeOvTracks(){
         }
     }
     refreshTracks();
+    node2trackUpt();
 }
 void cellTrackingMain::node2trackUpt(){
     for(nodeInfo &nf : movieInfo.nodes){
@@ -1021,12 +1075,16 @@ void cellTrackingMain::updateJumpCost(){
  * @brief track2parentKid: !! this function should be called before we do track merge
  */
 void cellTrackingMain::track2parentKid(){
-    for(nodeInfo n : movieInfo.nodes){
+    for(nodeInfo &n : movieInfo.nodes){
         n.parent_num = 0;
         n.kid_num = 0;
     }
-    for(vector<size_t> track : movieInfo.tracks){
+    for(size_t t_id=0; t_id<movieInfo.tracks.size(); t_id++){
+        vector<size_t> &track = movieInfo.tracks[t_id];
         for (size_t i = 1; i < track.size(); i++){
+            if(track[i-1] == 4 && track[i] == 190){
+                qDebug("Possible mem leaking");
+            }
             movieInfo.nodes[track[i-1]].kids[movieInfo.nodes[track[i-1]].kid_num] = track[i];
             for (int k = 0; k<movieInfo.nodes[track[i-1]].neighbors.size(); k++){
                 if (track[i] == movieInfo.nodes[track[i-1]].neighbors[k].node_id){
@@ -1039,13 +1097,17 @@ void cellTrackingMain::track2parentKid(){
 
             movieInfo.nodes[track[i]].parents[movieInfo.nodes[track[i]].parent_num] = track[i-1];
             for (int k = 0; k<movieInfo.nodes[track[i]].preNeighbors.size(); k++){
-                if (track[i] == movieInfo.nodes[track[i]].preNeighbors[k].node_id){
+                if (track[i-1] == movieInfo.nodes[track[i]].preNeighbors[k].node_id){
                     movieInfo.nodes[track[i]].parent_cost[movieInfo.nodes[track[i]].parent_num] =
                             movieInfo.nodes[track[i]].preNeighbors[k].link_cost;
                     break;
                 }
             }
             movieInfo.nodes[track[i]].parent_num ++;
+
+            if(movieInfo.nodes[4].kid_num > 2){
+                qDebug("Possible mem leaking");
+            }
         }
     }
 }

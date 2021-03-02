@@ -44,6 +44,7 @@ private:
     void track2parentKid();
     void refreshTracks(); //remove the empty tracks
     void mergeOvTracks(); //
+    void mergeOvTracks2();
     void node2trackUpt();
     void updateJumpCost();
     // functions to update cost given new gamma fitting results
