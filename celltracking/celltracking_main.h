@@ -110,7 +110,7 @@ private: // remaining for split/merge module
 
 
     bool handleNonSplitReg_link2oneSeed(size_t node_idx, size_t seeds[2]);
-    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], bool oneSeedIsGood, vector<simpleNodeInfo> &newCells);
+    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], bool &oneSeedIsGood, vector<simpleNodeInfo> &newCells);
 
     bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<simpleNodeInfo> &newCells);
 private:    // TODO: missing cell module

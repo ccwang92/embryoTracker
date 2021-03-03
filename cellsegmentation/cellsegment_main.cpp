@@ -59,6 +59,8 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
+
+    delete data4d;
 }
 
 void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QString fileName){
@@ -169,6 +171,8 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
     glWidget->setMode("Alpha blending rgba");
     glWidget->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, data_rows_cols_slices[1],
             data_rows_cols_slices[0], data_rows_cols_slices[2], 4);
+
+    delete single_frame;
 }
 /**
  * @brief cellSegmentMain::cellSegmentSingleFrame

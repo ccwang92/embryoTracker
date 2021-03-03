@@ -340,6 +340,9 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
                                shift_xyz, dist);
     c2n = dist[0];
     n2c = dist[1];
+
+    delete[] ref_cell;
+    delete[] mov_cell;
     return max_dist;
 }
 
@@ -404,6 +407,8 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int 
                                shift_xyz, dist);
     c2n = dist[0];
     n2c = dist[1];
+    delete[] mov_cell;
+    delete[] ref_cell;
     return max_dist;
 }
 
@@ -534,6 +539,7 @@ size_t cellTrackingMain::cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &
  */
 float cellTrackingMain::distance2cost(float distance, float punish=1){
     //assert(frame_diff>0 && frame_diff)
+    if (distance > 100) return INFINITY;
     float alpha = movieInfo.ovGammaParam[0];
     float beta = movieInfo.ovGammaParam[1];
     //float punish = p4tracking.jumpCost[frame_diff-1];
@@ -799,7 +805,7 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
 
         }
     }
-
+    delete[] msz;
     delete[] mtail;
     delete[] mhead;
     delete[] mlow;
@@ -958,7 +964,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
     if(m_append > 0){// merge tracks with overlapped nodes
         mergeOvTracks2();
     }
-
+    delete[] msz;
     delete[] mtail;
     delete[] mhead;
     delete[] mlow;
@@ -1529,9 +1535,10 @@ int cellTrackingMain::parentsKidsConsistency(size_t node_id){
             for(nodeRelation nr : movieInfo.nodes[p].neighbors){
                 if (nr.node_id == k){
                     map_2x2[cnt] = distance2cost(nr.dist_c2n, 1.0);
+                    break;
                 }
-                cnt++;
             }
+            cnt++;
         }
     }
     if (MAX(map_2x2[0], map_2x2[3]) < abs(p4tracking.observationCost) ||
@@ -1641,12 +1648,15 @@ bool seedsRefine_intensity(cellSegmentMain &cellSegment, vector<size_t> &root_id
     float lb = vals[(int)round(vals.size()*low)];
     float ub = vals[(int)round(vals.size()*high)];
     auto tmp = intersection(seeds_idx, root_idx);
+
     for(size_t j : tmp){
         unsigned char val = frame_root->at<unsigned char>(j);
         if(val > lb && val <ub){
             ref_seeds_idx.push_back(j);
         }
     }
+    delete frame_root;
+    delete frame_seed;
     if(ref_seeds_idx.size() == 0){
         return false;
     }
@@ -1849,6 +1859,7 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     if(!success){
         success = binary_seedsMap_create(fgMap, nullptr, &possibleGap3d, seeds_idx, seedsMap);
         if(!success){
+            delete single_frame;
             return false;
         }
     }
@@ -1863,6 +1874,8 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     int crop_start_yxz[3] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start, -seed.crop_range_yxz[2].start};
     coordinateTransfer(splitRegs[0], outLabelMap.size, splitRegs[0], crop_start_yxz,single_frame->size);
     coordinateTransfer(splitRegs[1], outLabelMap.size, splitRegs[1], crop_start_yxz,single_frame->size);
+    delete single_frame;
+    return true;
 }
 bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, size_t reg2split_idx,
                                                vector<size_t> &reg2split, int reg2split_frame,
@@ -1921,7 +1934,10 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     bool valid_seeds_flag = true;
     valid_seeds_flag = seedsRefine_intensity(cellSegment, reg2split, reg2split_frame,
                                              reg4seeds, reg4seeds_frame, ref_seeds_idx);
-    if (!valid_seeds_flag) return false;
+    if (!valid_seeds_flag) {
+        delete single_frame;
+        return false;
+    }
 
     vector<vector<size_t>> seeds_idx_in_subVol(ref_seeds_idx.size());
     int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
@@ -1943,6 +1959,9 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     int crop_start_yxz[3] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start, -seed.crop_range_yxz[2].start};
     coordinateTransfer(splitRegs[0], outLabelMap.size, splitRegs[0], crop_start_yxz,single_frame->size);
     coordinateTransfer(splitRegs[1], outLabelMap.size, splitRegs[1], crop_start_yxz,single_frame->size);
+
+    delete single_frame;
+    return true;
 }
 bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2split_idx, vector<size_t> reg2split,
                                        int reg2split_frame, vector<vector<size_t>> reg4seeds, int reg4seeds_frame,
@@ -2831,7 +2850,7 @@ void cellTrackingMain::nullifyCellOrNode(vector<size_t> node_idx, cellSegmentMai
  * @param seeds
  */
 bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
-                                      size_t seeds[2], bool oneSeedIsGood, vector<simpleNodeInfo> &newCells){
+                                      size_t seeds[2], bool &oneSeedIsGood, vector<simpleNodeInfo> &newCells){
     //newCells.resize(0);
     // first check that the regions is valid
     if(isValid(node_idx, &cellSegment)){

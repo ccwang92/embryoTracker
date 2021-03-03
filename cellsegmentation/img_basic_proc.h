@@ -361,6 +361,7 @@ template <typename T> T vec_stddev(vector<T> const & func)
 }
 template <typename T> T vec_variance(vector<T> const & func)
 {
+    if (func.size() <= 1) return 0;
     T mean = vec_mean(func);
     T sq_sum = inner_product(func.begin(), func.end(), func.begin(), 0.0,
         [](T const & x, T const & y) { return x + y; },

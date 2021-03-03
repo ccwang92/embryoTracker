@@ -2473,6 +2473,7 @@ void adjacentRegions(Mat &src, vector<size_t> curr_label_idx, int curr_label, un
     int page_sz = sz[0] * sz[1];
     int cur_nei_idx;
     vector<bool> checked_label(sz[2] * page_sz, false);
+    adj_labels.clear();
     FOREACH_i(curr_label_idx){
         z = curr_label_idx[i] / page_sz;
         remain = curr_label_idx[i] - (z*page_sz);
