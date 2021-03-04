@@ -1016,7 +1016,7 @@ void cellTrackingMain::refreshTracks(){
  * @brief mergeOvTracks2: merge overlapped tracks and update node id to track information
  */
 void cellTrackingMain::mergeOvTracks2(){
-    vector<std::vector<size_t>> new_tracks(movieInfo.tracks.size());
+    vector<std::vector<size_t>> new_tracks;
     long valid_num = 0;
     vector<bool> visited(movieInfo.nodes.size());
     fill(visited.begin(), visited.end(), false);
@@ -1027,13 +1027,14 @@ void cellTrackingMain::mergeOvTracks2(){
         deque<size_t> n_ids;
         n_ids.push_back(i);
         while(!n_ids.empty()){
-            one_track.push_back(n_ids.front());
-            for (int kk = 0; kk < movieInfo.nodes[i].kid_num; kk++){
-                if (!visited[movieInfo.nodes[i].kids[kk]]){
-                    n_ids.push_back(movieInfo.nodes[i].kids[kk]);
+            size_t cur_id = n_ids.front();
+            one_track.push_back(cur_id);
+            for (int kk = 0; kk < movieInfo.nodes[cur_id].kid_num; kk++){
+                if (!visited[movieInfo.nodes[cur_id].kids[kk]]){
+                    n_ids.push_back(movieInfo.nodes[cur_id].kids[kk]);
                 }
             }
-            visited[n_ids.front()] = true;
+            visited[cur_id] = true;
             n_ids.pop_front();
         }
         new_tracks.push_back(one_track);
@@ -1818,10 +1819,12 @@ bool cellTrackingMain::binary_seedsMap_create(Mat1b &fgMap, Mat1b *possibleGap3d
                 vals.push_back(tmp_seedMap.at<int>(j));
             }
         }
-        int it = Mode(vals.begin(), vals.end());
-        if(it != 0){
-            setValMat(seeds_map, CV_32S, voxIdxList[i], (float)it);
-            seeds_idx_used[it-1] = true;
+        if(vals.size() > 0){
+            int it = Mode(vals.begin(), vals.end());
+            if(it != 0){
+                setValMat(seeds_map, CV_32S, voxIdxList[i], (float)it);
+                seeds_idx_used[it-1] = true;
+            }
         }
     }
     for(bool v : seeds_idx_used){
@@ -2283,7 +2286,7 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
     if(!testCellsInOneTrackAdjacentOrNot(cellSegment, left_cells) ||
             !testCellsInOneTrackAdjacentOrNot(cellSegment, right_cells)){
         if (one2multiple_flag) return SPLIT_BY_KIDS;
-        else return SPLIT_BY_KIDS;
+        else return SPLIT_BY_PARENTS;
     }
     /** way 3: segmentation is not consistent in consecutive two frames **/
     // adjframesConsistency.m: I think this is over-fitting, should not add here
@@ -2437,6 +2440,7 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
         if(track.size() < 2 || track[0] < 0){
             continue;
         }
+
         vector<tuple<size_t, int, float>> merged_split_peers; //node_id, decision, confidence
         unordered_set<size_t> nodes4merge;
         unordered_map<size_t, int> p_k_InConsistenct;
@@ -2527,6 +2531,9 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
 
                 float pvalue;
                 int curr_decision = regionSplitMergeJudge(cellSegment, curr_node_id, false, pvalue);
+//                if(curr_decision == SPLIT_BY_KIDS && movieInfo.nodes[curr_node_id].kid_num < 2){
+//                    int tmp = regionSplitMergeJudge(cellSegment, curr_node_id, false, pvalue);
+//                }
                 if (curr_decision != MERGE_SPLIT_NOT_SURE){
                     merged_split_peers.push_back(make_tuple(curr_node_id, curr_decision, pvalue));
                     if(curr_decision == SPLIT_BY_PARENTS){
@@ -2571,15 +2578,21 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
             default:
                 break;
             }
-
+            if(seeds[0] == 0 || seeds[1] == 0){
+                qDebug("Possible error location");
+            }
             if(merge_flag){
                 if(mergedRegionGrow(cellSegment, seeds, newCells)){
+                    if(find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[0]) != uptCell_idxs.end() ||
+                            find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[1]) != uptCell_idxs.end()){
+                        qDebug("duplicated update found!");
+                    }
                     uptCell_idxs.push_back(seeds[0]);
                     uptCell_idxs.push_back(seeds[1]);
                     // if success, we need to check if gap should be removed
                     if(get<2>(merged_split_peers[i]) < 0.05){ // we are confident with the merging, so remove gaps between regions
                         int frame = movieInfo.frames[seeds[0]];
-                        setValMat(cellSegment.cell_label_maps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
+                        setValMat(validGapMaps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
                     }
                 }
             }else if(split_flag){
@@ -2591,13 +2604,20 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
                         if(mergedRegionGrow(cellSegment, seeds, newCells)){
                             uptCell_idxs.push_back(seeds[0]);
                             uptCell_idxs.push_back(seeds[1]);
+                            if(find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[0]) != uptCell_idxs.end() ||
+                                    find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[1]) != uptCell_idxs.end()){
+                                qDebug("duplicated update found!");
+                            }
                             // for the un-seperable region, we do not want to frequently check them; so remove the gaps between them
                             int frame = movieInfo.frames[seeds[0]];
-                            setValMat(cellSegment.cell_label_maps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
+                            setValMat(validGapMaps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
                         }
                     }
                 }else{
                     uptCell_idxs.push_back(curr_node_idx);
+                    if(find(uptCell_idxs.begin(), uptCell_idxs.end(), curr_node_idx) != uptCell_idxs.end() ){
+                        qDebug("duplicated update found!");
+                    }
                 }
             }
         }
