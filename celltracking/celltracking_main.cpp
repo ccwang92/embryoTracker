@@ -314,6 +314,9 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
         idx = (curr_vox_z[i] - curr_start_coord_xyz[2]) * frame_sz +
                (curr_vox_x[i] - curr_start_coord_xyz[0]) * curr_range_xyz[1] +
                 curr_vox_y[i] - curr_start_coord_xyz[1];
+        if(curr_range_xyz[0] * curr_range_xyz[1] * curr_range_xyz[2] <= idx || idx < 0){
+            qFatal("Leaking memory");
+        }
         ref_cell[idx] = true;
     }
     bool *mov_cell = new bool[nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2]];
@@ -324,7 +327,7 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
                (nei_vox_x[i] - nei_start_coord_xyz[0]) * nei_range_xyz[1] +
                 nei_vox_y[i] - nei_start_coord_xyz[1];
         if(nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2] <= idx || idx < 0){
-            qDebug("Leaking memory");
+            qFatal("Leaking memory");
         }
         mov_cell[idx] = true; // !!! NOTE: here may cause memory leaking
     }
@@ -345,7 +348,17 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
     delete[] mov_cell;
     return max_dist;
 }
-
+/** debug Done
+ * @brief voxelwise_avg_distance
+ * @param curr_voxIdx
+ * @param curr_frame
+ * @param nei_voxIdx
+ * @param nei_frame
+ * @param data3d_sz
+ * @param c2n
+ * @param n2c
+ * @return
+ */
 float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int curr_frame,
                              vector<size_t> &nei_voxIdx, int nei_frame,
                              int data3d_sz[3], float &c2n, float &n2c){
@@ -376,23 +389,27 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int 
     nei_range_xyz[2] = vec_max(nei_vox_z) - nei_start_coord_xyz[2] + 1;
 
 
-    bool *ref_cell = new bool[curr_voxIdx.size()];
-    memset(ref_cell, false, curr_voxIdx.size());
+    bool *ref_cell = new bool[curr_range_xyz[0] * curr_range_xyz[1] * curr_range_xyz[2]];
+    memset(ref_cell, false, curr_range_xyz[0] * curr_range_xyz[1] * curr_range_xyz[2]);
     size_t idx;
     size_t frame_sz = curr_range_xyz[0] * curr_range_xyz[1];
     for(size_t i = 0; i < curr_voxIdx.size(); i++){
         idx = (curr_vox_z[i] - curr_start_coord_xyz[2]) * frame_sz +
                (curr_vox_x[i] - curr_start_coord_xyz[0]) * curr_range_xyz[1] +
                 curr_vox_y[i] - curr_start_coord_xyz[1];
+
         ref_cell[idx] = true;
     }
-    bool *mov_cell = new bool[nei_voxIdx.size()];
-    memset(mov_cell, false, nei_voxIdx.size());
+    bool *mov_cell = new bool[nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2]];
+    memset(mov_cell, false, nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2]);
     frame_sz = nei_range_xyz[0] * nei_range_xyz[1];
     for(size_t i = 0; i < nei_voxIdx.size(); i++){
         idx = (nei_vox_z[i] - nei_start_coord_xyz[2]) * frame_sz +
                (nei_vox_x[i] - nei_start_coord_xyz[0]) * nei_range_xyz[1] +
                 nei_vox_y[i] - nei_start_coord_xyz[1];
+        if(nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2] <= idx || idx < 0){
+            qDebug("Leaking memory");
+        }
         mov_cell[idx] = true;
     }
     vector<float> dist(2);
@@ -675,7 +692,7 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
  */
 void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs){
     if(movieInfo.frames[cell_idx] == (int)cell_label_maps.size()) return;
-    for (size_t i = movieInfo.frames[cell_idx] + 1; i <= MIN(cell_label_maps.size()-1, movieInfo.frames[cell_idx]+p4tracking.k); i++){
+    for (long i = movieInfo.frames[cell_idx] + 1; i <= MIN(cell_label_maps.size()-1, movieInfo.frames[cell_idx]+p4tracking.k); i++){
         unordered_set<int> nei_labels;
         FOREACH_j(movieInfo.voxIdx[cell_idx]){
             if (cell_label_maps[i].at<int>(movieInfo.voxIdx[cell_idx][j])>0){
@@ -686,7 +703,7 @@ void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t c
             nei_idxs.push_back(it - 1 + cumulative_cell_nums[i - 1]);
             vector<size_t> tmp = intersection(movieInfo.voxIdx[it - 1 + cumulative_cell_nums[i - 1]],
                     movieInfo.voxIdx[cell_idx]);
-            qDebug("tmp size %ld", tmp.size());
+            //qDebug("tmp size %ld", tmp.size());
         }
     }
 }
@@ -699,7 +716,7 @@ void cellTrackingMain::extractNeighborIds(vector<Mat> &cell_label_maps, size_t c
  */
 void cellTrackingMain::extractPreNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs){
     if(movieInfo.frames[cell_idx] == (int)0) return;
-    for (size_t i = movieInfo.frames[cell_idx] - 1; i >= MAX(0, movieInfo.frames[cell_idx]-p4tracking.k); i--){
+    for (long i = movieInfo.frames[cell_idx] - 1; i >= MAX(0, movieInfo.frames[cell_idx]-p4tracking.k); i--){
         unordered_set<int> nei_labels;
         FOREACH_j(movieInfo.voxIdx[cell_idx]){
             if (cell_label_maps[i].at<int>(movieInfo.voxIdx[cell_idx][j])>0){
@@ -781,7 +798,11 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
             cost.push_back(track_vec[i]);
             vector<size_t> new_track;
             for(size_t j = 0; j < curr_track.size(); j+=2){
-                new_track.push_back(size_t(curr_track[j] / 2));
+                if(curr_track[j] < 1 ||
+                        movieInfo.voxIdx[size_t((curr_track[j]-1) / 2)].size() == 0){
+                    qFatal("Node id wrong!");
+                }
+                new_track.push_back(size_t((curr_track[j]-1) / 2));
             }
             if (new_track.size() > 1){
                 movieInfo.tracks.push_back(new_track);
@@ -950,8 +971,14 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
         else{
             cost.push_back(track_vec[i]);
             vector<size_t> new_track;
-            for(size_t j = 0; j < curr_track.size(); j+=2){
-                new_track.push_back(size_t(curr_track[j] / 2));
+            for(size_t j = 0; j < curr_track.size(); j++){
+                if (new_track.size() == 0 ||
+                        size_t((curr_track[j]-1) / 2) != new_track[new_track.size()-1]){
+                    new_track.push_back(size_t((curr_track[j]-1) / 2));
+                    if(movieInfo.voxIdx[size_t((curr_track[j]-1) / 2)].size() == 0){
+                        qDebug("node id wrong!");
+                    }
+                }
             }
             if (new_track.size() > 1){
                 movieInfo.tracks.push_back(new_track);
@@ -1088,9 +1115,9 @@ void cellTrackingMain::track2parentKid(){
     for(size_t t_id=0; t_id<movieInfo.tracks.size(); t_id++){
         vector<size_t> &track = movieInfo.tracks[t_id];
         for (size_t i = 1; i < track.size(); i++){
-            if(track[i-1] == 4 && track[i] == 190){
-                qDebug("Possible mem leaking");
-            }
+//            if(track[i] == 259){// && track[i] == 190
+//                qDebug("Possible mem leaking");
+//            }
             movieInfo.nodes[track[i-1]].kids[movieInfo.nodes[track[i-1]].kid_num] = track[i];
             for (int k = 0; k<movieInfo.nodes[track[i-1]].neighbors.size(); k++){
                 if (track[i] == movieInfo.nodes[track[i-1]].neighbors[k].node_id){
@@ -1238,14 +1265,14 @@ void cellTrackingMain::stableSegmentFixed(){
 float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_bestPeer, bool parent_flag){
     vector<size_t> peerCandidates(0);
     out_bestPeer.resize(0);
-    if(parent_flag){
+    if(parent_flag){ // test kids
         if (movieInfo.nodes[node_id].neighbors.size() >= 2){
             int frame2test = movieInfo.frames[node_id] + 1;
             float curr_cost;
             bool currBest;
             for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
                 if (movieInfo.frames[neighbor.node_id] != frame2test) continue;
-                curr_cost = neighbor.dist_c2n;
+                curr_cost = neighbor.dist_n2c;
                 currBest = true;
                 for(nodeRelation preNeighbor : movieInfo.nodes[neighbor.node_id].preNeighbors){
                     if(curr_cost > preNeighbor.dist_c2n && preNeighbor.node_id != node_id){
@@ -1263,7 +1290,7 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
             bool currBest;
             for(nodeRelation preNeighbor : movieInfo.nodes[node_id].preNeighbors){
                 if (movieInfo.frames[preNeighbor.node_id] != frame2test) continue;
-                curr_cost = preNeighbor.dist_c2n;
+                curr_cost = preNeighbor.dist_n2c;
                 currBest = true;
                 for(nodeRelation neighbor : movieInfo.nodes[preNeighbor.node_id].neighbors){
                     if(curr_cost > neighbor.dist_c2n && neighbor.node_id != node_id){
@@ -1280,7 +1307,8 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
     }else if(peerCandidates.size() == 2){
         out_bestPeer = peerCandidates;
         float dummy_c2n, dummy_n2c;
-        return voxelwise_avg_distance(node_id, out_bestPeer, dummy_c2n, dummy_n2c);
+        return distance2cost(voxelwise_avg_distance(node_id, out_bestPeer, dummy_c2n, dummy_n2c),
+                             p4tracking.jumpCost[0]); // no jump will be allowed
     }else{ // more than two regions available
         float min_distance = INFINITY, curr_distance;
         float dummy_c2n, dummy_n2c;
@@ -1296,7 +1324,7 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
                 }
             }
         }
-        return min_distance;
+        return distance2cost(min_distance, p4tracking.jumpCost[0]);
     }
 }
 
@@ -1307,23 +1335,23 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
  * @param parents_test
  * @param split_merge_node_info
  */
-void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool parents_test,
+void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool kids_test,
                                         vector<splitMergeNodeInfo> &split_merge_node_info,
                                         unordered_map<long, long> &node_id2split_merge_node_id){
     float merged_cost, min_exist_cost = INFINITY;
     vector<size_t> bestPeers(2);
-    merged_cost = bestPeerCandidate(node_id, bestPeers, parents_test);
+    merged_cost = bestPeerCandidate(node_id, bestPeers, kids_test);
     if(isinf(merged_cost)) return;
-    if(parents_test){
+    if(kids_test){// testing current node's kids
         for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
-            if(neighbor.dist_c2n < min_exist_cost){
-                min_exist_cost = neighbor.dist_c2n;
+            if(neighbor.link_cost < min_exist_cost){
+                min_exist_cost = neighbor.link_cost;
             }
         }
     }else{
         for(nodeRelation preNeighbor : movieInfo.nodes[node_id].preNeighbors){
-            if(preNeighbor.dist_c2n < min_exist_cost){
-                min_exist_cost = preNeighbor.dist_c2n;
+            if(preNeighbor.link_cost < min_exist_cost){
+                min_exist_cost = preNeighbor.link_cost;
             }
         }
     }
@@ -1339,15 +1367,15 @@ void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool
             split_merge_peer.link_costs[0] = merged_cost;
             split_merge_peer.link_costs[1] = merged_cost;
             split_merge_peer.node_id = node_id;
-            split_merge_peer.parent_flag = parents_test;
+            split_merge_peer.parent_flag = kids_test;
             split_merge_peer.src_link_cost = 0.0;
             split_merge_peer.invalid = false;
             split_merge_node_info.push_back(split_merge_peer);
             // 'long' is enough for our data analysis, indeed all the size_t are redundantly large
-            if(parents_test){
-                node_id2split_merge_node_id.insert(make_pair<long, long>(node_id, split_merge_node_info.size()));
+            if(kids_test){
+                node_id2split_merge_node_id.insert(make_pair<long, long>(node_id, split_merge_node_info.size()-1));
             }else{
-                node_id2split_merge_node_id.insert(make_pair<long, long>(-node_id, split_merge_node_info.size()));
+                node_id2split_merge_node_id.insert(make_pair<long, long>(-node_id, split_merge_node_info.size()-1));
             }
         }
     }
@@ -1362,6 +1390,9 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
     float cost_good2go; // the average cost of arcs in a track: only arc with larger cost will be test
     for(nodeInfo node : movieInfo.nodes){
         if(node.nodeId2trackId < 0) continue; // for isolated node, does not consider
+        if(node.nodeId2trackId >= movieInfo.track_arcs_avg_mid_std.size()){
+            qFatal("Error on node2trackid");
+        }
         cost_good2go = movieInfo.track_arcs_avg_mid_std[node.nodeId2trackId][0];
         if (cost_good2go > MIN(p4tracking.c_en, p4tracking.c_ex)){
             cost_good2go = 0;
@@ -1386,10 +1417,10 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
         }
 
         if(parents_test){
-            peerRegionVerify(node.node_id, cost_good2go, true, split_merge_node_info, node_id2split_merge_node_id);
+            peerRegionVerify(node.node_id, cost_good2go, false, split_merge_node_info, node_id2split_merge_node_id);
         }
         if(kids_test){
-            peerRegionVerify(node.node_id, cost_good2go, false, split_merge_node_info, node_id2split_merge_node_id);
+            peerRegionVerify(node.node_id, cost_good2go, true, split_merge_node_info, node_id2split_merge_node_id);
         }
     }
 }
@@ -1408,7 +1439,7 @@ size_t cellTrackingMain::sizeCumulate(size_t curr_cell, size_t familiy_members[2
  */
 void cellTrackingMain::handleMergeSplitRegions(){
     vector<splitMergeNodeInfo> split_merge_node_info;
-    unordered_map<long, long> node_id2split_merge_node_id;
+    unordered_map<long, long> node_id2split_merge_node_id; // save node_id and its index in split_merge_node_info
     detectPeerRegions(split_merge_node_info, node_id2split_merge_node_id);
     // 1. check these contradict conditions: e.g. a->b+c and a+d->b
     for(size_t ss = 0; ss < split_merge_node_info.size(); ss++){
@@ -1449,8 +1480,8 @@ void cellTrackingMain::handleMergeSplitRegions(){
                 }
             }
             for(int i=0; i<contradict_groups.size(); i++){
-                if(i != best_idx){ // remove contradict ones
-                    split_merge_node_info[ss].invalid = true; //
+                if(i != best_idx){ // remove contradict ones with smaller size (only keep best_idx)
+                    split_merge_node_info[contradict_groups[i].first].invalid = true; //
                     //node_id2split_merge_node_id.erease(-sp_mgInfo.family_nodes[i]);
                 }
             }
@@ -1699,9 +1730,13 @@ bool cellTrackingMain::seedsRefine_intensity(cellSegmentMain &cellSegment, vecto
             }
         }
         if(ref_seeds_idx.size() == 0){
+            delete frame_root;
+            delete frame_seed;
             return false;
         }
     }
+    delete frame_root;
+    delete frame_seed;
     return true;
 }
 /**
@@ -1817,18 +1852,20 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     cellSegment.cropSeed(-1, overall_idx, single_frame, nullptr, &cellSegment.cell_label_maps[reg2split_frame],
                          reg2split_frame, seed, cellSegment.p4segVol);
 
-
+    int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+    vector<size_t> reg2split_in_seed;
+    coordinateTransfer(reg2split, single_frame->size, reg2split_in_seed, crop_start, seed.idMap.size);
 
     Mat mask = seed.eigMap2d < 0;
     setValMat(seed.eigMap2d, CV_32F, &mask, 0.0);
     Mat1b possibleGap2d = seed.eigMap2d > 0;
-    float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split);
+    float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split_in_seed);
     scale_vol(&seed.eigMap2d, CV_32F, &seed.score2d, 0.001, 1, 0, max_val);
 
     mask = seed.eigMap3d < 0;
     setValMat(seed.eigMap3d, CV_32F, &mask, 0.0);
     Mat1b possibleGap3d = seed.eigMap3d > 0;
-    max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split);
+    max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split_in_seed);
     scale_vol(&seed.eigMap3d, CV_32F, &seed.score3d, 0.001, 1, 0, max_val);
     if(usePriorGapMap){
         Mat subGapMap;
@@ -1843,14 +1880,14 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
         fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
     }else{ // input is not a valid region exist in the label map
         fgMap = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_8U);
-        int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
-        vector<size_t> tmp_idx;
-        coordinateTransfer(reg2split, single_frame->size, tmp_idx, crop_start, seed.idMap.size);
-        setValMat(fgMap, CV_8U, tmp_idx, 255);
+//        int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+//        vector<size_t> tmp_idx;
+//        coordinateTransfer(reg2split, single_frame->size, tmp_idx, crop_start, seed.idMap.size);
+        setValMat(fgMap, CV_8U, reg2split_in_seed, 255);
     }
 
     vector<vector<size_t>> seeds_idx(reg4seeds.size());
-    int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+    //int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
     FOREACH_i(reg4seeds){
         coordinateTransfer(reg4seeds[i], single_frame->size, seeds_idx[i], crop_start, seed.idMap.size);
     }
@@ -1899,16 +1936,20 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     cellSegment.cropSeed(-1, overall_idx, single_frame, nullptr, &cellSegment.cell_label_maps[reg2split_frame],
                          reg2split_frame, seed, cellSegment.p4segVol);
 
+    int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+    vector<size_t> reg2split_in_seed;
+    coordinateTransfer(reg2split, single_frame->size, reg2split_in_seed, crop_start, seed.idMap.size);
+
     Mat mask = seed.eigMap2d < 0;
     setValMat(seed.eigMap2d, CV_32F, &mask, 0.0);
     Mat1b possibleGap2d = seed.eigMap2d > 0;
-    float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split);
+    float max_val = getMaxValMat(seed.eigMap2d, CV_32F, reg2split_in_seed);
     scale_vol(&seed.eigMap2d, CV_32F, &seed.score2d, 0.001, 1, 0, max_val);
 
     mask = seed.eigMap3d < 0;
     setValMat(seed.eigMap3d, CV_32F, &mask, 0.0);
     Mat1b possibleGap3d = seed.eigMap3d > 0;
-    max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split);
+    max_val = getMaxValMat(seed.eigMap3d, CV_32F, reg2split_in_seed);
     scale_vol(&seed.eigMap3d, CV_32F, &seed.score3d, 0.001, 1, 0, max_val);
     if(usePriorGapMap){
         Mat subGapMap;
@@ -1923,10 +1964,10 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
         fgMap = seed.idMap == movieInfo.labelInMap[reg2split_idx];
     }else{ // input is not a valid region exist in the label map
         fgMap = Mat::zeros(seed.idMap.dims, seed.idMap.size, CV_8U);
-        int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
-        vector<size_t> tmp_idx;
-        coordinateTransfer(reg2split, single_frame->size, tmp_idx, crop_start, seed.idMap.size);
-        setValMat(fgMap, CV_8U, tmp_idx, 255);
+        //int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+        //vector<size_t> tmp_idx;
+        //coordinateTransfer(reg2split, single_frame->size, tmp_idx, crop_start, seed.idMap.size);
+        setValMat(fgMap, CV_8U, reg2split_in_seed, 255);
     }
 
     /** ***** THIS the only difference between brute-force and gap-based method ******** **/
@@ -1940,7 +1981,7 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     }
 
     vector<vector<size_t>> seeds_idx_in_subVol(ref_seeds_idx.size());
-    int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
+    //int crop_start[3] = {seed.crop_range_yxz[0].start, seed.crop_range_yxz[1].start, seed.crop_range_yxz[2].start};
     FOREACH_i(reg4seeds){
         coordinateTransfer(ref_seeds_idx[i], single_frame->size, seeds_idx_in_subVol[i], crop_start, seed.idMap.size);
     }
@@ -2378,7 +2419,7 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
     reg4seeds[0] = movieInfo.voxIdx[bases[0]];
     reg4seeds[1] = movieInfo.voxIdx[bases[1]];
     bool sectTest = bisectValidTest(cellSegment, curr_node_id, movieInfo.voxIdx[curr_node_id], movieInfo.frames[curr_node_id],
-                                    reg4seeds, movieInfo.frames[bases[0]], false, true, dummy_splitRegs, dummy_costs);
+                                    reg4seeds, movieInfo.frames[bases[0]], true, true, dummy_splitRegs, dummy_costs);
     if(sectTest){
         if (one2multiple_flag) return SPLIT_BY_KIDS;
         else return SPLIT_BY_PARENTS;
@@ -2694,9 +2735,13 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
     movieInfo.zCoord[append_loc_idx] = vec_mean(z);
 
     movieInfo.start_coord_xyz[append_loc_idx] = {vec_min(x), vec_min(y), vec_min(z)};
-    movieInfo.range_xyz[append_loc_idx] = {vec_max(x)-movieInfo.start_coord_xyz[append_loc_idx][0],
-                                           vec_max(y)-movieInfo.start_coord_xyz[append_loc_idx][1],
-                                           vec_max(z)-movieInfo.start_coord_xyz[append_loc_idx][2]};
+
+    movieInfo.range_xyz[append_loc_idx] = {vec_max(x)-movieInfo.start_coord_xyz[append_loc_idx][0] + 1,
+                                           vec_max(y)-movieInfo.start_coord_xyz[append_loc_idx][1] + 1,
+                                           vec_max(z)-movieInfo.start_coord_xyz[append_loc_idx][2] + 1};
+    if(vec_max(movieInfo.range_xyz[append_loc_idx]) > 250){
+        qDebug("possibly lose information");
+    }
     nodeInfo n;
     n.node_id = append_loc_idx;
     n.in_cost = p4tracking.c_en;
@@ -2790,7 +2835,9 @@ void cellTrackingMain::nullifyCellOrNode(size_t node_idx, cellSegmentMain *cellS
     // NOTE: we do not need to decrease cell_num since the max cell label in the frame is not changed (not for sure)
     if(cellSegment != nullptr){
         int frame = movieInfo.frames[node_idx];
+        qDebug("%d val", cellSegment->cell_label_maps[frame].at<int>(movieInfo.voxIdx[node_idx][0]));
         setValMat(cellSegment->cell_label_maps[frame], CV_32S, movieInfo.voxIdx[node_idx], 0);
+        qDebug("%d val", cellSegment->cell_label_maps[frame].at<int>(movieInfo.voxIdx[node_idx][0]));
         setValMat(cellSegment->threshold_maps[frame], CV_32F, movieInfo.voxIdx[node_idx], 0);
     }
     // 2. nullify movieInfo
@@ -2986,7 +3033,8 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
     for(simpleNodeInfo &sNi : newCells){
         size_t new_idx;
         if(uptCell_framewise[sNi.frame].size() > 0){
-            new_idx = *uptCell_framewise[sNi.frame].erase(uptCell_framewise[sNi.frame].begin());
+            new_idx = *uptCell_framewise[sNi.frame].begin();
+            uptCell_framewise[sNi.frame].erase(uptCell_framewise[sNi.frame].begin());
         }else{
             new_idx = cellSegment.number_cells[sNi.frame] + 1;
             new_idx -= 1; // save index starts from 0
@@ -3073,7 +3121,7 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
         kid_idx = tmp;
     }
     extractSeedFromGivenCell(cellSegment, missing_type, parent_idx, kid_idx, missing_frames, seed_loc_idx);
-
+    bool detected_missing = false;
     // start the big game for missing cell retrieve
     for(int frame : missing_frames){
         vector<vector<size_t>> valid_seeds_loc_idx(0);
@@ -3133,8 +3181,11 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
 //            }else{
 
 //            }
+        }else{
+            detected_missing = true;
         }
     }
+    return detected_missing;
 }
 /**
  * @brief redetectCellinTrackingwithSeed: contains 3 functions in matlab, which are redetectCellinTrackingwithSeed +

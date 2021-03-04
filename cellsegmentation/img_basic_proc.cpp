@@ -1721,17 +1721,17 @@ float getMaxValMat(Mat &vol3d, int datatype, vector<size_t> idx){
     if (datatype == CV_8U){
         FOREACH_i(idx){
             tmp = (float)vol3d.at<unsigned char>(idx[i]);
-            if(tmp > max_val) tmp = max_val;
+            if(tmp > max_val) max_val = tmp;
         }
     }else if (datatype == CV_32F){
         FOREACH_i(idx){
             tmp = vol3d.at<float>(idx[i]);
-            if(tmp > max_val) tmp = max_val;
+            if(tmp > max_val) max_val = tmp;
         }
     }else if (datatype == CV_32S){
         FOREACH_i(idx){
             tmp = (float)vol3d.at<int>(idx[i]);
-            if(tmp > max_val) tmp = max_val;
+            if(tmp > max_val) max_val = tmp;
         }
     }
     return max_val;

@@ -140,7 +140,7 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
         QString stbVartrend_file_name = fileNameNoExt + "_stb_var_trend_single.bin";
         QFile stbVartrend_file = QFile(stbVartrend_file_name);
         if (!stbVartrend_file.open(QIODevice::ReadOnly)) return;
-        QByteArray stb_var = vartrend_file.read(4);
+        QByteArray stb_var = stbVartrend_file.read(4);
         QByteArray arr2 = stbVartrend_file.readAll();// #1-200 elements
         stblizedVarTrends[curr_time_point].resize(arr2.size() / 4);
         memcpy(stblizedVarTrends[curr_time_point].data(), arr2.data(), arr2.size()); // skip the first element
@@ -249,7 +249,8 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
         regionWiseAnalysis4d(data_grayim3d, dataVolFloat, stblizedVol, &label_map_2ndRound/*int*/,
                              seed_num_2ndRound, curr_frame, RoundOne);
     }
-
+    delete stblizedVol;
+    delete dataVolFloat;
 }
 /**
  * @brief retrieve_seeds: retrieve the seeds of cells lost in the first round of synQuant
@@ -528,9 +529,7 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     subVolExtract(&principalCurv2d[curr_frame], CV_32F, seed.eigMap2d, seed.crop_range_yxz);// deep copy
     subVolExtract(&principalCurv3d[curr_frame], CV_32F, seed.eigMap3d, seed.crop_range_yxz);// deep copy
     subVolExtract(&varMaps[curr_frame], CV_32F, seed.varMap, seed.crop_range_yxz);// deep copy
-    if(!seed_extract_in_tracking){
-        subVolExtract(&stblizedVarMaps[curr_frame], CV_32F, seed.stblizedVarMap, seed.crop_range_yxz);// deep copy
-    }
+    subVolExtract(&stblizedVarMaps[curr_frame], CV_32F, seed.stblizedVarMap, seed.crop_range_yxz);// deep copy
     //ccShowSlice3Dmat(&seed.stblizedVarMap, CV_32F);
     seed.gap2dMap = seed.eigMap2d > 0;
     seed.gap3dMap = seed.eigMap3d > 0;
@@ -539,6 +538,12 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
     subVolExtract(data_grayim3d, CV_8U, seed.volUint8, seed.crop_range_yxz);// deep copy
     if(!seed_extract_in_tracking){
         subVolExtract(data_stbized, CV_32F, seed.volStblizedFloat, seed.crop_range_yxz);// deep copy
+    }else{
+        seed.volStblizedFloat = Mat(seed.volUint8.dims, seed.volUint8.size, CV_32F);
+        float stb_term = 3/8;
+        FOREACH_i_MAT(seed.volStblizedFloat){
+            seed.volStblizedFloat.at<float>(i) = sqrt(stb_term + (float)seed.volUint8.at<unsigned char>(i));
+        }
     }
 //    ccShowSliceLabelMat(&seed.idMap, 6);
 //    ccShowSlice3Dmat(&seed.seedMap, CV_8U, 6);
