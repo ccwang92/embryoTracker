@@ -69,7 +69,7 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
     ///
     /// \brief We fist test if there is saved binary file for use
     ///
-    if(!fileName.isEmpty()){
+    if(time_points_processed[curr_time_point]==false && !fileName.isEmpty()){
         QString fileNameNoExt = fileName.left(fileName.lastIndexOf('.'));
         // read label data
         QString label_file_name = fileNameNoExt + "_label_map_int32.bin";
@@ -148,7 +148,6 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, QStri
 
         time_points_processed[curr_time_point] = true;
     }
-
 
     ///
     /// \brief If no saved results, start from scratch to detect cells

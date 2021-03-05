@@ -7,7 +7,6 @@
 
 #include "raycastcanvas.h"
 
-
 /*!
  * \brief Convert a QColor to a QVector3D.
  * \return A QVector3D holding a RGB representation of the colour.
@@ -234,77 +233,86 @@ void RayCastCanvas::raycasting(const QString& shader)
  * \brief import the data and set it as color RGBA data if needed
  */
 void RayCastCanvas::setVolume(long frame4display) {
-    if (!data_importer)
-    {
-        throw std::runtime_error("data_importer has not been initialized.");
-    }
-    if (!data_importer->p_vmin){// if max min value not defined
-        data_importer->updateminmaxvalues();
-    }
-    curr_timePoint_in_canvas = frame4display; // default is 0
-    try
-    {
-        if (data_importer->image4d && data_importer->image4d->getCDim()>0)
-        {
-            bufSize[0] = data_importer->image4d->getXDim();
-            bufSize[1] = data_importer->image4d->getYDim();
-            bufSize[2] = data_importer->image4d->getZDim();
-            bufSize[3] = data_importer->image4d->getCDim();
-            bufSize[4] = 1;
+    if(show_track_result){ // display RGBA tracking results
+        if(rgb_frame.empty()){
+            throw std::runtime_error("rgb results has not been initialized.");
         }
-        if (data_importer->image4d->getTDim()>1 && data_importer->image4d->getTimePackType()==TIME_PACK_C)
-        {
-            MESSAGE_ASSERT(data_importer->image4d->getCDim() >= data_importer->image4d->getTDim());
-
-            bufSize[3] = data_importer->image4d->getCDim()/data_importer->image4d->getTDim();
-            bufSize[4] = data_importer->image4d->getTDim();
-        }
-    } CATCH_handler( "RayCastCanvas:setVolume" );
-    if (!total_rgbaBuf && flag_rgba_display) // if buffer has not been initialized
-    {
-        QElapsedTimer timer;
-        // now the correct data size xyzct are saved in bufSize
-        total_rgbaBuf = rgbaBuf = 0; //(RGBA*)-1; //test whether the new sets pointer to 0 when failed
-        if (bufSize[3]>0)
-        {
-            // only RGB, first 3 channels of original image
-            total_rgbaBuf = new RGBA8[ bufSize[0] * bufSize[1] * bufSize[2] * 1 * bufSize[4]];
-        }
-
-        if (data_importer->image4d)
-        {
-            Image4DProxy<Image4DSimple> img4dp( data_importer->image4d );
-            img4dp.set_minmax(data_importer->p_vmin, data_importer->p_vmax);
-
-            timer.start();
-            data_importer->data4dp_to_rgba3d(img4dp,  bufSize[4],
-                    0, 0, 0, 0, // the starting location to make the transfer
-                    bufSize[0], bufSize[1], bufSize[2], bufSize[3],
-                    total_rgbaBuf, bufSize);
-        }
-        if (data_importer->image4d->getCDim()==1)   data_importer->rgba3d_r2gray(total_rgbaBuf, bufSize); //081103
-        qDebug() << "The slow operation took" << ((float)timer.elapsed())/1000.0 << "seconds";
-    }
-
-    double p_min = data_importer->p_vmin[0];
-    double p_max = data_importer->p_vmax[0];
-
-    if (frame4display>=bufSize[4]){
-        throw std::runtime_error("data to show is not gray.");
-    }
-    long offsets = frame4display*bufSize[0]*bufSize[1]*bufSize[2];
-    if (total_rgbaBuf){ // display the data using 4 channels
-        m_raycasting_volume->transfer_volume(total_rgbaBuf + offsets,
-                                             p_min, p_max, bufSize[0],
-                                             bufSize[1], bufSize[2], 4/*rgbaBuf contains 4 channels*/);
+        this->setMode("Alpha blending rgba");
+        m_raycasting_volume->transfer_volume((unsigned char *)rgb_frame.data, 0, 255, rgb_frame.size[0],
+                rgb_frame.size[1], rgb_frame.size[2], 4);
     }else{
-        offsets *= data_importer->image4d->getUnitBytes(); // if 16 bit, one pixel occupies two chars.
-        m_raycasting_volume->transfer_volume(data_importer->image4d->getRawData() + offsets,
-                                             p_min, p_max, bufSize[0],
-                                            bufSize[1], bufSize[2], 1);
+        if (!data_importer)
+        {
+            throw std::runtime_error("data_importer has not been initialized.");
+        }
+        if (!data_importer->p_vmin){// if max min value not defined
+            data_importer->updateminmaxvalues();
+        }
+        curr_timePoint_in_canvas = frame4display; // default is 0
+        try
+        {
+            if (data_importer->image4d && data_importer->image4d->getCDim()>0)
+            {
+                bufSize[0] = data_importer->image4d->getXDim();
+                bufSize[1] = data_importer->image4d->getYDim();
+                bufSize[2] = data_importer->image4d->getZDim();
+                bufSize[3] = data_importer->image4d->getCDim();
+                bufSize[4] = 1;
+            }
+            if (data_importer->image4d->getTDim()>1 && data_importer->image4d->getTimePackType()==TIME_PACK_C)
+            {
+                MESSAGE_ASSERT(data_importer->image4d->getCDim() >= data_importer->image4d->getTDim());
+
+                bufSize[3] = data_importer->image4d->getCDim()/data_importer->image4d->getTDim();
+                bufSize[4] = data_importer->image4d->getTDim();
+            }
+        } CATCH_handler( "RayCastCanvas:setVolume" );
+        if (!total_rgbaBuf && flag_rgba_display) // if buffer has not been initialized
+        {
+            QElapsedTimer timer;
+            // now the correct data size xyzct are saved in bufSize
+            total_rgbaBuf = rgbaBuf = 0; //(RGBA*)-1; //test whether the new sets pointer to 0 when failed
+            if (bufSize[3]>0)
+            {
+                // only RGB, first 3 channels of original image
+                total_rgbaBuf = new RGBA8[ bufSize[0] * bufSize[1] * bufSize[2] * 1 * bufSize[4]];
+            }
+
+            if (data_importer->image4d)
+            {
+                Image4DProxy<Image4DSimple> img4dp( data_importer->image4d );
+                img4dp.set_minmax(data_importer->p_vmin, data_importer->p_vmax);
+
+                timer.start();
+                data_importer->data4dp_to_rgba3d(img4dp,  bufSize[4],
+                        0, 0, 0, 0, // the starting location to make the transfer
+                        bufSize[0], bufSize[1], bufSize[2], bufSize[3],
+                        total_rgbaBuf, bufSize);
+            }
+            if (data_importer->image4d->getCDim()==1)   data_importer->rgba3d_r2gray(total_rgbaBuf, bufSize); //081103
+            qDebug() << "The slow operation took" << ((float)timer.elapsed())/1000.0 << "seconds";
+        }
+
+        double p_min = data_importer->p_vmin[0];
+        double p_max = data_importer->p_vmax[0];
+
+        if (frame4display>=bufSize[4]){
+            throw std::runtime_error("data to show is not gray.");
+        }
+        long offsets = frame4display*bufSize[0]*bufSize[1]*bufSize[2];
+        if (total_rgbaBuf){ // display the data using 4 channels
+            m_raycasting_volume->transfer_volume(total_rgbaBuf + offsets,
+                                                 p_min, p_max, bufSize[0],
+                    bufSize[1], bufSize[2], 4/*rgbaBuf contains 4 channels*/);
+        }else{
+            offsets *= data_importer->image4d->getUnitBytes(); // if 16 bit, one pixel occupies two chars.
+            m_raycasting_volume->transfer_volume(data_importer->image4d->getRawData() + offsets,
+                                                 p_min, p_max, bufSize[0],
+                    bufSize[1], bufSize[2], 1);
+        }
+        resetMode(); // reset the renderering to gray-scale
+        update();
     }
-    resetMode(); // reset the renderering to gray-scale
-    update();
 }
 
 
@@ -441,7 +449,7 @@ void RayCastCanvas::wheelEvent(QWheelEvent * event)
 /*!
  * \brief slot: display frame t.
  */
-void RayCastCanvas::setVolumeTimePoint(int t)
+void RayCastCanvas::setVolumeTimePoint(int t)//,
 {
     //qDebug("V3dR_GLWidget::setVolumeTimePoint = %d", t);
     if (t<0) t = 0;

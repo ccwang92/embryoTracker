@@ -6,6 +6,7 @@
 cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode)
 {
     debugMode = _debugMode;
+    tracking_sucess =false;
     /////////////////////////////////////////////////
     //   step 1. initialize cell info              //
     /////////////////////////////////////////////////
@@ -29,10 +30,12 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
         loop_cnt ++;
     }
     /////////////////////////////////////////////////
-    //   step 4. merge broken tracks and output    //
+    //   step 4. merge broken tracks               //
     /////////////////////////////////////////////////
     mccTracker_one2one();
     merge_broken_tracks();
+    mergeOvTracks2(); // wrap up trackes using parent-kid relation (may contain redundant computation)
+    tracking_sucess = true;
 }
 /**
  * @brief merge_broken_tracks: for node-neighbor pair with cost of dist_c2n or dist_n2c smaller than obz_cost, link them
@@ -1050,7 +1053,6 @@ void cellTrackingMain::mergeOvTracks2(){
     fill(visited.begin(), visited.end(), false);
     FOREACH_i(movieInfo.nodes){
         if(visited[i] || movieInfo.nodes[i].kid_num==0) continue;
-
         vector<size_t> one_track;
         deque<size_t> n_ids;
         n_ids.push_back(i);

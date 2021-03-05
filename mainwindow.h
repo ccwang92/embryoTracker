@@ -35,6 +35,7 @@ public slots:
     void updateControlPanel();
     void sendData4Segment();
     void sendData4Track();
+    void transferRGBAVolume(int t);
     // parameters
 public:
     QString win_title;
@@ -73,8 +74,9 @@ public:
     //QString debugDataPath = QString("/home/ccw/Desktop/test_ims/16bit/embryo_TM481.tif");
     //QString debugDataPath = QString("/home/ccw/Desktop/test_ims/cropped_16bit4speed/embryo_TM481.tif");
     QAction * debugButton;
-    cellSegmentMain *cellSegmenter;
-    cellTrackingMain *cellTracker;
+    cellSegmentMain *cellSegmenter = nullptr;
+    cellTrackingMain *cellTracker = nullptr;
+    bool tracking_result_exist = false;
 public slots:
     void debugAlgorithm();
 

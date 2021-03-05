@@ -10,7 +10,6 @@ public:
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
     void initTransitionCost(cellSegmentMain &cellSegment);
-
     // distance calculation
     float voxelwise_avg_distance(size_t cell_curr, size_t cell_nei, float &c2n, float &n2c);
     float voxelwise_avg_distance(size_t joint_cells_curr[], size_t joint_cells_nei[], float &c2n, float &n2c);
@@ -159,12 +158,14 @@ private:    // TODO: missing cell module
                                                vector<vector<size_t>> &splitted_reg_loc_idx);
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
-private:
+    void merge_broken_tracks();
+public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;
     vector<size_t> cumulative_cell_nums;
     vector<Mat1b> validGapMaps;
     bool debugMode;
+    bool tracking_sucess;
     //friend class cellSegmentMain;
 public:
     void init_parameter(segParameter &p4seg, long cell_num){

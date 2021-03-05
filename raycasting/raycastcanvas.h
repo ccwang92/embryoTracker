@@ -14,7 +14,8 @@
 #include "trackball.h"
 //#include "vtkvolume.h"
 #include "../data_importer.h"
-//#include <opencv2/core.hpp> //image type defines
+#include <opencv2/core.hpp> //mat4b
+
 // if error then close
 // clean memory before MessageBox, otherwise MessageBox maybe could not be created correctly
 #define ERROR_MessageBox(title, type, what) { \
@@ -135,6 +136,9 @@ public:
     //V3DLONG dim1, dim2, dim3, dim4, dim5;
     V3DLONG bufSize[5]; //(x,y,z,c,t) 090731: add time dim
     long curr_timePoint_in_canvas;
+
+    bool show_track_result = false;
+    cv::Mat4b rgb_frame = cv::Mat();
 private:
     DataImporter *data_importer {0};
     QMatrix4x4 m_viewMatrix;

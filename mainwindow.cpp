@@ -1,4 +1,4 @@
-#include "mainwindow.h"
+﻿#include "mainwindow.h"
 #include "data_importer.h"
 #include "src_3rd/basic_c_fun/v3d_message.h"
 
@@ -148,6 +148,7 @@ void MainWindow::connectSignal()
     }
     if (timeSlider) {
         connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
+        connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(transferRGBAVolume(int)));
         connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
     }
     if (contrastScrollBar) {
@@ -221,6 +222,10 @@ MainWindow::~MainWindow()
 }
 void MainWindow::debugAlgorithm()
 {
+    if(cellTracker != nullptr){ // already finish the tracking
+        tracking_result_exist = !tracking_result_exist;
+        return;
+    }
     //float kk = chi2inv(0.5, 2);
     algorithmDebug = true;
     this->data4test->debugMode = true;
@@ -230,6 +235,7 @@ void MainWindow::debugAlgorithm()
         glWidget_raycast->setVolumeTimePoint(i);
         this->sendData4Segment();
     }
+    glWidget_raycast->setVolumeTimePoint(0);
     //// send segmentation results for cell linking
     this->sendData4Track();
 }
@@ -253,5 +259,27 @@ void MainWindow::sendData4Segment()
 
 void MainWindow::sendData4Track()
 {
-    cellTracker = new cellTrackingMain(*cellSegmenter);
+    if(cellTracker == nullptr){
+        cellTracker = new cellTrackingMain(*cellSegmenter);
+        // label that the tracking results is OK for illustration
+        tracking_result_exist = cellTracker->tracking_sucess;
+    }
+
+}
+
+void MainWindow::transferRGBAVolume(int t){
+    glWidget_raycast->show_track_result = tracking_result_exist;
+    if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
+        glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
+        // re-set the rgb_frame
+        long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*
+                cellSegmenter->data_rows_cols_slices[1]*cellSegmenter->data_rows_cols_slices[2];
+        unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
+        Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
+        label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, glWidget_raycast->rgb_frame);
+//        glWidget_raycast->setMode("Alpha blending rgba");
+//        glWidget->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, data_rows_cols_slices[1],
+//                data_rows_cols_slices[0], data_rows_cols_slices[2], 4);
+
+    }
 }
