@@ -159,6 +159,7 @@ private:    // TODO: missing cell module
                                                vector<vector<size_t>> &splitted_reg_loc_idx);
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+    void merge_broken_tracks();
 private:
     allCellsCensus movieInfo;
     trackParameter p4tracking;
