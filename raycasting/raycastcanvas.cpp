@@ -233,14 +233,6 @@ void RayCastCanvas::raycasting(const QString& shader)
  * \brief import the data and set it as color RGBA data if needed
  */
 void RayCastCanvas::setVolume(long frame4display) {
-    if(show_track_result){ // display RGBA tracking results
-        if(rgb_frame.empty()){
-            throw std::runtime_error("rgb results has not been initialized.");
-        }
-        this->setMode("Alpha blending rgba");
-        m_raycasting_volume->transfer_volume((unsigned char *)rgb_frame.data, 0, 255, rgb_frame.size[0],
-                rgb_frame.size[1], rgb_frame.size[2], 4);
-    }else{
         if (!data_importer)
         {
             throw std::runtime_error("data_importer has not been initialized.");
@@ -312,7 +304,15 @@ void RayCastCanvas::setVolume(long frame4display) {
         }
         resetMode(); // reset the renderering to gray-scale
         update();
-    }
+
+        if(show_track_result){ // display RGBA tracking results
+            if(rgb_frame.empty()){
+                throw std::runtime_error("rgb results has not been initialized.");
+            }
+            this->setMode("Alpha blending rgba");
+            m_raycasting_volume->transfer_volume((unsigned char *)rgb_frame.data, 0, 255, rgb_frame.size[0],
+                    rgb_frame.size[1], rgb_frame.size[2], 4);
+        }
 }
 
 

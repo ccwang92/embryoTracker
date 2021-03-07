@@ -33,8 +33,8 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     //   step 4. merge broken tracks               //
     /////////////////////////////////////////////////
     mccTracker_one2one();
-    merge_broken_tracks();
-    mergeOvTracks2(); // wrap up trackes using parent-kid relation (may contain redundant computation)
+    //merge_broken_tracks();
+    //mergeOvTracks2(); // wrap up trackes using parent-kid relation (may contain redundant computation)
     tracking_sucess = true;
 }
 /**
@@ -443,7 +443,7 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, int 
                (nei_vox_x[i] - nei_start_coord_xyz[0]) * nei_range_xyz[1] +
                 nei_vox_y[i] - nei_start_coord_xyz[1];
         if(nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2] <= idx || idx < 0){
-            qDebug("Leaking memory");
+            qFatal("Leaking memory");
         }
         mov_cell[idx] = true;
     }
@@ -635,7 +635,7 @@ void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
                 }
             }
             if(nn_dist[nn_dist_cnt] == 0){
-                qDebug("we found two cell exactly overlapped");
+                qFatal("we found two cell exactly overlapped, this should not happen");
             }
             if(!isinf(nn_dist[nn_dist_cnt])){
                 nn_dist_cnt ++;
@@ -788,17 +788,17 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
         // in arc
         mtail[arc_cnt] = src_id;
         mhead[arc_cnt] =  2 * node.node_id+1;
-        mcost[arc_cnt] = round((double)node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)node.in_cost * 1e7); //  + rand() % rand_max add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // observation arc
         mtail[arc_cnt] = 2 * node.node_id+1;
         mhead[arc_cnt] =  2 * node.node_id + 2;
-        mcost[arc_cnt] = round((double)p4tracking.observationCost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)p4tracking.observationCost * 1e7); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // out arc
         mhead[arc_cnt] = src_id;
         mtail[arc_cnt] =  2 * node.node_id + 2;
-        mcost[arc_cnt] = round((double)node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)node.out_cost * 1e7); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         linkCostUpBound = node.out_cost;
         // link with neighbors
@@ -806,7 +806,7 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
             if(neighbor.link_cost < linkCostUpBound){
                 mtail[arc_cnt] = 2 * node.node_id + 2;
                 mhead[arc_cnt] =  2 * neighbor.node_id + 1;
-                mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
             }
 
@@ -903,34 +903,34 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
             if(sp_mg_info.parent_flag){
                 mtail[arc_cnt] = 2 * sp_mg_info.node_id + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.family_nodes[0] + 1;
-                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[0] * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = 2 * sp_mg_info.node_id + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.family_nodes[1] + 1;
-                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[1] * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = src_id;
                 mhead[arc_cnt] =  2 * sp_mg_info.node_id + 2;
-                mcost[arc_cnt] = round((double)sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.src_link_cost * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 visited[sp_mg_info.node_id] = true;
             }else{
                 mtail[arc_cnt] = 2 * sp_mg_info.family_nodes[0] + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.node_id + 1;
-                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[0] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[0] * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = 2 * sp_mg_info.family_nodes[1] + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.node_id + 1;
-                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[1] * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.link_costs[1] * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 mtail[arc_cnt] = 2 * sp_mg_info.node_id + 1;
                 mhead[arc_cnt] =  src_id;
-                mcost[arc_cnt] = round((double)sp_mg_info.src_link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                mcost[arc_cnt] = round((double)sp_mg_info.src_link_cost * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
 
                 visited[sp_mg_info.family_nodes[0]] = true;
@@ -942,17 +942,17 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
         // in arc
         mtail[arc_cnt] = src_id;
         mhead[arc_cnt] =  2 * node.node_id + 1;
-        mcost[arc_cnt] = round((double)node.in_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)node.in_cost * 1e7); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // observation arc
         mtail[arc_cnt] = 2 * node.node_id+1;
         mhead[arc_cnt] =  2 * node.node_id + 2;
-        mcost[arc_cnt] = round((double)p4tracking.observationCost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)p4tracking.observationCost * 1e7); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         // out arc
         mhead[arc_cnt] = src_id;
         mtail[arc_cnt] =  2 * node.node_id+2;
-        mcost[arc_cnt] = round((double)node.out_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((double)node.out_cost * 1e7); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
         if(visited[node.node_id]){ // for those have split/merge arcs, not more neighbor-linking needed
             continue;
@@ -965,7 +965,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
                     if(neighbor.link_cost < linkCostUpBound){
                         mtail[arc_cnt] = 2 * node.node_id+2;
                         mhead[arc_cnt] =  2 * neighbor.node_id+1;
-                        mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                        mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7); // add some randomness to make sure unique optimal solution
                         arc_cnt ++;
                     }
                 }
@@ -975,7 +975,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
                 if(neighbor.link_cost < linkCostUpBound){
                     mtail[arc_cnt] = 2 * node.node_id+1;
                     mhead[arc_cnt] =  2 * neighbor.node_id+2;
-                    mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7 + rand() % rand_max); // add some randomness to make sure unique optimal solution
+                    mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7); // add some randomness to make sure unique optimal solution
                     arc_cnt ++;
                 }
             }
@@ -1007,7 +1007,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
                         size_t((curr_track[j]-1) / 2) != new_track[new_track.size()-1]){
                     new_track.push_back(size_t((curr_track[j]-1) / 2));
                     if(movieInfo.voxIdx[size_t((curr_track[j]-1) / 2)].size() == 0){
-                        qDebug("node id wrong!");
+                        qFatal("node id assignment is wrong!");
                     }
                 }
             }
@@ -1176,7 +1176,7 @@ void cellTrackingMain::track2parentKid(){
             movieInfo.nodes[track[i]].parent_num ++;
 
             if(movieInfo.nodes[4].kid_num > 2){
-                qDebug("Possible mem leaking");
+                qFatal("Possible mem leaking");
             }
         }
     }
@@ -3001,7 +3001,8 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
             return true;
         }
     }else{
-        qFatal("This region or seeds has been nullified!");
+        qDebug("This region or seeds has been nullified!");
+        return false;
     }
 }
 /**

@@ -185,7 +185,7 @@ public:
         p4tracking.realEnter = chi2inv(1-0.01/cell_num, 1)/2; // 12.3546 is from chi2inv(1-0.01/particleNum) / 2
         p4tracking.c_en = p4tracking.realEnter;// cost of appearance and disappearance in the scene
         p4tracking.c_ex = p4tracking.c_en;
-        p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex); // make sure detections are all included
+        p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex) + 0.00001; // make sure detections are all included
         p4tracking.jumpCost.resize(p4tracking.k);
         p4tracking.jumpCost[0] = 1;
         p4tracking.jumpCost[1] = 1;

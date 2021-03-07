@@ -2608,7 +2608,36 @@ void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat4b &dst)
         }
     }
 }
-
+/**
+ * @brief label2rgb3d
+ * @param src: CV_32S
+ * @param dst: CV_8UC3, RGB data
+ */
+void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat3b &colormap, Mat4b &dst)
+{
+    // Apply color mapping
+    dst = Mat4b(src_label.dims, src_label.size, Vec4b(0,0,0));
+    Vec3b cur_cl;
+    //float a;
+    FOREACH_i_MAT(src_label){
+        cur_cl = colormap(src_label.at<int>(i));
+//        if (src_label.at<int>(i) > 0){
+//            dst.at<Vec4b>(i)(0) = 255;
+//            dst.at<Vec4b>(i)(1) = 0;
+//            dst.at<Vec4b>(i)(2) = 0;
+//            dst.at<Vec4b>(i)(3) = 255;
+//        }
+        if (src_label.at<int>(i) > 0){
+            dst.at<Vec4b>(i)(0) = cur_cl(0);
+            dst.at<Vec4b>(i)(1) = cur_cl(1);
+            dst.at<Vec4b>(i)(2) = cur_cl(2);
+            dst.at<Vec4b>(i)(3) = 255;
+        }else{
+            dst.at<Vec4b>(i)(1) = src_intensity.at<unsigned char>(i); //g
+            dst.at<Vec4b>(i)(3) = src_intensity.at<unsigned char>(i)/2;//the lower the more transparent it is
+        }
+    }
+}
 //hsv rgb2hsv(rgb in)
 //{
 //    hsv         out;
@@ -2787,6 +2816,98 @@ void colorMapGen(Mat *src, Mat3b &colormap, String colorType){
             cmap(i, 2) = b[i];
             cmap(i, 1) = g[i];
             cmap(i, 0) = r[i];
+        }
+        Mat3d cmap3 = cmap.reshape(3);
+        //Mat3b colormap;
+        cmap3.convertTo(colormap, CV_8U, 255.0);
+    }
+}
+
+/**
+ * @brief colorMapGen
+ * @param m: number of colors to generate
+ * @param colorMap
+ */
+void colorMapGen(double m, Mat3b &colormap, String colorType){
+    m++;
+
+    if (colorType.compare("JET") == 0){
+        int n = ceil(m / 4);
+        Mat1d u(n*3-1, 1, double(1.0));
+
+        for (int i = 1; i <= n; ++i) {
+            u(i-1) = double(i) / n;
+            u((n*3-1) - i) = double(i) / n;
+        }
+
+        vector<double> g(n * 3 - 1, 1);
+        vector<double> r(n * 3 - 1, 1);
+        vector<double> b(n * 3 - 1, 1);
+        for (int i = 0; i < g.size(); ++i)
+        {
+            g[i] = ceil(double(n) / 2) - (int(m)%4 == 1 ? 1 : 0) + i + 1;
+            r[i] = g[i] + n;
+            b[i] = g[i] - n;
+        }
+        srand(time(0));
+        random_shuffle(g.begin() + 1, g.end());
+        random_shuffle(r.begin() + 1, r.end());
+        random_shuffle(b.begin() + 1, b.end());
+
+        g.erase(remove_if(g.begin(), g.end(), [m](double v){ return v > m;}), g.end());
+        r.erase(remove_if(r.begin(), r.end(), [m](double v){ return v > m; }), r.end());
+        b.erase(remove_if(b.begin(), b.end(), [](double v){ return v < 1.0; }), b.end());
+
+        Mat1d cmap(m, 3, double(0.0));
+        int c, l;
+        for (int i = 0; i < r.size(); ++i)
+        {
+            c = int(r[i])-1;
+            cmap(c, 2) = u(i);
+        }
+        for (int i = 0; i < g.size(); ++i)
+        {
+            cmap(int(g[i])-1, 1) = u(i);
+        }
+        for (int i = 0; i < b.size(); ++i)
+        {
+            cmap(int(b[i])-1, 0) = u(u.rows - b.size() + i);
+        }
+
+        Mat3d cmap3 = cmap.reshape(3);
+
+        //Mat3b colormap;
+        cmap3.convertTo(colormap, CV_8U, 255.0);
+    }else{ //"HSV"
+        vector<double> g(m, 1);
+        vector<double> r(m, 1);
+        vector<double> b(m, 1);
+        double h, s, v, rand_val;
+        //float r = static_cast <float> (rand()) / static_cast <float> (RAND_MAX); // 0-1
+        //float r3 = LO + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(HI-LO))); // LO-HI
+        for (int i = 0; i < m; i++)
+        {
+            h = i * 360.0/m;
+            rand_val = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
+            s = 90.0 + rand_val * 10;
+            rand_val = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
+            v = 80.0 + rand_val * 10;
+            HsvToRgb(h,s/100,v/100, r[i], g[i], b[i]);
+        }
+        Mat1d cmap(m, 3, double(0.0));
+        srand (10);
+        vector<int> randpermed_od;
+
+        // set some values:
+        for (int i=0; i<m; ++i) randpermed_od.push_back(i); // 0 1 2 3 4 5 6 7 8 9
+
+        // using built-in random generator:
+        random_shuffle ( randpermed_od.begin(), randpermed_od.end() );
+        for (int i = 0; i < m; ++i)
+        {
+            cmap(i, 2) = b[randpermed_od[i]];
+            cmap(i, 1) = g[randpermed_od[i]];
+            cmap(i, 0) = r[randpermed_od[i]];
         }
         Mat3d cmap3 = cmap.reshape(3);
         //Mat3b colormap;

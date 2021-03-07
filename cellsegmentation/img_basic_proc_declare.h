@@ -147,10 +147,12 @@ void idx2tightBwMap(vector<size_t> idx, MatSize org_sz_yxz, Mat1b &bwMap, int *s
 
 // fucntions for display
 void colorMapGen(Mat *src, Mat3b &colormap, String colorType = "HSV");
+void colorMapGen(double m, Mat3b &colormap, String colorType = "HSV");
 void ccShowSlice3Dmat(Mat *src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
 void ccShowSliceLabelMat(Mat *src3d, int slice = 0 /*default 2d*/);
 void ccShowSlice3Dmat(Mat src3d, int datatype, int slice = 0 /*default 2d*/, bool binary = false);
 void ccShowSliceLabelMat(Mat src3d, int slice = 0 /*default 2d*/);
+void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat3b &colormap, Mat4b &dst);
 void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat4b &dst);
 void label2rgb2d(Mat1i &src, Mat3b &dst);
 
