@@ -364,7 +364,7 @@ float cellTrackingMain::voxelwise_avg_distance(vector<size_t> &curr_voxIdx, vect
         if(nei_range_xyz[0] * nei_range_xyz[1] * nei_range_xyz[2] <= idx || idx < 0){
             qFatal("Leaking memory");
         }
-        mov_cell[idx] = true; // !!! NOTE: here may cause memory leaking
+        mov_cell[idx] = true;  // !!! NOTE: here may cause memory leaking
     }
     vector<float> dist(2);
     vector<double> shift_xyz(3); // the true shift from ref cell to mov cell (:nei_start-ref_start-drift)
