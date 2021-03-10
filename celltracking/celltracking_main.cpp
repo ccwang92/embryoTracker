@@ -694,7 +694,9 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
     }
     // calculate the distances between each cell and its neighbors
     reCalculateCellsDistances();
+    movieInfo.gammUptTimes = 0;
     updateGammaParam();
+    movieInfo.gammUptTimes++;
     bool update_preNei_cost = false; // preNei has not been initilized
     updateArcCost(update_preNei_cost); // calculate the link cost from given new gamma parameter
     // initialize all node as not stable
@@ -712,6 +714,7 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
     driftCorrection(); // update frame drifting
     reCalculateCellsDistances(); //this distance will not wholy update any more
     updateGammaParam();
+    movieInfo.gammUptTimes++;
     initPreNeighborInfo(); // preNei initilized
     // update arc cost and stable status with the parameters (these generally are conducted in mccTracker_one2one).
     updateArcCost();
@@ -1211,7 +1214,7 @@ void cellTrackingMain::driftCorrection(){
 void cellTrackingMain::updateGammaParam(){
     vector<float> nn_dist;
     calCellFootprintsDistance(nn_dist); // the nearest neighbor
-    truncatedGammafit(nn_dist, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+    truncatedGammafit(nn_dist, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1], movieInfo.gammUptTimes);
 }
 void cellTrackingMain::updateArcCost(bool updatePreNei){
     for(nodeInfo &n : movieInfo.nodes){

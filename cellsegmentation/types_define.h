@@ -257,6 +257,7 @@ struct allCellsCensus{
 //    std::vector<std::vector<nodeRelation>> neighbors; // candidate kids
 //    std::vector<singleCellCensus> cells;
     float ovGammaParam[2];
+    int gammUptTimes;
     std::vector<std::vector<double>> frame_shift_xyz;
     long long overall_neighbor_num;
     std::vector<nodeInfo> nodes;

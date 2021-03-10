@@ -209,7 +209,7 @@ template <typename T> float binocdf(T num_cls0, T num_all, float p);
 template <typename T> double chi2inv(T p, int df = 1); // inverse chi-square distribution
 template <typename T> double gammacdf(T x, T a, T b, bool upper = true); // gamma cdf function
 template <typename T> void gammafit(vector<T> data, T &a, T &b);// gamma fitting use MLE
-template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b); // not done
+template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b, int uptTimes = 0); // not done
 template <typename T> vector<T> vec_log(vector<T> &data);
 
 template <typename T> T vec_stddev(vector<T> const & func);

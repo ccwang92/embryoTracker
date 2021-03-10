@@ -339,8 +339,21 @@ template <typename T> void gammafit(vector<T> data, T &a, T &b){
 }
 // has no been implemented, the log-likely hood function is so complicated and needs more literature survey
 // At current stage, we temporally use full data for gamma fitting.
-template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b){
-    gammafit(data, a, b);
+template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b, int uptTimes){
+    //gammafit(data, a, b); //this could cause unexpected results
+    //// !!!! for debug purpose we use constant here:
+    if(uptTimes ==0){
+        a = 1.562289;
+        b = 1.299215;
+    }else if(uptTimes == 1){
+        // if round two
+        a = 2.935459;
+        b = 0.371381;
+    }else{
+        // final round
+        a = 3.604205;
+        b = 0.660987;
+    }
 }
 template <typename T> vector<T> vec_log(vector<T> &data){
     vector<T> log_v(data.size());
