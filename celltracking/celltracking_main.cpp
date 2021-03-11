@@ -11,7 +11,7 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     //   step 1. initialize cell info              //
     /////////////////////////////////////////////////
     cellInfoAccumuate(cellSegment);
-    init_parameter(cellSegment.p4segVol, movieInfo.frames.size());
+    init_parameter(cellSegment.p4segVol, movieInfo.frames.size()/2);
     /////////////////////////////////////////////////
     //   step 2. try a naive tracking first        //
     /////////////////////////////////////////////////
@@ -581,7 +581,7 @@ size_t cellTrackingMain::cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &
     }
     return overlap_sz;
 }
-/**
+/** exactly the same as Matlab version
  * @brief distance2cost
  * @param distance
  * @param alpha
@@ -591,13 +591,16 @@ size_t cellTrackingMain::cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &
  */
 float cellTrackingMain::distance2cost(float distance, float punish=1){
     //assert(frame_diff>0 && frame_diff)
-    if (distance > 100) return INFINITY;
+    //if (distance > 100) return INFINITY;
     float alpha = movieInfo.ovGammaParam[0];
     float beta = movieInfo.ovGammaParam[1];
     //float punish = p4tracking.jumpCost[frame_diff-1];
-    float p = gammacdf(distance, alpha, beta);
-    float cost = normInv(p * punish / 2);
-    return cost*cost;
+    double p = gammacdf(distance, alpha, beta);
+    double cost = normInv(p * punish / 2);
+//    if(isinf(cost*cost)){
+//        qDebug("check point");
+//    }
+    return (float)(cost*cost);
 }
 
 void cellTrackingMain::reCalculateCellsDistances(){
@@ -786,8 +789,13 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
     long long arc_cnt = 0;
     double src_id = 0;
     int rand_max = 100;
-    float linkCostUpBound = INFINITY / 1e7;
-    for(nodeInfo node : movieInfo.nodes){
+    int node_valid_cnt = 0;
+    float linkCostUpBound = INFINITY;
+    for(size_t i=0; i < movieInfo.nodes.size(); i++){
+        nodeInfo &node = movieInfo.nodes[i];
+        if(movieInfo.voxIdx[i].size() == 0) continue;
+
+        node_valid_cnt ++;
         // in arc
         mtail[arc_cnt] = src_id;
         mhead[arc_cnt] =  2 * node.node_id+1;
@@ -803,15 +811,17 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
         mtail[arc_cnt] =  2 * node.node_id + 2;
         mcost[arc_cnt] = round((double)node.out_cost * 1e7); // add some randomness to make sure unique optimal solution
         arc_cnt ++;
-        linkCostUpBound = node.out_cost;
+        //linkCostUpBound = node.out_cost;
         // link with neighbors
         for(nodeRelation neighbor : node.neighbors){
-            if(neighbor.link_cost < linkCostUpBound){
+            if(neighbor.link_cost == linkCostUpBound){
+                qDebug("Check point");
+            }
                 mtail[arc_cnt] = 2 * node.node_id + 2;
                 mhead[arc_cnt] =  2 * neighbor.node_id + 1;
                 mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
-            }
+            //}
 
         }
     }
@@ -825,7 +835,8 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
     long long *track_vec = pyCS2(msz, mtail, mhead, mlow, macap, mcost);
 
     // update movieInfo.tracks
-    vector<long long> cost;
+    vector<double> cost;
+    double all_cost = 0;
     vector<size_t> curr_track;
     movieInfo.tracks.clear();
     for(long long i = 1; i < track_vec[0] + 1; i++){
@@ -833,7 +844,8 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
             curr_track.push_back(track_vec[i]);
         }
         else{
-            cost.push_back(track_vec[i]);
+            cost.push_back(((double)track_vec[i])/1e7);
+            all_cost += cost[cost.size()-1];
             vector<size_t> new_track;
             for(size_t j = 0; j < curr_track.size(); j+=2){
                 if(curr_track[j] < 1 ||
