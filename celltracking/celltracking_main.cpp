@@ -814,14 +814,12 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
         //linkCostUpBound = node.out_cost;
         // link with neighbors
         for(nodeRelation neighbor : node.neighbors){
-            if(neighbor.link_cost == linkCostUpBound){
-                qDebug("Check point");
-            }
+            if(neighbor.link_cost < linkCostUpBound){
                 mtail[arc_cnt] = 2 * node.node_id + 2;
                 mhead[arc_cnt] =  2 * neighbor.node_id + 1;
                 mcost[arc_cnt] = round((double)neighbor.link_cost * 1e7); // add some randomness to make sure unique optimal solution
                 arc_cnt ++;
-            //}
+            }
 
         }
     }
@@ -1147,6 +1145,7 @@ void cellTrackingMain::updateJumpCost(){
     vector<size_t> jumpArcs(p4tracking.k);
     fill(jumpArcs.begin(), jumpArcs.end(), 0);
     for(vector<size_t> &track : movieInfo.tracks){
+        if(track.size() < p4tracking.validtrackLength4var) continue;
         overall_arcs += track.size() - 1;
         for (size_t i = 1; i < track.size(); i++){
             jumpArcs[movieInfo.frames[track[i]] - movieInfo.frames[track[i-1]] - 1] ++;

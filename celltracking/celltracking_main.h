@@ -192,7 +192,7 @@ public:
         p4tracking.jumpCost[2] = 1;
         p4tracking.varEstMethod = 1; // 0 for median and 1 for independent
         p4tracking.costCalMethod= ccm_CHI1SQUARE; // chi1Square:use 1df chi-squre, fisher: 2df chi-square,zscore: use z-score
-        if (debugMode) p4tracking.validtrackLength4var = 2;// tracks with smaller length will not be used to cal variance
+        if (debugMode) p4tracking.validtrackLength4var = 5;// tracks with smaller length will not be used to cal variance
         else p4tracking.validtrackLength4var = 5; // tracks with smaller length will not be used to cal variance
         p4tracking.truncatedGaussian = 0.2; // remove 20// of extreme edges in variance estiamtion (truncated gaussian)
         p4tracking.varPrior = 100;// use gamma distribution as variance prior, use longest 100 tracks to estimate gamma parameters
