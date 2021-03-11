@@ -1216,10 +1216,10 @@ void cellTrackingMain::driftCorrection(){
             }
         }
     }
-    FOREACH_i(movieInfo.frame_shift_xyz){
-        movieInfo.frame_shift_xyz[i][0] /= samples4driftCumulate[curr_frame];
-        movieInfo.frame_shift_xyz[i][1] /= samples4driftCumulate[curr_frame];
-        movieInfo.frame_shift_xyz[i][2] /= samples4driftCumulate[curr_frame];
+    for(int i=1;i < movieInfo.frame_shift_xyz.size(); i++){
+        movieInfo.frame_shift_xyz[i][0] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][1] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][2] /= samples4driftCumulate[i];
     }
 }
 void cellTrackingMain::updateGammaParam(){
