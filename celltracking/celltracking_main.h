@@ -215,7 +215,7 @@ public:
         p4tracking.considerBrokenCellOnly = true; // for linking allowing split/merge, does not consider nodes that has another good linkage already
         p4tracking.addCellMissingPart = false; // if a cell missed part, we want to detect it, otherwise we can remove seeds that highly overlapped with an existing cell
         p4tracking.splitMergeCost = true;// if cost of a+b->c is 20, then cost of a->c and b->c are set to 10 if true; otherwise both 20
-        if (debugMode) p4tracking.min_stable_node_cluster_sz = 2;
+        if (debugMode) p4tracking.min_stable_node_cluster_sz = 5;
         else p4tracking.min_stable_node_cluster_sz = 5;
 
         ////update cost of p4seg

@@ -722,6 +722,7 @@ void cellTrackingMain::initTransitionCost(cellSegmentMain &cellSegment){
     // update arc cost and stable status with the parameters (these generally are conducted in mccTracker_one2one).
     updateArcCost();
     // we need to update parent and kids given tracks first
+    node2trackUpt(true);
     track2parentKid();
     stableSegmentFixed();
 }
@@ -861,7 +862,6 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
 
     // update the jumpCost in p4tracking if no split/merge allowed
     updateJumpCost();
-
     if(!get_jumpCost_only){ // means this time of tracking is just to estimate jump cost and/or drift
         node2trackUpt(true);
         // update parent and kids given tracks
@@ -909,7 +909,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
     bool *visited = new bool[movieInfo.nodes.size()]; // ok to use memset
     memset(visited, false, sizeof(bool) * movieInfo.nodes.size());
 
-    float linkCostUpBound = INFINITY / 1e7;
+    float linkCostUpBound = INFINITY;
     // add the arcs of splitting and merging
     for(splitMergeNodeInfo sp_mg_info : split_merge_node_info){
         if(sp_mg_info.node_id >= 0){
@@ -952,6 +952,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
         }
     }
     for(nodeInfo node : movieInfo.nodes){
+        if(movieInfo.voxIdx[node.node_id].size() == 0) continue;
         // in arc
         mtail[arc_cnt] = src_id;
         mhead[arc_cnt] =  2 * node.node_id + 1;
@@ -1005,7 +1006,8 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
     long long *track_vec = pyCS2(msz, mtail, mhead, mlow, macap, mcost);
 
     // update movieInfo.tracks
-    vector<long long> cost;
+    vector<double> cost;
+    double all_cost = 0;
     vector<size_t> curr_track;
     movieInfo.tracks.clear();
     for(long long i = 1; i < track_vec[0] + 1; i++){
@@ -1013,7 +1015,8 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
             curr_track.push_back(track_vec[i]);
         }
         else{
-            cost.push_back(track_vec[i]);
+            cost.push_back(((double)track_vec[i])/1e7);
+            all_cost += cost[cost.size()-1];
             vector<size_t> new_track;
             for(size_t j = 0; j < curr_track.size(); j++){
                 if (new_track.size() == 0 ||
@@ -1065,7 +1068,10 @@ void cellTrackingMain::mergeOvTracks2(){
     vector<bool> visited(movieInfo.nodes.size());
     fill(visited.begin(), visited.end(), false);
     FOREACH_i(movieInfo.nodes){
-        if(visited[i] || movieInfo.nodes[i].kid_num==0) continue;
+        if(visited[i] || (movieInfo.nodes[i].parent_num == 0
+                          && movieInfo.nodes[i].kid_num==0)){
+            continue;
+        }
         vector<size_t> one_track;
         deque<size_t> n_ids;
         n_ids.push_back(i);
@@ -1075,6 +1081,11 @@ void cellTrackingMain::mergeOvTracks2(){
             for (int kk = 0; kk < movieInfo.nodes[cur_id].kid_num; kk++){
                 if (!visited[movieInfo.nodes[cur_id].kids[kk]]){
                     n_ids.push_back(movieInfo.nodes[cur_id].kids[kk]);
+                }
+            }
+            for (int kk = 0; kk < movieInfo.nodes[cur_id].parent_num; kk++){
+                if (!visited[movieInfo.nodes[cur_id].parents[kk]]){
+                    n_ids.push_back(movieInfo.nodes[cur_id].parents[kk]);
                 }
             }
             visited[cur_id] = true;
@@ -1125,6 +1136,7 @@ void cellTrackingMain::mergeOvTracks(){
 }
 void cellTrackingMain::node2trackUpt(bool one2one_track){ // default is false
     for(nodeInfo &nf : movieInfo.nodes){
+        nf.nodeId2One2OneTrackId = -1;
         nf.nodeId2trackId = -1;
         nf.nodeLocInTrack = -1;
     }
@@ -1218,8 +1230,11 @@ void cellTrackingMain::driftCorrection(){
     }
     for(int i=1;i < movieInfo.frame_shift_xyz.size(); i++){
         movieInfo.frame_shift_xyz[i][0] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][0] += movieInfo.frame_shift_xyz[i-1][0];
         movieInfo.frame_shift_xyz[i][1] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][1] += movieInfo.frame_shift_xyz[i-1][1];
         movieInfo.frame_shift_xyz[i][2] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][2] += movieInfo.frame_shift_xyz[i-1][2];
     }
 }
 void cellTrackingMain::updateGammaParam(){
@@ -1255,6 +1270,7 @@ void cellTrackingMain::stableSegmentFixed(){
     float max_cost = pow(normInv(0.5*p4tracking.jumpCost[0]/2), 2);
     int min_valid_node_cluster_sz = p4tracking.min_stable_node_cluster_sz;
     FOREACH_i(movieInfo.tracks){
+        if(movieInfo.tracks[i].size() < p4tracking.validtrackLength4var) continue;
         vector<float> arc_costs;
         getArcCostOne2OneTrack(i, arc_costs);
         movieInfo.track_arcs_avg_mid_std[i][0] = vec_mean(arc_costs);
@@ -1263,10 +1279,11 @@ void cellTrackingMain::stableSegmentFixed(){
 
         size_t start_id = 0, end_id = 0;
         for(size_t j = 0; j<arc_costs.size(); j++){
-            if (arc_costs[j] <= max_cost){
+            if (arc_costs[j] <= max_cost &&
+                    movieInfo.frames[movieInfo.tracks[i][j+1]] - movieInfo.frames[movieInfo.tracks[i][j]] == 1){
                 end_id = j + 1;
             }else{
-                if ((end_id - start_id + 1) >= min_valid_node_cluster_sz){
+                if ((end_id - start_id) >= min_valid_node_cluster_sz){
                     for(size_t k = start_id + 1; k <= end_id - 1; k++){
                         movieInfo.nodes[movieInfo.tracks[i][k]].stable_status = STABLE_TRACK_MID;
                     }
@@ -1326,12 +1343,16 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
                 curr_cost = neighbor.dist_n2c;
                 currBest = true;
                 for(nodeRelation preNeighbor : movieInfo.nodes[neighbor.node_id].preNeighbors){
-                    if(curr_cost > preNeighbor.dist_c2n && preNeighbor.node_id != node_id){
+                    if((curr_cost > preNeighbor.dist_c2n || preNeighbor.link_cost < abs(p4tracking.observationCost))
+                            && preNeighbor.node_id != node_id &&
+                            movieInfo.frames[node_id] == movieInfo.frames[preNeighbor.node_id]){
                         currBest = false;
                         break;
                     }
                 }
-                if(currBest) peerCandidates.push_back(neighbor.node_id);
+                if(currBest) {
+                    peerCandidates.push_back(neighbor.node_id);
+                }
             }
         }
     }else{
@@ -1344,12 +1365,16 @@ float cellTrackingMain::bestPeerCandidate(size_t node_id, vector<size_t> &out_be
                 curr_cost = preNeighbor.dist_n2c;
                 currBest = true;
                 for(nodeRelation neighbor : movieInfo.nodes[preNeighbor.node_id].neighbors){
-                    if(curr_cost > neighbor.dist_c2n && neighbor.node_id != node_id){
+                    if((curr_cost > neighbor.dist_c2n  || neighbor.link_cost < abs(p4tracking.observationCost))
+                            && neighbor.node_id != node_id &&
+                            movieInfo.frames[node_id] == movieInfo.frames[neighbor.node_id]){
                         currBest = false;
                         break;
                     }
                 }
-                if(currBest) peerCandidates.push_back(preNeighbor.node_id);
+                if(currBest) {
+                    peerCandidates.push_back(preNeighbor.node_id);
+                }
             }
         }
     }
@@ -1393,21 +1418,24 @@ void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool
     vector<size_t> bestPeers(2);
     merged_cost = bestPeerCandidate(node_id, bestPeers, kids_test);
     if(isinf(merged_cost)) return;
+    int cur_frame = movieInfo.frames[node_id];
     if(kids_test){// testing current node's kids
-        for(nodeRelation neighbor : movieInfo.nodes[node_id].neighbors){
-            if(neighbor.link_cost < min_exist_cost){
+        for(nodeRelation &neighbor : movieInfo.nodes[node_id].neighbors){
+            if(neighbor.link_cost < min_exist_cost &&
+                    movieInfo.frames[neighbor.node_id] == cur_frame + 1){
                 min_exist_cost = neighbor.link_cost;
             }
         }
     }else{
-        for(nodeRelation preNeighbor : movieInfo.nodes[node_id].preNeighbors){
-            if(preNeighbor.link_cost < min_exist_cost){
+        for(nodeRelation &preNeighbor : movieInfo.nodes[node_id].preNeighbors){
+            if(preNeighbor.link_cost < min_exist_cost &&
+                    movieInfo.frames[preNeighbor.node_id] == cur_frame - 1){
                 min_exist_cost = preNeighbor.link_cost;
             }
         }
     }
     splitMergeNodeInfo split_merge_peer;
-    if(merged_cost < min_exist_cost && min_exist_cost > cost_good2go){
+    if(merged_cost < (min_exist_cost-0.001) && min_exist_cost > cost_good2go){
         if (p4tracking.splitMergeCost){
             merged_cost /= 2;
         }
@@ -1439,12 +1467,20 @@ void cellTrackingMain::peerRegionVerify(size_t node_id, float cost_good2go, bool
 void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info,
                                          unordered_map<long, long> &node_id2split_merge_node_id){
     float cost_good2go; // the average cost of arcs in a track: only arc with larger cost will be test
+    vector<size_t> p_cnt, k_cnt, all_cnt;
     for(nodeInfo node : movieInfo.nodes){
-        if(node.nodeId2One2OneTrackId < 0) continue; // for isolated node, does not consider
-        if(node.nodeId2One2OneTrackId >= movieInfo.track_arcs_avg_mid_std.size()){
+        if(node.nodeId2One2OneTrackId >= 0 &&
+                node.nodeId2One2OneTrackId >= movieInfo.track_arcs_avg_mid_std.size()){
             qFatal("Error on node2trackid");
         }
-        cost_good2go = movieInfo.track_arcs_avg_mid_std[node.nodeId2One2OneTrackId][0];
+        if(node.nodeId2One2OneTrackId < 0){
+            cost_good2go = 0; // for isolated node, does not consider
+        }
+        else {
+            cost_good2go = MIN(movieInfo.track_arcs_avg_mid_std[node.nodeId2One2OneTrackId][0],
+                            movieInfo.track_arcs_avg_mid_std[node.nodeId2One2OneTrackId][1]); // use median to replace mean
+        }
+
         if (cost_good2go > MIN(p4tracking.c_en, p4tracking.c_ex)){
             cost_good2go = 0;
         }
@@ -1466,14 +1502,29 @@ void cellTrackingMain::detectPeerRegions(vector<splitMergeNodeInfo> &split_merge
                     break;
             }
         }
-
+//        if (node.node_id == 8275){
+//            qDebug("check point");
+//        }
+//        size_t tmp1 = split_merge_node_info.size();
         if(parents_test){
             peerRegionVerify(node.node_id, cost_good2go, false, split_merge_node_info, node_id2split_merge_node_id);
+
         }
+//        if (split_merge_node_info.size() > tmp1){
+//            p_cnt.push_back(node.node_id);
+//        }
+//        size_t tmp2 = split_merge_node_info.size();
         if(kids_test){
             peerRegionVerify(node.node_id, cost_good2go, true, split_merge_node_info, node_id2split_merge_node_id);
         }
+//        if (split_merge_node_info.size() > tmp2){
+//            k_cnt.push_back(node.node_id);
+//        }
+//        if (split_merge_node_info.size() > MIN(tmp1, tmp2)){
+//            all_cnt.push_back(node.node_id);
+//        }
     }
+    //qDebug("check point");
 }
 /**
  * @brief sizeCumulate: calculate the overall size of three nodes
@@ -1492,6 +1543,7 @@ void cellTrackingMain::handleMergeSplitRegions(){
     vector<splitMergeNodeInfo> split_merge_node_info;
     unordered_map<long, long> node_id2split_merge_node_id; // save node_id and its index in split_merge_node_info
     detectPeerRegions(split_merge_node_info, node_id2split_merge_node_id);
+    vector<size_t> invalid_cnt;
     // 1. check these contradict conditions: e.g. a->b+c and a+d->b
     for(size_t ss = 0; ss < split_merge_node_info.size(); ss++){
         auto sp_mgInfo = split_merge_node_info[ss];
@@ -1533,6 +1585,7 @@ void cellTrackingMain::handleMergeSplitRegions(){
             for(int i=0; i<contradict_groups.size(); i++){
                 if(i != best_idx){ // remove contradict ones with smaller size (only keep best_idx)
                     split_merge_node_info[contradict_groups[i].first].invalid = true; //
+                    invalid_cnt.push_back(split_merge_node_info[contradict_groups[i].first].node_id);
                     //node_id2split_merge_node_id.erease(-sp_mgInfo.family_nodes[i]);
                 }
             }

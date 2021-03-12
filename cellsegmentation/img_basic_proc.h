@@ -385,7 +385,7 @@ template <typename T> float vec_mean(vector<T> const & func)
 {
     return (float)(accumulate(func.begin(), func.end(), 0.0) / func.size());
 }
-template <typename T> float vec_median(vector<T> & len){
+template <typename T> float vec_median(vector<T> len){
     assert(!len.empty());
     if (len.size() % 2 == 0) {
         auto median_it1 = len.begin() + len.size() / 2 - 1;
