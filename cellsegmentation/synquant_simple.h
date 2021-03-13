@@ -31,7 +31,7 @@ public:
 public:
     void processVoxLabel(std::size_t j);
     void componentTree3d(segParameter p4segVol, odStatsParameter p4odStats);
-    void cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats);
+    void cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats, size_t minSize = 100);
     float zscoreCal(float t0, std::size_t M/*in*/, std::size_t N/*nei*/); // directly use non_overlap_gaussian
 
     std::size_t findNode(std::size_t e);

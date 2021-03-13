@@ -3306,7 +3306,7 @@ void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vect
         if(p4tracking.detect_missing_head_tail){
             // tail extending
             if(movieInfo.nodes[i].kid_num == 0 && movieInfo.nodes[i].parent_num > 0 &&
-                    cur_frame < cellSegment.number_cells.size() &&
+                    cur_frame < cellSegment.number_cells.size()-1 &&
                     !movieInfo.node_tested_st_end_jump[i].track_tail_tested){
                 if(!deal_single_missing_case(cellSegment, newCells, uptCell_idxs, i, MISS_AT_TRACK_END)){
                     movieInfo.node_tested_st_end_jump[i].track_tail_tested = true;
@@ -3344,9 +3344,9 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
     if(!extractSeedFromGivenCell(cellSegment, missing_type, parent_idx,
                                  kid_idx, missing_frames, seed_loc_idx)){
         return false;
-//        if(seed_loc_idx.size() == 1){
-//            qDebug("seed size too samll");
-//        }
+    }
+    if(parent_idx == 0 && kid_idx == 238){
+        qDebug("check point");
     }
 
     bool detected_missing = false;
@@ -3477,7 +3477,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
         }
         cellSegment.reset_shift();
     }
-    if(seed.bestFgThreshold == 0 || isempty(seed.outputIdMap, CV_32S)){
+    if(seed.bestFgThreshold <= 0 || isempty(seed.outputIdMap, CV_32S)){
         return false;
     }
 
@@ -3987,7 +3987,7 @@ bool cellTrackingMain::checkSeedCoveredByExistingCell(cellSegmentMain &cellSegme
             labels_can_be_removed.insert(it.first);
         }
     }
-    if(labels_can_be_removed.size() > 1){
+    if(labels_can_be_removed.size() > 0){
         for(size_t i=0; i<in_seed_loc_idx.size(); i++){
             int label = seed_loc_existing_labels[i];
             if (label==0 || labels_can_be_removed.find(label) != labels_can_be_removed.end()){
@@ -4197,31 +4197,31 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
         }
         seed_loc_idx = intersection(movieInfo.voxIdx[parent_idx], movieInfo.voxIdx[kid_idx]);
     }else if(missing_type == MISS_AT_TRACK_START){
-        if(movieInfo.frames[parent_idx] == 0){
+        if(movieInfo.frames[kid_idx] == 0){
             return false;
         }
-        missing_frames = {movieInfo.frames[parent_idx] - 1};
+        missing_frames = {movieInfo.frames[kid_idx] - 1};
         threshold =
-                cellSegment.threshold_maps[movieInfo.frames[parent_idx]].at<unsigned char>(movieInfo.voxIdx[parent_idx][0]);
+                cellSegment.threshold_maps[movieInfo.frames[kid_idx]].at<unsigned char>(movieInfo.voxIdx[kid_idx][0]);
         assert(threshold > 0);
         unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*missing_frames[0]; // sub-matrix pointer
         Mat single_frame(3, cellSegment.normalized_data4d.size, CV_8U, ind);
-        for(size_t i : movieInfo.voxIdx[parent_idx]){
+        for(size_t i : movieInfo.voxIdx[kid_idx]){
             if(single_frame.at<unsigned char>(i) > threshold){
                 seed_loc_idx.push_back(i);
             }
         }
     }else if(missing_type == MISS_AT_TRACK_END){
-        if(movieInfo.frames[parent_idx] >= cellSegment.threshold_maps.size()){
+        if(movieInfo.frames[parent_idx] >= cellSegment.threshold_maps.size()-1){
             return false;
         }
-        missing_frames = {movieInfo.frames[kid_idx] + 1};
+        missing_frames = {movieInfo.frames[parent_idx] + 1};
         threshold =
-                cellSegment.threshold_maps[movieInfo.frames[kid_idx]].at<unsigned char>(movieInfo.voxIdx[kid_idx][0]);
+                cellSegment.threshold_maps[movieInfo.frames[parent_idx]].at<unsigned char>(movieInfo.voxIdx[parent_idx][0]);
         assert(threshold > 0);
         unsigned char *ind2 = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*missing_frames[0]; // sub-matrix pointer
         Mat single_frame2(3, cellSegment.normalized_data4d.size, CV_8U, ind2);
-        for(size_t i : movieInfo.voxIdx[kid_idx]){
+        for(size_t i : movieInfo.voxIdx[parent_idx]){
             if(single_frame2.at<unsigned char>(i) > threshold){
                 seed_loc_idx.push_back(i);
             }

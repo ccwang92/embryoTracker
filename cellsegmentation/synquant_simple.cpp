@@ -117,7 +117,7 @@ synQuantSimple::synQuantSimple(singleCellSeed &seed){
  * @param seed
  * @param p4odStats
  */
-void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats){
+void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsParameter &p4odStats, size_t minSize){
     //Scalar seed_val = mean(seed.volUint8, seed.validSearchAreaMap);// scalar is a vector<double> with length 4 for RGBA data
     //ccShowSlice3Dmat(&seed.volUint8, CV_8U, 3);
     int ub = MAX(30, round(mat_mean(&seed.volUint8, CV_8U, seed.idx_yxz_cropped)));
@@ -157,14 +157,15 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
     if (max_exist_zscore > 0){
         bitwise_and(seed.volUint8 >= maxZ_intensity_level, valid_cell_territory, fgMap);
         validSingleRegionExtract(fgMap, &seed.seedMap, p4odStats.connectInSeedRefine);
-        qInfo("threshold:%d, zscore:%.2f", maxZ_intensity_level, max_exist_zscore);
+        qInfo("threshold:%ld, zscore:%.2f", maxZ_intensity_level, max_exist_zscore);
     }else{
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
         qInfo("No valid fg can be found.");
         return;
     }
-    // refine the resultant region
-    if (isempty_mat_vec(&fgMap, CV_8U, seed.idx_yxz_cropped, 0)){
+    // test the resultant region
+    size_t fg_sz = fgMapSize(&fgMap, CV_8U);
+    if (fg_sz < minSize){//isempty_mat_vec(&fgMap, CV_8U, seed.idx_yxz_cropped, 0)){
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
         qInfo("No valid fg can be found.");
         return;

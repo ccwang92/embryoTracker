@@ -429,6 +429,7 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
             reset_shift();
         }
         qInfo("----------------%d cell output from this seed-------------------", seed.outCell_num);
+        if(seed.outCell_num <= 0) continue;
         //ccShowSliceLabelMat(seed.outputIdMap);
         // assign cells to outmap
 //        Mat cropLabelMap = cell_label_maps[curr_time_point](seed.crop_range_yxz);
@@ -547,7 +548,7 @@ void cellSegmentMain::cropSeed(int seed_id, vector<size_t> idx_yxz, Mat *data_gr
 //    ccShowSliceLabelMat(&seed.idMap, 6);
 //    ccShowSlice3Dmat(&seed.seedMap, CV_8U, 6);
 //    ccShowSlice3Dmat(&seed.volUint8, CV_8U, 6);
-    seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S);
+    seed.outputIdMap = Mat(seed.idMap.dims, seed.idMap.size, CV_32S, Scalar(0));
     //ccShowSliceLabelMat(idMap);
     vec_sub2ind(seed.idx_yxz_cropped, vec_Minus(seed.y, seed.crop_range_yxz[0].start),
             vec_Minus(seed.x, seed.crop_range_yxz[1].start),
@@ -587,17 +588,28 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
     if(seed.bestFgThreshold <= 0){
         // we have no idea what is the best intensity threshold to get the region
         // we use this funcion to get this.fgMap
+        //ccShowSliceLabelMat(seed.idMap);
         cellSegFromSynQuant.cellTerritoryExtractFromSeed(seed, p4odStats);
+        //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
     } else{
         // we have alreay have some idea what is the best intensity level
         // we use thresholding to get this.fgMap
         bitwise_and(seed.validSearchAreaMap, seed.volUint8 >= seed.bestFgThreshold, cellSegFromSynQuant.fgMap);
         //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
     }
-    qInfo("after refine, fgmap is empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
-
+    if(isempty(cellSegFromSynQuant.fgMap, CV_8U)){
+        qInfo("after refine, fgmap is empty");
+        seed.bestFgThreshold = 0;
+        cellSegFromSynQuant.cell_num = 0;
+        return NO_TOUCH;
+    }
     refineCellTerritoryWithSeedRegion(cellSegFromSynQuant, seed, p4segVol);
-    qInfo("after refine, fgmap is empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
+    if(isempty(cellSegFromSynQuant.fgMap, CV_8U)){
+        qInfo("after refine, fgmap is empty");
+        seed.bestFgThreshold = 0;
+        cellSegFromSynQuant.cell_num = 0;
+        return NO_TOUCH;
+    }
 
     //// 2. update seed's score map based on idMap (fg)
     normalize(seed.eigMap2d, seed.score2d, 0.001, 1, NORM_MINMAX, CV_32F, cellSegFromSynQuant.fgMap);
@@ -609,7 +621,13 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         //qInfo("after change shift scale, fgmap valid?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
         //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
         removeOtherSeedsInfgMap(cellSegFromSynQuant, seed, p4segVol);
-        qInfo("after remove other seeds, fgmap empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
+        if(isempty(cellSegFromSynQuant.fgMap, CV_8U)){
+            qInfo("after remove other seeds, fgmap empty");
+            seed.bestFgThreshold = 0;
+            cellSegFromSynQuant.cell_num = 0;
+            return NO_TOUCH;
+        }
+        //qInfo("after remove other seeds, fgmap empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
     }
     //// 3. segment fgMap into idMap based on gaps from principal curvature
     //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
