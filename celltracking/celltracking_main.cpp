@@ -19,16 +19,17 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     /////////////////////////////////////////////////
     //   step 3. main loop for cell tracking       //
     /////////////////////////////////////////////////
-    int loop_cnt = 1;
-    while (loop_cnt <= p4tracking.maxIter){
-        // MODULE ONE: split/merge test from current tracking results
-        for(int dummy = 0; dummy < 3; dummy ++){
-            split_merge_module(cellSegment);
-        }
-        // MODULE TWO: retrieve missing cells
-        missing_cell_module(cellSegment);
-        loop_cnt ++;
-    }
+//    int loop_cnt = 1;
+//    while (loop_cnt <= p4tracking.maxIter){
+//        // MODULE ONE: split/merge test from current tracking results
+//        for(int dummy = 0; dummy < 3; dummy ++){
+//            split_merge_module(cellSegment);
+//        }
+//        // MODULE TWO: retrieve missing cells
+//        missing_cell_module(cellSegment);
+//        loop_cnt ++;
+//    }
+    missing_cell_module(cellSegment);//split_merge_module(cellSegment);
     /////////////////////////////////////////////////
     //   step 4. merge broken tracks               //
     /////////////////////////////////////////////////
@@ -591,7 +592,7 @@ size_t cellTrackingMain::cellOverlapSize(size_t c0, size_t c1, cellSegmentMain &
  */
 float cellTrackingMain::distance2cost(float distance, float punish=1){
     //assert(frame_diff>0 && frame_diff)
-    //if (distance > 100) return INFINITY;
+    if (distance > 100) return INFINITY;
     float alpha = movieInfo.ovGammaParam[0];
     float beta = movieInfo.ovGammaParam[1];
     //float punish = p4tracking.jumpCost[frame_diff-1];
@@ -1639,7 +1640,7 @@ int cellTrackingMain::handleInconsistentParentKid(cellSegmentMain &cellSegment, 
                         reg4seeds, reg4seeds_frame, gapBasedSplit, true,
                          splitRegs, reg4seeds2splitRes_costs);
     }
-    if(valid_p && valid_k){
+    if(valid_p && valid_k){// both parents/kids can be used to split root, but these 4 regions does not fit
         return MERGE_BOTH_PARENTS_KIDS;
     }else if(valid_p){
         return SPLIT_BY_PARENTS;
@@ -1815,10 +1816,10 @@ bool cellTrackingMain::seedsRefine_intensity(cellSegmentMain &cellSegment, vecto
     long sz_single_frame = cellSegment.data_rows_cols_slices[0]*
             cellSegment.data_rows_cols_slices[1]*cellSegment.data_rows_cols_slices[2];
 
-    unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*seed_frame; // sub-matrix pointer
+    unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*root_frame; // sub-matrix pointer
     Mat *frame_root = new Mat(3, cellSegment.normalized_data4d.size, CV_8U, ind);
 
-    unsigned char *ind2 = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*root_frame; // sub-matrix pointer
+    unsigned char *ind2 = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*seed_frame; // sub-matrix pointer
     Mat *frame_seed = new Mat(3, cellSegment.normalized_data4d.size, CV_8U, ind2);
     ref_seeds_idx.resize(seeds_idx.size());
     for(int i = 0; i<seeds_idx.size(); i++){
@@ -1862,7 +1863,13 @@ bool cellTrackingMain::seedsRefine_gap(Mat1b &possibleGaps, vector<vector<size_t
         Mat1b tmp = Mat(possibleGaps.dims, possibleGaps.size, CV_8U, Scalar(0));
         setValMat(tmp, CV_8U, seeds_idx[i], 255);
         bitwise_and(noGaps, tmp, tmp);
-        if(isempty(tmp, CV_8U)){
+        Mat1i tmp_label;
+        int ncc = connectedComponents3d(&tmp, tmp_label, 26);
+        if(ncc > 1){
+            int lid = largestRegionIdExtract(&tmp_label, ncc);
+            tmp = tmp_label == lid;
+        }
+        if(ncc==0 || isempty(tmp, CV_8U)){
             return false;
         }else{
             setValMat(outLabelMap, CV_32S, &tmp, (float)i+1);
@@ -1900,7 +1907,7 @@ bool cellTrackingMain::binary_seedsMap_create(Mat1b &fgMap, Mat1b *possibleGap3d
         seed_map_gen(fgMap, *possibleGap3d, *possibleGap2d, tmp0);
         numCC = connectedComponents3d(&tmp0, label_map, 6);
     }
-    ccShowSliceLabelMat(label_map);
+    //ccShowSliceLabelMat(label_map);
     if(numCC < 2){
         return false;
     }
@@ -2011,6 +2018,7 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     regionGrow(&seedsMap, 2, outLabelMap, &seed.scoreMap, &fgMap,
                cellSegment.p4segVol.growConnectInRefine, cellSegment.p4segVol.graph_cost_design, false);
 
+    //ccShowSliceLabelMat(outLabelMap);
     splitRegs.resize(2);
     extractVoxIdxGivenId(&outLabelMap, splitRegs[0], 1);
     extractVoxIdxGivenId(&outLabelMap, splitRegs[1], 2);
@@ -2018,8 +2026,23 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     coordinateTransfer(splitRegs[0], outLabelMap.size, splitRegs[0], crop_start_yxz,single_frame->size);
     coordinateTransfer(splitRegs[1], outLabelMap.size, splitRegs[1], crop_start_yxz,single_frame->size);
     delete single_frame;
+
+//    vector<size_t> tmp1 = intersection(reg4seeds[0], splitRegs[0]);
+//    vector<size_t> tmp2 = intersection(reg4seeds[1], splitRegs[1]);
     return true;
 }
+/** debug done
+ * @brief bisectRegion_bruteforce
+ * @param cellSegment
+ * @param reg2split_idx
+ * @param reg2split
+ * @param reg2split_frame
+ * @param reg4seeds
+ * @param reg4seeds_frame
+ * @param usePriorGapMap
+ * @param splitRegs
+ * @return
+ */
 bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, size_t reg2split_idx,
                                                vector<size_t> &reg2split, int reg2split_frame,
                                                vector<vector<size_t>> &reg4seeds, int reg4seeds_frame,
@@ -2093,6 +2116,8 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     }
     Mat1i seedsMap;
     valid_seeds_flag = seedsRefine_gap(possibleGap3d, seeds_idx_in_subVol, seedsMap);
+
+    //ccShowSliceLabelMat(seedsMap);
     /** ************************************ Done ************************************* **/
 
     seed.scoreMap = seed.score2d + seed.score3d;
@@ -2100,16 +2125,32 @@ bool cellTrackingMain::bisectRegion_bruteforce(cellSegmentMain &cellSegment, siz
     regionGrow(&seedsMap, 2, outLabelMap, &seed.scoreMap, &fgMap,
                cellSegment.p4segVol.growConnectInRefine, cellSegment.p4segVol.graph_cost_design, false);
 
+    //ccShowSliceLabelMat(outLabelMap);
     splitRegs.resize(2);
     extractVoxIdxGivenId(&outLabelMap, splitRegs[0], 1);
     extractVoxIdxGivenId(&outLabelMap, splitRegs[1], 2);
     int crop_start_yxz[3] = {-seed.crop_range_yxz[0].start, -seed.crop_range_yxz[1].start, -seed.crop_range_yxz[2].start};
     coordinateTransfer(splitRegs[0], outLabelMap.size, splitRegs[0], crop_start_yxz,single_frame->size);
     coordinateTransfer(splitRegs[1], outLabelMap.size, splitRegs[1], crop_start_yxz,single_frame->size);
-
+    //vector<size_t> tmp1 = intersection(reg4seeds[0], splitRegs[0]);
+    //vector<size_t> tmp2 = intersection(reg4seeds[1], splitRegs[1]);
     delete single_frame;
     return true;
 }
+/** debug done
+ * @brief bisectValidTest
+ * @param cellSegment
+ * @param reg2split_idx
+ * @param reg2split
+ * @param reg2split_frame
+ * @param reg4seeds
+ * @param reg4seeds_frame
+ * @param gapBasedSplit
+ * @param usePriorGapMap
+ * @param splitRegs
+ * @param reg4seeds2splitRes_costs
+ * @return
+ */
 bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2split_idx, vector<size_t> reg2split,
                                        int reg2split_frame, vector<vector<size_t>> reg4seeds, int reg4seeds_frame,
                                        bool gapBasedSplit, bool usePriorGapMap, vector<vector<size_t>> &splitRegs,
@@ -2137,10 +2178,10 @@ bool cellTrackingMain::bisectValidTest(cellSegmentMain &cellSegment, size_t reg2
 //                                                                           vector<size_t> &nei_voxIdx, int nei_frame,
 //                                                                           MatSize data3d_sz, float &c2n, float &n2c);
         float dummy_c2n, dummy_n2c;
-        reg4seeds2splitRes_costs[0] = voxelwise_avg_distance(reg2split, reg2split_frame, splitRegs[0], reg4seeds_frame,
+        reg4seeds2splitRes_costs[0] = voxelwise_avg_distance(reg4seeds[0], reg4seeds_frame, splitRegs[0], reg2split_frame,
                 cellSegment.cell_label_maps[0].size, dummy_c2n, dummy_n2c);
         reg4seeds2splitRes_costs[0] = distance2cost(reg4seeds2splitRes_costs[0], p4tracking.jumpCost[0]); // adjacent frames
-        reg4seeds2splitRes_costs[1] = voxelwise_avg_distance(reg2split, reg2split_frame, splitRegs[1], reg4seeds_frame,
+        reg4seeds2splitRes_costs[1] = voxelwise_avg_distance(reg4seeds[1], reg4seeds_frame, splitRegs[1], reg2split_frame,
                 cellSegment.cell_label_maps[0].size, dummy_c2n, dummy_n2c);
         reg4seeds2splitRes_costs[1] = distance2cost(reg4seeds2splitRes_costs[1], p4tracking.jumpCost[0]);
         if(MAX(reg4seeds2splitRes_costs[0], reg4seeds2splitRes_costs[1]) < abs(p4tracking.observationCost)){
@@ -2671,11 +2712,15 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
         //all_merge_split_peers.insert(all_merge_split_peers.end(), merged_split_peers.begin(), merged_split_peers.end());
 
         // deal with inconsistent decisions: not needed
-
+        unordered_set<size_t> splitted_reg_ids, merged_reg_ids;
         FOREACH_i(merged_split_peers){
             //separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
             //size_t seeds[2], vector<simpleNodeInfo> &newCells)
             size_t curr_node_idx = get<0>(merged_split_peers[i]);
+            if(splitted_reg_ids.find(curr_node_idx)!=splitted_reg_ids.end() ||
+                    merged_reg_ids.find(curr_node_idx)!=splitted_reg_ids.end()){
+                continue;
+            }
             size_t seeds[2];
             bool merge_flag = false, split_flag = false;
             switch (get<1>(merged_split_peers[i])){
@@ -2683,36 +2728,62 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
                 merge_flag = true;
                 seeds[0] = movieInfo.nodes[curr_node_idx].parents[0];
                 seeds[1] = movieInfo.nodes[curr_node_idx].parents[1];
+                if(merged_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        merged_reg_ids.find(seeds[1])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[1])!=splitted_reg_ids.end()){
+                    merge_flag = false;
+                }
                 break;
             case MERGE_KIDS:
                 merge_flag = true;
                 seeds[0] = movieInfo.nodes[curr_node_idx].kids[0];
                 seeds[1] = movieInfo.nodes[curr_node_idx].kids[1];
+                if(merged_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        merged_reg_ids.find(seeds[1])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[1])!=splitted_reg_ids.end()){
+                    merge_flag = false;
+                }
                 break;
             case SPLIT_BY_PARENTS:
                 split_flag = true;
                 seeds[0] = movieInfo.nodes[curr_node_idx].parents[0];
                 seeds[1] = movieInfo.nodes[curr_node_idx].parents[1];
+                if(merged_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        merged_reg_ids.find(seeds[1])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[1])!=splitted_reg_ids.end()){
+                    split_flag = false;
+                }
                 break;
             case SPLIT_BY_KIDS:
                 split_flag = true;
                 seeds[0] = movieInfo.nodes[curr_node_idx].kids[0];
                 seeds[1] = movieInfo.nodes[curr_node_idx].kids[1];
+                if(merged_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        merged_reg_ids.find(seeds[1])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[0])!=splitted_reg_ids.end() ||
+                        splitted_reg_ids.find(seeds[1])!=splitted_reg_ids.end()){
+                    split_flag = false;
+                }
                 break;
             default:
                 break;
             }
-            if(seeds[0] == 0 || seeds[1] == 0){
-                qDebug("Possible error location");
-            }
+//            if(seeds[0] == 3792 || seeds[1] == 3792){
+//                qDebug("Possible error location");
+//            }
             if(merge_flag){
                 if(mergedRegionGrow(cellSegment, seeds, newCells)){
-                    if(find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[0]) != uptCell_idxs.end() ||
-                            find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[1]) != uptCell_idxs.end()){
-                        qDebug("duplicated update found!");
-                    }
+//                    if(find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[0]) != uptCell_idxs.end() ||
+//                            find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[1]) != uptCell_idxs.end()){
+//                        qDebug("duplicated update found!");
+//                    }
                     uptCell_idxs.push_back(seeds[0]);
                     uptCell_idxs.push_back(seeds[1]);
+                    merged_reg_ids.insert(seeds[0]);
+                    merged_reg_ids.insert(seeds[1]);
                     // if success, we need to check if gap should be removed
                     if(get<2>(merged_split_peers[i]) < 0.05){ // we are confident with the merging, so remove gaps between regions
                         int frame = movieInfo.frames[seeds[0]];
@@ -2726,24 +2797,25 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
                     // such case, we merge two parents
                     if(!oneSeedIsGood){ // if there is one seed is good, we have linked the region to one of the seed
                         if(mergedRegionGrow(cellSegment, seeds, newCells)){
-                            if(find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[0]) != uptCell_idxs.end() ||
-                                    find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[1]) != uptCell_idxs.end()){
-                                qDebug("duplicated update found!");
-                            }
+//                            if(find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[0]) != uptCell_idxs.end() ||
+//                                    find(uptCell_idxs.begin(), uptCell_idxs.end(), seeds[1]) != uptCell_idxs.end()){
+//                                qDebug("duplicated update found!");
+//                            }
                             uptCell_idxs.push_back(seeds[0]);
                             uptCell_idxs.push_back(seeds[1]);
-
+                            merged_reg_ids.insert(seeds[0]);
+                            merged_reg_ids.insert(seeds[1]);
                             // for the un-seperable region, we do not want to frequently check them; so remove the gaps between them
                             int frame = movieInfo.frames[seeds[0]];
                             setValMat(validGapMaps[frame], CV_8U, newCells[newCells.size()-1].voxIdx, 0);
                         }
                     }
                 }else{
-                    if(find(uptCell_idxs.begin(), uptCell_idxs.end(), curr_node_idx) != uptCell_idxs.end() ){
-                        qDebug("duplicated update found!");
-                    }
+//                    if(find(uptCell_idxs.begin(), uptCell_idxs.end(), curr_node_idx) != uptCell_idxs.end() ){
+//                        qDebug("duplicated update found!");
+//                    }
                     uptCell_idxs.push_back(curr_node_idx);
-
+                    splitted_reg_ids.insert(curr_node_idx);
                 }
             }
         }
@@ -3058,13 +3130,13 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
             reg4seeds[0] = movieInfo.voxIdx[seeds[0]];
             reg4seeds[1] = movieInfo.voxIdx[seeds[1]];
             int reg4seeds_frame = movieInfo.frames[seeds[0]];
-            gapBasedSplit = false;
+            gapBasedSplit = true;
             split_success = bisectValidTest(cellSegment, node_idx, movieInfo.voxIdx[node_idx], movieInfo.frames[node_idx],
                                 reg4seeds, reg4seeds_frame, gapBasedSplit, usePriorGapMap,
                                  splitRegs, reg4seeds2splitRes_costs);
             if(!split_success){
                 splitRegs.clear();
-                gapBasedSplit = true;
+                gapBasedSplit = false;
                 split_success = bisectValidTest(cellSegment, node_idx, movieInfo.voxIdx[node_idx], movieInfo.frames[node_idx],
                                     reg4seeds, reg4seeds_frame, gapBasedSplit, usePriorGapMap,
                                      splitRegs, reg4seeds2splitRes_costs);
@@ -3102,7 +3174,7 @@ bool cellTrackingMain::handleNonSplitReg_link2oneSeed(size_t node_idx, size_t se
     float curr_link_cost;
     bool one_is_good = false;
     for(int i=0; i<2; i++){
-        if(isBestNeighbor(node_idx, seeds[0], curr_link_cost)){
+        if(isBestNeighbor(node_idx, seeds[i], curr_link_cost)){
             if(curr_link_cost < abs(p4tracking.observationCost)){
                 infinitifyCellRelation(node_idx, seeds[1-i]); // remove the other node
                 one_is_good = true;
