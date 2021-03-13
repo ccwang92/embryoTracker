@@ -19,17 +19,17 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     /////////////////////////////////////////////////
     //   step 3. main loop for cell tracking       //
     /////////////////////////////////////////////////
-//    int loop_cnt = 1;
-//    while (loop_cnt <= p4tracking.maxIter){
-//        // MODULE ONE: split/merge test from current tracking results
-//        for(int dummy = 0; dummy < 3; dummy ++){
-//            split_merge_module(cellSegment);
-//        }
-//        // MODULE TWO: retrieve missing cells
-//        missing_cell_module(cellSegment);
-//        loop_cnt ++;
-//    }
-    missing_cell_module(cellSegment);//split_merge_module(cellSegment);
+    int loop_cnt = 1;
+    while (loop_cnt <= p4tracking.maxIter){
+        // MODULE ONE: split/merge test from current tracking results
+        for(int dummy = 0; dummy < 3; dummy ++){
+            split_merge_module(cellSegment);
+        }
+        // MODULE TWO: retrieve missing cells
+        missing_cell_module(cellSegment);
+        loop_cnt ++;
+    }
+    //missing_cell_module(cellSegment);//split_merge_module(cellSegment);
     /////////////////////////////////////////////////
     //   step 4. merge broken tracks               //
     /////////////////////////////////////////////////
@@ -3069,6 +3069,9 @@ void cellTrackingMain::nullifyCellOrNode(size_t node_idx, cellSegmentMain *cellS
     movieInfo.zCoord[node_idx] = -INFINITY;
     movieInfo.start_coord_xyz[node_idx] = {-1,-1,-1};
     movieInfo.range_xyz[node_idx] = {0,0,0};
+    movieInfo.node_tested_st_end_jump[node_idx].track_head_tested = false;
+    movieInfo.node_tested_st_end_jump[node_idx].track_tail_tested = false;
+    movieInfo.node_tested_st_end_jump[node_idx].jump_tested = false;
 
     for(nodeRelation n : movieInfo.nodes[node_idx].neighbors){
         for(nodeRelation &pn : movieInfo.nodes[n.node_id].preNeighbors){
@@ -3262,8 +3265,6 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
         }
         appendNewCellOrNode(cellSegment, sNi, new_idx);
     }
-    // TODO: there should be an update related to missing cell re-detect (named: node_tested_st_end_jump)
-
 
 }
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
@@ -3345,7 +3346,7 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
                                  kid_idx, missing_frames, seed_loc_idx)){
         return false;
     }
-    if(parent_idx == 0 && kid_idx == 238){
+    if(parent_idx == 239 && kid_idx == 762){
         qDebug("check point");
     }
 
@@ -3418,6 +3419,11 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
                 }
             }
             if(cell_idx_can_be_removed.size() > 0){
+//                for(auto cell_iid : cell_idx_can_be_removed){
+//                    if(find(uptCell_idxs.begin(), uptCell_idxs.end(), cell_iid) != uptCell_idxs.end()){
+//                        qDebug("duplicated update found!");
+//                    }
+//                }
                 uptCell_idxs.insert(uptCell_idxs.end(), cell_idx_can_be_removed.begin(), cell_idx_can_be_removed.end());
             }
             detected_missing = true;
@@ -3480,7 +3486,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
     if(seed.bestFgThreshold <= 0 || isempty(seed.outputIdMap, CV_32S)){
         return false;
     }
-
+    //ccShowSliceLabelMat(seed.outputIdMap);
     //// testMissingCellGotFromMultiSeeds: if we detected multiple cells with
     ///  several seeds, we only test if they are compatible with its own
     ///  parents/kids, if so, keep them, otherwise remove those bad ones.
@@ -3551,6 +3557,8 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 adj_cell_id[0] = adj_cell_label;
                 adj_cell_id[0] -= 1; // label 1 indicates node id 0 in the vector
                 adj_cell_id[0] += frame == 0 ? 0:cumulative_cell_nums[frame-1];
+            }else{
+                adj_cell_id.resize(0);
             }
         }else{
             adj_cell_id.resize(0);
@@ -3575,7 +3583,9 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 tmp.threshold = seed.bestFgThreshold;
                 tmp.voxIdx = vec_merge(new_cell_loc_idx, movieInfo.voxIdx[adj_cell_id[0]]);
                 newCells.push_back(tmp);
-
+//                if(find(uptCell_idxs.begin(), uptCell_idxs.end(), adj_cell_id[0]) != uptCell_idxs.end()){
+//                    qDebug("duplicated update found!");
+//                }
                 uptCell_idxs.push_back(adj_cell_id[0]);
                 movieInfo.nodes[adj_cell_id[0]].node_id = -1;
             }else if(res.first == 3){
@@ -3588,6 +3598,9 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 tmp.voxIdx = extra_new_cells_loc_idx[1];
                 tmp.threshold = seed.bestFgThreshold;
                 newCells.push_back(tmp);
+//                if(find(uptCell_idxs.begin(), uptCell_idxs.end(), adj_cell_id[0]) != uptCell_idxs.end()){
+//                    qDebug("duplicated update found!");
+//                }
                 uptCell_idxs.push_back(adj_cell_id[0]);
                 movieInfo.nodes[adj_cell_id[0]].node_id = -1;
             }else if(res.first == 6){
@@ -3652,9 +3665,9 @@ pair<int, int> cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSe
                     }
                     if(overlapped){
                         overlap_with_seed = true;
-                        setValMat(label_map_new, CV_8U, it, 1);
+                        setValMat(label_map_new, CV_32S, it, 1);
                     }else{
-                        setValMat(label_map_new, CV_8U, it, 2);
+                        setValMat(label_map_new, CV_32S, it, 2);
                         not_overlap_with_seed = true;
                     }
                 }
@@ -3675,7 +3688,8 @@ pair<int, int> cellTrackingMain::newlyAddedCellValidTest(cellSegmentMain &cellSe
             }
             if(parentKidLink_valid){
                 res = make_pair(6,1);
-                new_cell_idx = new_cell_with_append_idx;
+                extra_new_cells_loc_idx.clear();
+                extra_new_cells_loc_idx.push_back(new_cell_with_append_idx);
             }else if(missing_type == MISS_AS_JUMP){
                 //case 4: TOO RARE, so we only check it loosely with a strict criterion
                 vector<size_t> adj_pk_vec(2);
@@ -4203,6 +4217,9 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
         missing_frames = {movieInfo.frames[kid_idx] - 1};
         threshold =
                 cellSegment.threshold_maps[movieInfo.frames[kid_idx]].at<unsigned char>(movieInfo.voxIdx[kid_idx][0]);
+        if(threshold <= 0){
+            qDebug("check point");
+        }
         assert(threshold > 0);
         unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*missing_frames[0]; // sub-matrix pointer
         Mat single_frame(3, cellSegment.normalized_data4d.size, CV_8U, ind);
