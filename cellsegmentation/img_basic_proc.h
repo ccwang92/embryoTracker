@@ -368,18 +368,18 @@ template <typename T> vector<T> vec_log(vector<T> &data){
     }
     return log_v;
 }
-template <typename T> T vec_stddev(vector<T> const & func)
+template <typename T> float vec_stddev(vector<T> const & func)
 {
     return sqrt(vec_variance(func));
 }
-template <typename T> T vec_variance(vector<T> const & func)
+template <typename T> float vec_variance(vector<T> const & func)
 {
     if (func.size() <= 1) return 0;
     T mean = vec_mean(func);
-    T sq_sum = inner_product(func.begin(), func.end(), func.begin(), 0.0,
+    double sq_sum = (double)inner_product(func.begin(), func.end(), func.begin(), 0.0,
         [](T const & x, T const & y) { return x + y; },
         [mean](T const & x, T const & y) { return (x - mean)*(y - mean); });
-    return sq_sum / ( func.size() - 1 );
+    return (float) (sq_sum / ( func.size() - 1 ));
 }
 template <typename T> float vec_mean(vector<T> const & func)
 {
@@ -888,7 +888,12 @@ template <class Iter> typename std::iterator_traits<Iter>::value_type Mode(Iter 
     typedef typename std::iterator_traits<Iter>::value_type type_t;
 
     std::vector<type_t> arr (first, last);
-
+    if(arr.size() == 0){
+        return -1;
+    }
+    if(arr.size() == 1){
+        return arr[0];
+    }
     std::sort(arr.begin(), arr.end());
 
     type_t output = type_t();

@@ -911,8 +911,8 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
 
     float linkCostUpBound = INFINITY;
     // add the arcs of splitting and merging
-    for(splitMergeNodeInfo sp_mg_info : split_merge_node_info){
-        if(sp_mg_info.node_id >= 0){
+    for(splitMergeNodeInfo &sp_mg_info : split_merge_node_info){
+        if(sp_mg_info.node_id >= 0 && sp_mg_info.invalid == false){
             if(sp_mg_info.parent_flag){
                 mtail[arc_cnt] = 2 * sp_mg_info.node_id + 2;
                 mhead[arc_cnt] =  2 * sp_mg_info.family_nodes[0] + 1;
@@ -971,7 +971,7 @@ void cellTrackingMain::mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_m
         if(visited[node.node_id]){ // for those have split/merge arcs, not more neighbor-linking needed
             continue;
         }
-        // link with neighbors
+        // link with neighbors:!!! here needs remove arcs added in previous section
         if(link_adj_frs){
             int curr_frame = movieInfo.frames[node.node_id];
             for(nodeRelation neighbor : node.neighbors){
@@ -1900,7 +1900,7 @@ bool cellTrackingMain::binary_seedsMap_create(Mat1b &fgMap, Mat1b *possibleGap3d
         seed_map_gen(fgMap, *possibleGap3d, *possibleGap2d, tmp0);
         numCC = connectedComponents3d(&tmp0, label_map, 6);
     }
-
+    ccShowSliceLabelMat(label_map);
     if(numCC < 2){
         return false;
     }
@@ -2000,7 +2000,7 @@ bool cellTrackingMain::bisectRegion_gapGuided(cellSegmentMain &cellSegment, size
     Mat1i seedsMap;
     bool success = binary_seedsMap_create(fgMap, &possibleGap3d, nullptr, seeds_idx, seedsMap);
     if(!success){
-        success = binary_seedsMap_create(fgMap, nullptr, &possibleGap3d, seeds_idx, seedsMap);
+        success = binary_seedsMap_create(fgMap, nullptr, &possibleGap2d, seeds_idx, seedsMap);
         if(!success){
             delete single_frame;
             return false;
@@ -2208,7 +2208,7 @@ bool cellTrackingMain::mergeValidTest(size_t curr_node_id, size_t seedRegs4split
     bool kid_flag = true;
     if (seed_fr < root_fr) kid_flag = false;
 
-    int loopCnt = 0;
+    int loopCnt = 1;
     vector<size_t> bases(2);
     vector<size_t> pre_bases(2);
     bases[0] = seedRegs4split[0];
@@ -2250,22 +2250,31 @@ bool cellTrackingMain::mergeValidTest(size_t curr_node_id, size_t seedRegs4split
         if(bases[0] == bases[1]){
             size_t root_node2 = bases[0];
 
-            if(kid_flag && movieInfo.nodes[root_node2].parent_num > 1){
-                bases[0] = movieInfo.nodes[root_node2].parents[0];
-                bases[1] = movieInfo.nodes[root_node2].parents[1];
-                if((bases[0] != pre_bases[0] && bases[0] != pre_bases[1]) ||
-                        (bases[1] != pre_bases[0] && bases[1] != pre_bases[1])){
-                    return false;
+//            if(kid_flag && movieInfo.nodes[root_node2].parent_num > 1){
+//                bases[0] = movieInfo.nodes[root_node2].parents[0];
+//                bases[1] = movieInfo.nodes[root_node2].parents[1];
+//                if((bases[0] != pre_bases[0] && bases[0] != pre_bases[1]) ||
+//                        (bases[1] != pre_bases[0] && bases[1] != pre_bases[1])){
+//                    return false;
+//                }
+//            }else if(!kid_flag && movieInfo.nodes[root_node2].kid_num > 1){
+//                bases[0] = movieInfo.nodes[root_node2].kids[0];
+//                bases[1] = movieInfo.nodes[root_node2].kids[1];
+//                if((bases[0] != pre_bases[0] && bases[0] != pre_bases[1]) ||
+//                        (bases[1] != pre_bases[0] && bases[1] != pre_bases[1])){
+//                    return false;
+//                }
+//            }
+            if(kid_flag){
+                for(int pp = 0 ; pp < movieInfo.nodes[root_node2].parent_num; pp ++){
+                    pre_bases.push_back(movieInfo.nodes[root_node2].parents[pp]);
                 }
             }else if(!kid_flag && movieInfo.nodes[root_node2].kid_num > 1){
-                bases[0] = movieInfo.nodes[root_node2].kids[0];
-                bases[1] = movieInfo.nodes[root_node2].kids[1];
-                if((bases[0] != pre_bases[0] && bases[0] != pre_bases[1]) ||
-                        (bases[1] != pre_bases[0] && bases[1] != pre_bases[1])){
-                    return false;
+                for(int kk = 0 ; kk < movieInfo.nodes[root_node2].kid_num; kk ++){
+                    pre_bases.push_back(movieInfo.nodes[root_node2].kids[kk]);
                 }
             }
-
+            vec_unique(pre_bases);
             float dummy_c2n, dummy_n2c;
             float maxDistance = voxelwise_avg_distance(root_node2, pre_bases, dummy_c2n, dummy_n2c);
             if(distance2cost(maxDistance, p4tracking.jumpCost[0]) < p4tracking.c_ex){
@@ -2273,7 +2282,7 @@ bool cellTrackingMain::mergeValidTest(size_t curr_node_id, size_t seedRegs4split
             }else{
                 return false;
             }
-        }
+        }// else continue;
     }
     return false;
 
@@ -2474,7 +2483,18 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
         if (one2multiple_flag) return MERGE_KIDS;
         else return MERGE_PARENTS;
     }
-
+    /** way 4.1 two split regions that consistent with its two kid or parent regions **/
+    if(one2multiple_flag && right_cells[1].size() == 2 &&
+            mergeValidTest(*right_cells[0].begin(), movieInfo.nodes[*right_cells[0].begin()].kids)){
+        return MERGE_KIDS;
+    }else if(!one2multiple_flag && left_cells[1].size() == 2 &&
+             mergeValidTest(*left_cells[0].begin(), movieInfo.nodes[*left_cells[0].begin()].parents)){
+        return MERGE_PARENTS;
+    }
+    if((one2multiple_flag && right_cells[1].size() != 2) ||
+            (!one2multiple_flag && left_cells[1].size() != 2)){
+        return MERGE_SPLIT_NOT_SURE;
+    }
     /** way 5: test if the region is a small piece of shit **/
     // Way 5.1: one side show solid evidence of spliting.
     int split_cnt_left = 0, split_cnt_right = 0;
@@ -2515,9 +2535,6 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
     if(split_again_flag){
         if (one2multiple_flag) return SPLIT_BY_KIDS;
         else return SPLIT_BY_PARENTS;
-    }else if(split_consistent_flag){
-        if (one2multiple_flag) return MERGE_KIDS;
-        else return MERGE_PARENTS;
     }
     // Way 5.3: gap exists for spliting.
     vector<vector<size_t>> reg4seeds(2), dummy_splitRegs;
@@ -2530,7 +2547,11 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
         if (one2multiple_flag) return SPLIT_BY_KIDS;
         else return SPLIT_BY_PARENTS;
     }
-
+    // way 5.4: all other ways failed
+    if(split_consistent_flag){
+        if (one2multiple_flag) return MERGE_KIDS;
+        else return MERGE_PARENTS;
+    }
     return MERGE_SPLIT_NOT_SURE;
 }
 /**

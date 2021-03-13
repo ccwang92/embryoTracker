@@ -212,8 +212,8 @@ template <typename T> void gammafit(vector<T> data, T &a, T &b);// gamma fitting
 template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b, int uptTimes = 0); // not done
 template <typename T> vector<T> vec_log(vector<T> &data);
 
-template <typename T> T vec_stddev(vector<T> const & func);
-template <typename T> T vec_variance(vector<T> const & func);
+template <typename T> float vec_stddev(vector<T> const & func);
+template <typename T> float vec_variance(vector<T> const & func);
 template <typename T> float vec_mean(vector<T> const & func);
 template <typename T> float vec_median(vector<T> func);
 template <typename T> T vec_max(vector<T> const &func, size_t &max_val_idx);

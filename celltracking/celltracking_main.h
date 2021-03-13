@@ -231,7 +231,13 @@ public:
 
         p4seg.updateCellsAdjMissingCell = false;// when add missing cell, do we need to update other regions nearby
         p4seg.sqrtDistance = false; // euclidian distance or squared euclidian distance
-
+        if (debugMode){
+            p4seg.min_cell_sz /= 2;
+            p4seg.min_seed_size /= 2;
+            p4seg.shift_yxz[0] /= 2;
+            p4seg.shift_yxz[1] /= 2;
+            p4seg.shift_yxz[2] /= 2;
+        }
     }
 };
 
