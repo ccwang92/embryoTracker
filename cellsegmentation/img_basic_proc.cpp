@@ -1188,7 +1188,7 @@ size_t fgMapSize(Mat *src3d, int datatype, float threshold_in){
     }
     return fg_sz;
 }
-bool isempty(Mat src3d, int datatype, float threshold_in){
+bool isempty(Mat &src3d, int datatype, float threshold_in){
     return isempty(&src3d, datatype, threshold_in);
 }
 bool isempty(Mat *src3d, int datatype, float threshold_in){
@@ -1694,7 +1694,7 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
     delete g;
 }
 
-void setValMat(Mat &vol3d, int datatype, vector<size_t> idx, float v){
+void setValMat(Mat &vol3d, int datatype, vector<size_t> const &idx, float v){
     assert(datatype == CV_8U || datatype == CV_32F || datatype == CV_32S);
 
     if (datatype == CV_8U){

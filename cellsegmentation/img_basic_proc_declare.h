@@ -101,7 +101,7 @@ void volumeWrite(Mat *src3d, string filename);
 void validSingleRegionExtract(Mat &vol3d, Mat *binary_mask, int connect);
 int largestRegionIdExtract(Mat *label_map, int numCC, Mat *mask = nullptr);
 size_t fgMapSize(Mat *src3d, int datatype, float threshold_in = 0);
-bool isempty(Mat src3d, int datatype, float threshold_in = 0);
+bool isempty(Mat &src3d, int datatype, float threshold_in = 0);
 bool isempty(Mat *src3d, int datatype, float threshold_in = 0);
 vector<size_t> fgMapIdx(Mat *src3d, int datatype, float threshold_in);
 vector<float> extractValsGivenMask(Mat *vol3d, int datatype, Mat *src3d, float threshold_in);
@@ -113,7 +113,7 @@ bool findRelatedCC(Mat *src3d4testing, int numCC, Mat *src3d4reference, Mat &dst
 void neighbor_idx(vector<size_t> idx, vector<size_t> &center_idx, vector<size_t> &nei_idx, int sz[], int connect);
 void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
                 Mat *fgMap, int connect, int cost_design[], bool bg2sink = true);
-void setValMat(Mat &src, int datatype, vector<size_t> idx, float v);
+void setValMat(Mat &src, int datatype, vector<size_t> const &idx, float v);
 float getMaxValMat(Mat &src, int datatype, vector<size_t> idx);
 void scale_vol(Mat *src3d, int datatype, Mat *dst, float il, float ih, float vl=1.0, float vh=0.0);
 void setValMat(Mat &src, int datatype, Mat *mask, float v);

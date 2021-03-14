@@ -3002,6 +3002,7 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
             movieInfo.nodes[nei_ids[i]].preNeighbors.push_back(newPreNei);
         }
     }
+    movieInfo.overall_neighbor_num += nei_ids.size();
     // update the preNeighbors
     vector<size_t> preNei_ids(0);
     extractPreNeighborIds(cellSegment.cell_label_maps, append_loc_idx, preNei_ids);
@@ -3038,6 +3039,9 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
         }
     }
     // 2. update cellSegment
+//    if((newCell.voxIdx[2] == 751285 && newCell.voxIdx.size()==300) || append_loc_idx == 6182){
+//        qDebug("check point");
+//    }
     setValMat(cellSegment.cell_label_maps[frame], CV_32S, newCell.voxIdx, labelInLabelMap);
     setValMat(cellSegment.threshold_maps[frame], CV_8U, newCell.voxIdx, newCell.threshold);
     if(labelInLabelMap > cellSegment.number_cells[frame]){
@@ -3069,6 +3073,7 @@ void cellTrackingMain::nullifyCellOrNode(size_t node_idx, cellSegmentMain *cellS
     movieInfo.zCoord[node_idx] = -INFINITY;
     movieInfo.start_coord_xyz[node_idx] = {-1,-1,-1};
     movieInfo.range_xyz[node_idx] = {0,0,0};
+    movieInfo.labelInMap[node_idx] = 0;
     movieInfo.node_tested_st_end_jump[node_idx].track_head_tested = false;
     movieInfo.node_tested_st_end_jump[node_idx].track_tail_tested = false;
     movieInfo.node_tested_st_end_jump[node_idx].jump_tested = false;
@@ -3253,7 +3258,8 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
         uptCell_framewise[frame].insert(uptCell_idxs[i]);
         nullifyCellOrNode(uptCell_idxs[i], &cellSegment);
     }
-    for(simpleNodeInfo &sNi : newCells){
+    FOREACH_i(newCells){
+        simpleNodeInfo &sNi = newCells[i];
         size_t new_idx;
         if(uptCell_framewise[sNi.frame].size() > 0){
             new_idx = *uptCell_framewise[sNi.frame].begin();
@@ -3264,19 +3270,27 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
             new_idx += sNi.frame>0 ? cumulative_cell_nums[sNi.frame-1]:0;
         }
         appendNewCellOrNode(cellSegment, sNi, new_idx);
+//        if(new_idx == 6182){
+//            qDebug("check piont");
+//        }
+//        if(movieInfo.voxIdx[6182].size() == 300 && cellSegment.cell_label_maps[24].at<int>(751035) != 155){
+//            qDebug("check piont");
+//        }
     }
-
+    newCells.clear();
+    uptCell_idxs.clear();
 }
 void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
     // step 1. link cells allowing jump but no split/merge
     mccTracker_one2one();
+
     // step 2. re-detect missed cells (manipulate existing cells if needed)
     vector<simpleNodeInfo> newCells;
     vector<size_t> uptCell_idxs;
     retrieve_missing_cells(cellSegment, newCells, uptCell_idxs);
 
     // step 3. update movieInfo/cellSegment based on the newly detected cells or removed cells
-    movieInfo_update(cellSegment, newCells, uptCell_idxs);
+    // movieInfo_update(cellSegment, newCells, uptCell_idxs);//Has been moved to retrieve_missing_cells
 }
 /**
  * @brief retrieve_missing_cells:
@@ -3322,6 +3336,8 @@ void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vect
             }
         }
 
+        /** directly update the movieInfo here **/
+        movieInfo_update(cellSegment, newCells, uptCell_idxs);
     }
 }
 /**
@@ -3346,9 +3362,9 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
                                  kid_idx, missing_frames, seed_loc_idx)){
         return false;
     }
-    if(parent_idx == 239 && kid_idx == 762){
-        qDebug("check point");
-    }
+//    if(parent_idx == 239 && kid_idx == 762){
+//        qDebug("check point");
+//    }
 
     bool detected_missing = false;
     // start the big game for missing cell retrieve
