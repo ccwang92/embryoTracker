@@ -251,10 +251,10 @@ void MainWindow::sendData4Segment()
                                             glWidget_raycast->bufSize);
     }
     /// way 1: directly detect cells on the original data
-    //cellSegmenter->processSingleFrameAndReturn(glWidget_raycast);
+    cellSegmenter->processSingleFrameAndReturn(glWidget_raycast);
     /// way 2: try to load saved data. Detect cells if failed.
-    cellSegmenter->processSingleFrameAndReturn(glWidget_raycast,
-                                               data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
+    //cellSegmenter->processSingleFrameAndReturn(glWidget_raycast,
+    //                                           data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
 }
 
 void MainWindow::sendData4Track()

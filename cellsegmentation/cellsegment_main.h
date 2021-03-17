@@ -17,7 +17,7 @@ public:
         //if(data_rows_cols_slices) delete data_rows_cols_slices;
         //if(time_points_processed) delete time_points_processed;
     };
-    void processSingleFrameAndReturn(RayCastCanvas *glWidget, QString fileName = "");
+    void processSingleFrameAndReturn(RayCastCanvas *glWidget, const QString &fileName = "");
     //void processAllFramesAndReturn(RayCastCanvas *glWidget);
     void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
     void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,
@@ -38,6 +38,8 @@ public:
 
     void retrieve_seeds(Mat *dataVolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
                         Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound);
+    bool loadSegResults(const QString &fileName);
+    bool saveSegResults(const QString &fileName);
 public:
     string debug_folder;
     string default_name;
