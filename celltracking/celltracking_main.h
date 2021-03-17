@@ -192,8 +192,7 @@ public:
         p4tracking.jumpCost[2] = 1;
         p4tracking.varEstMethod = 1; // 0 for median and 1 for independent
         p4tracking.costCalMethod= ccm_CHI1SQUARE; // chi1Square:use 1df chi-squre, fisher: 2df chi-square,zscore: use z-score
-        if (debugMode) p4tracking.validtrackLength4var = 5;// tracks with smaller length will not be used to cal variance
-        else p4tracking.validtrackLength4var = 5; // tracks with smaller length will not be used to cal variance
+        p4tracking.validtrackLength4var = 5; // tracks with smaller length will not be used to cal variance
         p4tracking.truncatedGaussian = 0.2; // remove 20// of extreme edges in variance estiamtion (truncated gaussian)
         p4tracking.varPrior = 100;// use gamma distribution as variance prior, use longest 100 tracks to estimate gamma parameters
         p4tracking.priorType = pri_GAUSS; // prior distribution: gamma/weiAvg/Gauss/ scaled inverse chi-square  (sInvX2)
@@ -215,8 +214,7 @@ public:
         p4tracking.considerBrokenCellOnly = true; // for linking allowing split/merge, does not consider nodes that has another good linkage already
         p4tracking.addCellMissingPart = false; // if a cell missed part, we want to detect it, otherwise we can remove seeds that highly overlapped with an existing cell
         p4tracking.splitMergeCost = true;// if cost of a+b->c is 20, then cost of a->c and b->c are set to 10 if true; otherwise both 20
-        if (debugMode) p4tracking.min_stable_node_cluster_sz = 5;
-        else p4tracking.min_stable_node_cluster_sz = 5;
+        p4tracking.min_stable_node_cluster_sz = 5;
 
         ////update cost of p4seg
         p4seg.validTrackLength = 0; // the shortest path we want, cells in other tracks will be removed
@@ -231,13 +229,13 @@ public:
 
         p4seg.updateCellsAdjMissingCell = false;// when add missing cell, do we need to update other regions nearby
         p4seg.sqrtDistance = false; // euclidian distance or squared euclidian distance
-        if (debugMode){
-            p4seg.min_cell_sz /= 2;
-            p4seg.min_seed_size /= 2;
-            p4seg.shift_yxz[0] /= 2;
-            p4seg.shift_yxz[1] /= 2;
-            p4seg.shift_yxz[2] /= 2;
-        }
+//        if (debugMode){
+//            p4seg.min_cell_sz /= 2;
+//            p4seg.min_seed_size /= 2;
+//            p4seg.shift_yxz[0] /= 2;
+//            p4seg.shift_yxz[1] /= 2;
+//            p4seg.shift_yxz[2] /= 2;
+//        }
     }
 };
 

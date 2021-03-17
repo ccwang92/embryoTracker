@@ -639,7 +639,7 @@ void cellTrackingMain::calCellFootprintsDistance(vector<float> &nn_dist){
                 }
             }
             if(nn_dist[nn_dist_cnt] == 0){
-                qFatal("we found two cell exactly overlapped, this should not happen");
+                qDebug("we found two cell exactly overlapped, this should not happen");
             }
             if(!isinf(nn_dist[nn_dist_cnt])){
                 nn_dist_cnt ++;

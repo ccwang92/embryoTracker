@@ -74,7 +74,11 @@ bool cellSegmentMain::loadSegResults(const QString &fileName){
     // tmp is local variable, which will be released soon, so we need copyTo
     Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data()).copyTo(cell_label_maps[curr_time_point]);
     //cell_label_maps[curr_time_point] = Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data());
+    unsigned char *ind = (unsigned char*)normalized_data4d.data; // sub-matrix pointer
+    Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
+    //ccShowSlice3Dmat(single_frame, CV_8U);
     //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
+
     label_file.close();
     double tmp_maxVal;
     minMaxIdx(cell_label_maps[curr_time_point], nullptr, &tmp_maxVal);//minMaxLoc for 2d

@@ -42,6 +42,7 @@ public:
     bool saveSegResults(const QString &fileName);
 public:
     string debug_folder;
+    float scale_cell_seed_shift_bndtest[6] = {6, 2, 3, 3, 2, 1.5};
     string default_name;
     int data_type;
     Mat1b normalized_data4d;
@@ -68,14 +69,13 @@ public:
     void init_parameter(){
         debug_folder = "/home/ccw/Desktop/embryo_res_folder/";
         default_name = debug_folder + "test.tiff";
-
         p4segVol.min_intensity = 0.0;
         p4segVol.fdr = .05;
-        p4segVol.min_cell_sz = 100;
-        p4segVol.max_cell_sz = 3000;
+        p4segVol.min_cell_sz = round(100 / scale_cell_seed_shift_bndtest[0]);
+        p4segVol.max_cell_sz = round(3000 / scale_cell_seed_shift_bndtest[0]);
         p4segVol.min_fill = 0.0001;
         p4segVol.max_WHRatio = 100;
-        p4segVol.min_seed_size = 10;
+        p4segVol.min_seed_size = round(10 / scale_cell_seed_shift_bndtest[1]);
         p4segVol.graph_cost_design[0] = ARITHMETIC_AVERAGE; //default 1, GEOMETRIC_AVERAGE = 2;
         p4segVol.graph_cost_design[1] = 2;
         p4segVol.growConnectInTest = 4;
@@ -83,9 +83,9 @@ public:
         p4segVol.edgeConnect = 48;
         p4segVol.neiMap = 26;
         p4segVol.connect4fgGapRemoval = 26;
-        p4segVol.shift_yxz[0] = 20;
-        p4segVol.shift_yxz[1] = 20;
-        p4segVol.shift_yxz[2] = 4;
+        p4segVol.shift_yxz[0] = round(20 / scale_cell_seed_shift_bndtest[2]);
+        p4segVol.shift_yxz[1] = round(20 / scale_cell_seed_shift_bndtest[3]);
+        p4segVol.shift_yxz[2] = round(4 / scale_cell_seed_shift_bndtest[4]);
         p4segVol.shrink_flag = true;
         p4segVol.shrink_scale_yxz[0] = 2;
         p4segVol.shrink_scale_yxz[1] = 2;
@@ -97,7 +97,7 @@ public:
 
         p4odStats.gap4varTrendEst = 2;
         p4odStats.gap4fgbgCompare = 0; // the fg and bg should be adjacent
-        p4odStats.roundNum4fgbgCompare = 3; // fg/bg both are width-3 band
+        p4odStats.roundNum4fgbgCompare = round(3 / scale_cell_seed_shift_bndtest[5]); // fg/bg both are width-3 band
         p4odStats.varAtRatio = 0.80;
         p4odStats.fgSignificanceTestWay = KSEC;
         p4odStats.minGapWithOtherCell_yxz[0] = 3;
@@ -109,9 +109,9 @@ public:
         p4odStats.gapTestThreshold = 0.01;
     }
     void reset_shift(){
-        p4segVol.shift_yxz[0] = 20;
-        p4segVol.shift_yxz[1] = 20;
-        p4segVol.shift_yxz[2] = 4;
+        p4segVol.shift_yxz[0] = round(20 / scale_cell_seed_shift_bndtest[2]);
+        p4segVol.shift_yxz[1] = round(20 / scale_cell_seed_shift_bndtest[3]);
+        p4segVol.shift_yxz[2] = round(4 / scale_cell_seed_shift_bndtest[4]);
     }
 };
 
