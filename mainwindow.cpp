@@ -232,6 +232,7 @@ void MainWindow::debugAlgorithm()
     this->importImageSeries();
     //// send data to do segmentation on all frames
     for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
+        qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
         glWidget_raycast->setVolumeTimePoint(i);
         this->sendData4Segment();
     }

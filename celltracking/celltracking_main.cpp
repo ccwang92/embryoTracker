@@ -21,12 +21,13 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     /////////////////////////////////////////////////
     int loop_cnt = 1;
     while (loop_cnt <= p4tracking.maxIter){
+        missing_cell_module(cellSegment);
         // MODULE ONE: split/merge test from current tracking results
         for(int dummy = 0; dummy < 3; dummy ++){
             split_merge_module(cellSegment);
         }
         // MODULE TWO: retrieve missing cells
-        missing_cell_module(cellSegment);
+        //missing_cell_module(cellSegment);
         loop_cnt ++;
     }
     //missing_cell_module(cellSegment);//split_merge_module(cellSegment);
@@ -2939,6 +2940,9 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
     if (frame>0) labelInLabelMap = append_loc_idx + 1 - cumulative_cell_nums[frame-1];
     else labelInLabelMap = append_loc_idx + 1;
 
+    if(frame == 12 && labelInLabelMap==6){
+        qDebug("check point");
+    }
     movieInfo.frames[append_loc_idx] = newCell.frame;
     movieInfo.voxIdx[append_loc_idx] = newCell.voxIdx;
     movieInfo.labelInMap[append_loc_idx] = labelInLabelMap;
@@ -3255,6 +3259,9 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
     //vector<unordered_set<size_t>> newCells_framewise (cellSegment.number_cells.size());
     FOREACH_i(uptCell_idxs){
         int frame = movieInfo.frames[uptCell_idxs[i]];
+        qInfo("remove node_id %ld, with label %d, threshold %d", uptCell_idxs[i], movieInfo.labelInMap[uptCell_idxs[i]],
+                cellSegment.threshold_maps[frame].at<unsigned char>(movieInfo.voxIdx[uptCell_idxs[i]][0]));
+
         uptCell_framewise[frame].insert(uptCell_idxs[i]);
         nullifyCellOrNode(uptCell_idxs[i], &cellSegment);
     }
@@ -3269,7 +3276,11 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
             new_idx -= 1; // save index starts from 0
             new_idx += sNi.frame>0 ? cumulative_cell_nums[sNi.frame-1]:0;
         }
+
         appendNewCellOrNode(cellSegment, sNi, new_idx);
+
+        qInfo("add node_id %ld, with label %d, threshold %d", new_idx, movieInfo.labelInMap[new_idx],
+                cellSegment.threshold_maps[sNi.frame].at<unsigned char>(movieInfo.voxIdx[new_idx][0]));
 //        if(new_idx == 6182){
 //            qDebug("check piont");
 //        }
@@ -4251,6 +4262,9 @@ bool cellTrackingMain::extractSeedFromGivenCell(cellSegmentMain &cellSegment, in
         missing_frames = {movieInfo.frames[parent_idx] + 1};
         threshold =
                 cellSegment.threshold_maps[movieInfo.frames[parent_idx]].at<unsigned char>(movieInfo.voxIdx[parent_idx][0]);
+        if(threshold <= 0){
+            qDebug("check point");
+        }
         assert(threshold > 0);
         unsigned char *ind2 = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*missing_frames[0]; // sub-matrix pointer
         Mat single_frame2(3, cellSegment.normalized_data4d.size, CV_8U, ind2);

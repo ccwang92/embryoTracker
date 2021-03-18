@@ -125,11 +125,11 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
     //Mat curr_seed_map = seed.idMap == seed.id; //replaced by seed.seedMap
     if (ub <= lb){
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
-        qInfo("No valid fg can be found.");
+        //qInfo("No valid fg can be found.");
         return;
     }
     vector<float> zscore (ub-lb+1);
-    qInfo("%d thresholds totally: ub:%d, lb:%d.", ub-lb+1, ub, lb);
+    //qInfo("%d thresholds totally: ub:%d, lb:%d.", ub-lb+1, ub, lb);
     Mat otherCellTerritory, valid_cell_territory, cur_reg, cur_valid_nei; // uint8
     int shift_othercell[] = {3,3,1};
     volumeDilate(&seed.otherIdMap, otherCellTerritory, shift_othercell, MORPH_ELLIPSE);
@@ -157,17 +157,17 @@ void synQuantSimple::cellTerritoryExtractFromSeed(singleCellSeed &seed, odStatsP
     if (max_exist_zscore > 0){
         bitwise_and(seed.volUint8 >= maxZ_intensity_level, valid_cell_territory, fgMap);
         validSingleRegionExtract(fgMap, &seed.seedMap, p4odStats.connectInSeedRefine);
-        qInfo("threshold:%ld, zscore:%.2f", maxZ_intensity_level, max_exist_zscore);
+        //qInfo("threshold:%ld, zscore:%.2f", maxZ_intensity_level, max_exist_zscore);
     }else{
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
-        qInfo("No valid fg can be found.");
+        //qInfo("No valid fg can be found.");
         return;
     }
     // test the resultant region
     size_t fg_sz = fgMapSize(&fgMap, CV_8U);
     if (fg_sz < minSize){//isempty_mat_vec(&fgMap, CV_8U, seed.idx_yxz_cropped, 0)){
         fgMap = Mat::zeros(seed.volUint8.dims, seed.volUint8.size, CV_8U);
-        qInfo("No valid fg can be found.");
+        //qInfo("No valid fg can be found.");
         return;
     }
 }

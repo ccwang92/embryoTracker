@@ -60,7 +60,6 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
-
     delete data4d;
 }
 // this function contains redundant operation due to copyTo
@@ -74,8 +73,8 @@ bool cellSegmentMain::loadSegResults(const QString &fileName){
     // tmp is local variable, which will be released soon, so we need copyTo
     Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data()).copyTo(cell_label_maps[curr_time_point]);
     //cell_label_maps[curr_time_point] = Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data());
-    unsigned char *ind = (unsigned char*)normalized_data4d.data; // sub-matrix pointer
-    Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
+    //unsigned char *ind = (unsigned char*)normalized_data4d.data; // sub-matrix pointer
+    //Mat *single_frame = new Mat(3, normalized_data4d.size, CV_8U, ind);
     //ccShowSlice3Dmat(single_frame, CV_8U);
     //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
 
@@ -1041,7 +1040,7 @@ void cellSegmentMain::gapTest2SplitCellTerritory(synQuantSimple &cellSegFromSynQ
                 }
 
                 if (p0 <= p_treshold && p1 <= p_treshold){ // gap is true
-                    qInfo("!!!--->We find a real Gap!!!");
+                    //qInfo("!!!--->We find a real Gap!!!");
                     gap_tested_true[i] = 1;
                     real_gap_idx.insert(real_gap_idx.end(), gap_idx_list[i].begin(), gap_idx_list[i].end());
                 }else{
