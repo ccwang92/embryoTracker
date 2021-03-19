@@ -1687,8 +1687,8 @@ void regionGrow(Mat *label_map, int numCC, Mat &outLabelMap, Mat *scoreMap,
                 region_sz ++;
             }
         }
-        qInfo("%ld out of %ld voxel in region %d.", region_sz, valid_fg_idx.size(),
-              region_id);
+//        qInfo("%ld out of %ld voxel in region %d.", region_sz, valid_fg_idx.size(),
+//              region_id);
         g->reset();
     }
     delete g;
@@ -1700,6 +1700,9 @@ void setValMat(Mat &vol3d, int datatype, vector<size_t> const &idx, float v){
     if (datatype == CV_8U){
         unsigned char v0 = (unsigned char)v;
         FOREACH_i(idx){
+//            if(idx[i]==34968693){
+//                qDebug("checkpoint");
+//            }
             vol3d.at<unsigned char>(idx[i]) = v0;
         }
     }else if (datatype == CV_32F){

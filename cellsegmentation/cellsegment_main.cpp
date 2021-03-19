@@ -680,15 +680,15 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         bitwise_and(seed.validSearchAreaMap, seed.volUint8 >= seed.bestFgThreshold, cellSegFromSynQuant.fgMap);
         //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
     }
-    if(isempty(cellSegFromSynQuant.fgMap, CV_8U)){
-        qInfo("after refine, fgmap is empty");
-        seed.bestFgThreshold = 0;
-        cellSegFromSynQuant.cell_num = 0;
-        return NO_TOUCH;
-    }
+//    if(isempty(cellSegFromSynQuant.fgMap, CV_8U)){
+//        qInfo("after refine, fgmap is empty");
+//        seed.bestFgThreshold = 0;
+//        cellSegFromSynQuant.cell_num = 0;
+//        return NO_TOUCH;
+//    }
     refineCellTerritoryWithSeedRegion(cellSegFromSynQuant, seed, p4segVol);
     if(isempty(cellSegFromSynQuant.fgMap, CV_8U)){
-        qInfo("after refine, fgmap is empty");
+        //qInfo("after refine, fgmap is empty");
         seed.bestFgThreshold = 0;
         cellSegFromSynQuant.cell_num = 0;
         return NO_TOUCH;
@@ -711,6 +711,34 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
             return NO_TOUCH;
         }
         //qInfo("after remove other seeds, fgmap empty?: %d", isempty(cellSegFromSynQuant.fgMap, CV_8U));
+    }
+    int boundary_touch_status = NO_TOUCH;
+    if(bnd_check){
+        // if the fg from refinement touching the fg or not, if so, enlarge the fg
+        bool xy_touched = false, z_touched = false;
+        boundaryTouchedTest(cellSegFromSynQuant.idMap, &seed.validSearchAreaMap, xy_touched, z_touched);
+        if(z_touched && xy_touched){
+            boundary_touch_status = XYZ_TOUCH;
+        }else if(z_touched){
+            boundary_touch_status = Z_TOUCH;
+        }else if(xy_touched){
+            boundary_touch_status = XY_TOUCH;
+        }else
+            boundary_touch_status = NO_TOUCH;
+    }
+    if(p4segVol.growSeedInTracking){ // for tracking, the results is can be returned now
+        FOREACH_i_MAT(seed.outputIdMap){
+            if(cellSegFromSynQuant.fgMap.at<unsigned char>(i) > 0){
+                seed.outputIdMap.at<int>(i) = 1;
+            }else{
+                seed.outputIdMap.at<int>(i) = 0;
+            }
+        }
+        return boundary_touch_status;
+    }
+
+    if(boundary_touch_status != NO_TOUCH){
+        return boundary_touch_status;
     }
     //// 3. segment fgMap into idMap based on gaps from principal curvature
     //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
@@ -739,7 +767,12 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
     }else{
         qFatal("We did not find any cell from this seed.");
     }
-
+    // double check if outputIdMap contains other cell's territory
+//    FOREACH_i_MAT(seed.outputIdMap){
+//        if(seed.otherIdMap.at<unsigned char>(i)==0){
+//            seed.outputIdMap.at<int>(i)=0;
+//        }
+//    }
     if(cellSegFromSynQuant.cell_num > 0){ // shrink test
         cellShrinkTest(cellSegFromSynQuant, seed, p4segVol);
     }
@@ -751,23 +784,7 @@ int cellSegmentMain::refineSeed2Region(singleCellSeed &seed, odStatsParameter p4
         seed.bestFgThreshold = (int) cellSegFromSynQuant.maxZ_intensity_level;
     }
 
-
-
-    if(bnd_check){
-        // if the fg from refinement touching the fg or not, if so, enlarge the fg
-        bool xy_touched = false, z_touched = false;
-        boundaryTouchedTest(cellSegFromSynQuant.idMap, &seed.validSearchAreaMap, xy_touched, z_touched);
-        if(z_touched && xy_touched){
-            return XYZ_TOUCH;
-        }else if(z_touched){
-            return Z_TOUCH;
-        }else if(xy_touched){
-            return XY_TOUCH;
-        }else
-            return NO_TOUCH;
-    }else{
-        return NO_TOUCH;
-    }
+    return boundary_touch_status;
 }
 
 
@@ -890,7 +907,8 @@ void cellSegmentMain::refineCellTerritoryWithSeedRegion(synQuantSimple &cellSegF
     volumeDilate(&cellSegFromSynQuant.fgMap, tmp_map, radius, MORPH_ELLIPSE);
     n = connectedComponents3d(&tmp_map, labelMap, 26);
     removeSmallCC(labelMap, n, p4segVol.min_cell_sz, false);
-    cellSegFromSynQuant.fgMap = labelMap > 0;
+    //cellSegFromSynQuant.fgMap = labelMap > 0;
+    bitwise_and(labelMap > 0, seed.otherIdMap==0, cellSegFromSynQuant.fgMap);
     //ccShowSlice3Dmat(cellSegFromSynQuant.fgMap, CV_8U);
 }
 

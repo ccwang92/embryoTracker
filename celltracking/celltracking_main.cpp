@@ -21,13 +21,13 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     /////////////////////////////////////////////////
     int loop_cnt = 1;
     while (loop_cnt <= p4tracking.maxIter){
-        missing_cell_module(cellSegment);
+        //missing_cell_module(cellSegment);
         // MODULE ONE: split/merge test from current tracking results
         for(int dummy = 0; dummy < 3; dummy ++){
             split_merge_module(cellSegment);
         }
         // MODULE TWO: retrieve missing cells
-        //missing_cell_module(cellSegment);
+        missing_cell_module(cellSegment);
         loop_cnt ++;
     }
     //missing_cell_module(cellSegment);//split_merge_module(cellSegment);
@@ -2218,7 +2218,9 @@ bool cellTrackingMain::testCellsInOneTrackAdjacentOrNot(cellSegmentMain &cellSeg
             size_t test_cnt = 0;
             for(auto it : left_or_right_cells[i]){
                 unordered_set<int> tmp;
-                assert(it = movieInfo.nodes[it].node_id);
+                if(it < 0 || it != movieInfo.nodes[it].node_id){
+                    qDebug("check point: the node has been removed or changed");
+                }
                 int frame = movieInfo.frames[it];
                 adjacentRegions(cellSegment.cell_label_maps[frame], movieInfo.voxIdx[it],
                                 movieInfo.labelInMap[it], tmp);
@@ -2606,7 +2608,6 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
         if(track.size() < 2 || track[0] < 0){
             continue;
         }
-
         vector<tuple<size_t, int, float>> merged_split_peers; //node_id, decision, confidence
         unordered_set<size_t> nodes4merge;
         unordered_map<size_t, int> p_k_InConsistenct;
@@ -2940,9 +2941,9 @@ void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleN
     if (frame>0) labelInLabelMap = append_loc_idx + 1 - cumulative_cell_nums[frame-1];
     else labelInLabelMap = append_loc_idx + 1;
 
-    if(frame == 12 && labelInLabelMap==6){
-        qDebug("check point");
-    }
+//    if(frame == 12 && labelInLabelMap==6){
+//        qDebug("check point");
+//    }
     movieInfo.frames[append_loc_idx] = newCell.frame;
     movieInfo.voxIdx[append_loc_idx] = newCell.voxIdx;
     movieInfo.labelInMap[append_loc_idx] = labelInLabelMap;
@@ -3349,6 +3350,10 @@ void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vect
 
         /** directly update the movieInfo here **/
         movieInfo_update(cellSegment, newCells, uptCell_idxs);
+
+//        if(cellSegment.cell_label_maps[movieInfo.frames[112846]].at<int>(movieInfo.voxIdx[112846][0]) == 0){
+//            qFatal("found a wrong place %ld", i);
+//        }
     }
 }
 /**
@@ -3373,7 +3378,7 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
                                  kid_idx, missing_frames, seed_loc_idx)){
         return false;
     }
-//    if(parent_idx == 239 && kid_idx == 762){
+//    if(parent_idx == 28528 && kid_idx == 65841){
 //        qDebug("check point");
 //    }
 
@@ -3419,7 +3424,15 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
             seed_idx4fgRefine.insert(seed_idx4fgRefine.end(), valid_seeds_loc_idx[i].begin(),
                                      valid_seeds_loc_idx[i].end());
         }
-        int seed_label4fgRefine = cellSegment.number_cells[frame] + 1;
+
+        /** debug*/
+        //        vector<int> tmp = extractValsGivenIdx_type<int>(&cellSegment.cell_label_maps[frame], seed_idx4fgRefine, CV_32S);
+        //        vector<size_t> invalid_locidx = vec_atrange(seed_idx4fgRefine, tmp, 100000000, 0, true);
+        //        if(invalid_locidx.size() > 0){
+        //            qDebug("we set some cell with existing labels to 0");
+        //        }
+        //---debug end --//
+        int seed_label4fgRefine = cellSegment.number_cells[frame] + 1;// make sure no existing cell has this label
         setValMat(cellSegment.cell_label_maps[frame], CV_32S, seed_idx4fgRefine, seed_label4fgRefine);
         //vector<simpleNodeInfo> newCells_currentRun;
         size_t parentKid_idx[] = {parent_idx, kid_idx};
@@ -3455,7 +3468,13 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
             }
             detected_missing = true;
         }
-        setValMat(cellSegment.cell_label_maps[frame], CV_32S, seed_idx4fgRefine, 0); // set the seed region back to 0s
+        // Set the seed region back to 0s, NOTE:!!! this place may contradict with line-3457,
+        // so we need to check, rather than using: setValMat(cellSegment.cell_label_maps[frame], CV_32S, seed_idx4fgRefine, 0);
+        FOREACH_i(seed_idx4fgRefine){
+            if(cellSegment.cell_label_maps[frame].at<int>(seed_idx4fgRefine[i]) == seed_label4fgRefine){
+                cellSegment.cell_label_maps[frame].at<int>(seed_idx4fgRefine[i]) = 0;
+            }
+        }
     }
     return detected_missing;
 }
@@ -3510,6 +3529,16 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
         }
         cellSegment.reset_shift();
     }
+
+//    Mat1b tmp0=seed.otherIdMap > 0, tmp1 = seed.outputIdMap > 0, tmp2;
+//    bitwise_and(tmp0, tmp1, tmp2);
+//    if(!isempty(tmp2, CV_8U)){
+//        ccShowSlice3Dmat(tmp2, CV_8U);
+//        ccShowSliceLabelMat(seed.outputIdMap);
+//        ccShowSliceLabelMat(seed.idMap);
+//        qFatal("region grow is problematic");
+//    }
+
     if(seed.bestFgThreshold <= 0 || isempty(seed.outputIdMap, CV_32S)){
         return false;
     }
@@ -3525,7 +3554,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 label_map.at<int>(tmp_idx) = i+1;
             }
         }
-        Mat1b fgMap = seed.idMap>0;
+        Mat1b fgMap = seed.outputIdMap>0;
         Mat1i grownSeedMap2d, grownSeedMap3d;
         bool bg2sink = true;
         //ccShowSliceLabelMat(seedMap);
@@ -3563,12 +3592,12 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
         // check the neighboring cells, should we combine them?
         /** step 1. find neighboring cells */
         vector<size_t> adj_cell_ids;
-        Mat1b fgMap = seed.idMap>0, fgMap_dilate;
+        Mat1b fgMap = seed.outputIdMap>0, fgMap_dilate;
         int dilate_sz[] = {1,1,0};
         volumeDilate(&fgMap, fgMap_dilate, dilate_sz, MORPH_CROSS);
         fgMap_dilate = fgMap_dilate - fgMap;
         vector<size_t> adj_cells_idx;
-        vector<int> adj_cells_labels = extractValsGivenMask_type<int>(&seed.idMap, CV_32S, &fgMap_dilate, 0);
+        vector<int> adj_cells_labels = extractValsGivenMask_type<int>(&seed.outputIdMap, CV_32S, &fgMap_dilate, 0);
         unordered_map<int, size_t> adj_cells_adj_sz = frequecy_cnt(adj_cells_labels);
         vector<size_t> adj_cell_id (1);
         if(adj_cells_adj_sz.size() > 0){
