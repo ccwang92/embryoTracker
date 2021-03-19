@@ -19,7 +19,7 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     /////////////////////////////////////////////////
     //   step 3. main loop for cell tracking       //
     /////////////////////////////////////////////////
-    int loop_cnt = 1;
+    int loop_cnt = 10;
     while (loop_cnt <= p4tracking.maxIter){
         //missing_cell_module(cellSegment);
         // MODULE ONE: split/merge test from current tracking results
