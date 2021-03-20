@@ -246,6 +246,7 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const
             qDebug("Failed to save the segmentation results to hard drive");
         }
     }
+    qInfo("----------------totally: %ld cells are detected", number_cells[curr_time_point]);
     //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     //// display volume in canvas
     Mat4b rgb_mat4display;

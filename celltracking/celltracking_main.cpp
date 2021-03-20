@@ -19,7 +19,7 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     /////////////////////////////////////////////////
     //   step 3. main loop for cell tracking       //
     /////////////////////////////////////////////////
-    int loop_cnt = 10;
+    int loop_cnt = 1;
     while (loop_cnt <= p4tracking.maxIter){
         //missing_cell_module(cellSegment);
         // MODULE ONE: split/merge test from current tracking results
@@ -38,6 +38,8 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     //merge_broken_tracks();
     //mergeOvTracks2(); // wrap up trackes using parent-kid relation (may contain redundant computation)
     tracking_sucess = true;
+    size_t total_cells = accumulate(cellSegment.number_cells.begin(), cellSegment.number_cells.end(), 0);
+    qInfo("----------------%ld cells after iterative correction-------------------", total_cells);
 }
 /**
  * @brief merge_broken_tracks: for node-neighbor pair with cost of dist_c2n or dist_n2c smaller than obz_cost, link them

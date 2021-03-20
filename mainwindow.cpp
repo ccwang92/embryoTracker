@@ -11,7 +11,6 @@ MainWindow::MainWindow()
     createControlWidgets();
     // initialize data4test as null
     data4test = new DataImporter(algorithmDebug); //do we need?
-
     setMenuBar(menuBar);
     setCentralWidget(grpBox4display_canvas);
     //layout->addWidget(rightSideControlLayout);
@@ -242,7 +241,7 @@ void MainWindow::debugAlgorithm()
 }
 void MainWindow::sendData4Segment()
 {
-    if(!data4test || !glWidget_raycast){
+    if(!data4test->image4d || !glWidget_raycast->getDataImporter()){
         QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
         return;
     }
@@ -260,9 +259,21 @@ void MainWindow::sendData4Segment()
 
 void MainWindow::sendData4Track()
 {
+    if(!data4test->image4d || !glWidget_raycast->getDataImporter()){
+        QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
+        return;
+    }
     if(cellTracker == nullptr){
         chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-
+        if(!cellSegmenter){ // already finish the tracking
+            //// send data to do segmentation on all frames
+            for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
+                glWidget_raycast->setVolumeTimePoint(i);
+                this->sendData4Segment();
+                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+            }
+        }
+        //glWidget_raycast->setVolumeTimePoint(0);
         cellTracker = new cellTrackingMain(*cellSegmenter);
 
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
@@ -270,8 +281,10 @@ void MainWindow::sendData4Track()
 
         // label that the tracking results is OK for illustration
         tracking_result_exist = cellTracker->tracking_sucess;
-        //transferRGBAVolume(0);
+    }else{
+        tracking_result_exist = !tracking_result_exist;
     }
+    transferRGBAVolume(0);
 }
 
 void MainWindow::transferRGBAVolume(int t){
