@@ -3,12 +3,12 @@ This is an on-going project aiming to build a platform that supports 3D+time (co
 
 ## Current interface and visualization quality
 <p align="center">
-  <img height="400" src="imgs/org_im3d.png">
+  <img height="500" src="imgs/org_im3d.png">
 </p>
 
 ## Current segmentation quality
 <p align="center">
-  <img height="400" src="imgs/seg_res.png">
+  <img height="500" src="imgs/seg_res.png">
 </p>
 
 # Other resources
