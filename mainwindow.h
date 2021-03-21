@@ -56,6 +56,8 @@ public:
     // control widgets on the right size
     //QGridLayout *rightSideControlLayout;
     QScrollBar *contrastScrollBar, *thresholdScrollBar;
+    QCheckBox *axesCheckBox, *bndboxCheckBox;
+    QPushButton *backgroundColorButton;
     // major widget
     QScrollArea *glWidgetArea = 0;
     int widget_type = raycast_type;
@@ -68,8 +70,10 @@ public:
     //QAction *exitAct;
     void createControlWidgets();
     void connectSignal();
-    QScrollBar *createContrastSlider();
-    QScrollBar *createThreshodSlider();
+    QScrollBar* createContrastSlider();
+    QScrollBar* createThreshodSlider();
+//    QCheckBox* createAxesCheckBox();
+//    QCheckBox* createBndBoxCheckBox();
 public:
     bool algorithmDebug = false;
     //QString debugDataPath = QString("/home/ccw/Desktop/embryo_res_folder/crop_embryo_data_500x500x30x40/images_downsample/1.tif");//_5f

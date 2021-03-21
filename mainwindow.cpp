@@ -104,53 +104,26 @@ void MainWindow::createControlWidgets()
     leftSideCanvas->setContentsMargins(0,0,0,0);
     viewHLayout->addLayout(leftSideCanvas);
 /** ************* control panel on the right *******************/
+    QVBoxLayout *rightSideControlLayout = new QVBoxLayout;
+
     QWidget *volDisplayOptGroup = new QWidget;
     QGridLayout *layout_mainDisplayOptGroup = new QGridLayout(volDisplayOptGroup);
     contrastScrollBar = createContrastSlider();
     thresholdScrollBar = createThreshodSlider();
-    zthicknessBox = createThicknessSpinBox();
-    comboBox_channel = createChannelComboBox();
-    zthicknessBox->setToolTip("more thick more Slow!");
-    comboBox_channel->setToolTip("Set the default channel for pinpointing in 3D image.");
 
-    checkBox_channelR = new QCheckBox("R", volDisplayOptGroup);
-    checkBox_channelG = new QCheckBox("G", volDisplayOptGroup);
-    checkBox_channelB = new QCheckBox("B", volDisplayOptGroup);
-    checkBox_volCompress = new QCheckBox("Compress", volDisplayOptGroup);
-    checkBox_channelR->setToolTip("output Red color on screen");
-    checkBox_channelG->setToolTip("output Green color on screen");
-    checkBox_channelB->setToolTip("output Blue color on screen");
-    checkBox_volCompress->setToolTip("Compressed format can improve\n interactive speed of static volume");
-            //".\nUncompressed format for very large volume may cause system halt!");
+    axesCheckBox = new QCheckBox("Axes", volDisplayOptGroup);
+    bndboxCheckBox = new QCheckBox("Bounding box", volDisplayOptGroup);
+    backgroundColorButton = new QPushButton("Canvas Color", volDisplayOptGroup);
 
-    layout_mainDisplayOptGroup->addWidget(dispType_maxip, 1, 0, 1, 5);
-    layout_mainDisplayOptGroup->addWidget(dispType_minip, 1, 5, 1, 5);
-    layout_mainDisplayOptGroup->addWidget(dispType_alpha, 1, 5+5, 1, 7);
-    layout_mainDisplayOptGroup->addWidget(dispType_cs3d, 1, 5+5+7, 1, 9);
+    layout_mainDisplayOptGroup->addWidget(new QLabel("Threshold"), 1, 0, 1, 5);
+    layout_mainDisplayOptGroup->addWidget(thresholdScrollBar, 1, 5, 1, 21-5);
+    layout_mainDisplayOptGroup->addWidget(axesCheckBox, 2, 0, 1, 5);
+    layout_mainDisplayOptGroup->addWidget(bndboxCheckBox, 2, 5, 1, 8);
+    layout_mainDisplayOptGroup->addWidget(new QLabel("Contrast"), 3, 0, 1, 5);
+    layout_mainDisplayOptGroup->addWidget(contrastScrollBar, 3, 5, 1, 21-5);
+    layout_mainDisplayOptGroup->addWidget(backgroundColorButton, 4, 0, 1, 8);
 
-    //layout_mainDisplayOptGroup->addWidget(labelline, 2, 0, 1, 21);
-
-    layout_mainDisplayOptGroup->addWidget(transparentSlider_Label = new QLabel("Transparency"), 2, 0, 1, 9);
-    layout_mainDisplayOptGroup->addWidget(transparentSlider,       2, 9-1, 1, 13);
-
-    layout_mainDisplayOptGroup->addWidget(new QLabel("Z-thick"), 3, 0, 1, 8);
-    layout_mainDisplayOptGroup->addWidget(zthicknessBox,         3, 5, 1, 7);
-
-    layout_mainDisplayOptGroup->addWidget(new QLabel("M-chan"), 3, 12, 1, 8);
-    layout_mainDisplayOptGroup->addWidget(comboBox_channel,    3, 12+5, 1, 5);
-
-    layout_mainDisplayOptGroup->addWidget(checkBox_channelR,      4, 0, 1, 4);
-    layout_mainDisplayOptGroup->addWidget(checkBox_channelG,      4, 0+4, 1, 4);
-    layout_mainDisplayOptGroup->addWidget(checkBox_channelB,      4, 0+4+4, 1, 4);
-    layout_mainDisplayOptGroup->addWidget(checkBox_volCompress, 4, 12+1, 1, 9);
-
-    layout_mainDisplayOptGroup->addWidget(contrastSlider_Label = new QLabel("Contrast"), 5, 0, 1, 9);
-    layout_mainDisplayOptGroup->addWidget(contrastSlider,       5, 9-1, 1, 13);
-
-
-    QVBoxLayout *rightSideControlLayout = new QVBoxLayout;
-    //rightSideControlLayout->addWidget(contrastSlider_Label);
-    rightSideControlLayout->addWidget(contrastScrollBar, Qt::AlignCenter);
+    rightSideControlLayout->addWidget(volDisplayOptGroup, Qt::AlignTop);
 /** ************* Volume control panel on the right *******************/
     //rightSideControlLayout->setContentsMargins(0,0,0,0);
 /** ************* Angle control panel on the right *******************/
@@ -161,16 +134,28 @@ void MainWindow::createControlWidgets()
 
 QScrollBar* MainWindow::createContrastSlider(){
     QScrollBar *cstScrollBar = new QScrollBar(Qt::Orientation::Horizontal);
-    cstScrollBar->setFocusPolicy(Qt::StrongFocus);
+    //cstScrollBar->setFocusPolicy(Qt::StrongFocus);
     cstScrollBar->setRange(-100, 100);
     cstScrollBar->setSingleStep(1);
     cstScrollBar->setPageStep(10);
     return cstScrollBar;
 }
-QScrollBar *createThreshodSlider(){
+
+QScrollBar* MainWindow::createThreshodSlider(){
     QScrollBar *thresScrollBar = new QScrollBar(Qt::Orientation::Horizontal);
+    thresScrollBar->setRange(-100, 100);
+    thresScrollBar->setSingleStep(1);
+    thresScrollBar->setPageStep(10);
     return thresScrollBar;
 }
+//QCheckBox* createAxesCheckBox(){
+//    QCheckBox *axesCkBox = new QCheckBox();
+//    return axesCkBox;
+//}
+//QCheckBox* createBndBoxCheckBox(){
+//    QCheckBox *bndBoxCkBox = new QCheckBox();
+//    return bndBoxCkBox;
+//}
 void MainWindow::updateControlPanel(){
     timeSlider->setMinimum(0);
     long st = data4test->image4d->getTDim();
@@ -404,3 +389,4 @@ void MainWindow::transferRGBAVolume(int t){
     }
     glWidget_raycast->setVolumeTimePoint(t);
 }
+
