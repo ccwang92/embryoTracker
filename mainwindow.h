@@ -44,7 +44,7 @@ public:
     QMenu *fileMenu;
     QAction *importImageSeriesAct;
     QAction *exitAct;
-    DataImporter *data4test = 0; // functions to import data
+
     // edit menu
     QMenu *editMenu;
     QAction *resetViewPoint;
@@ -58,6 +58,11 @@ public:
     QScrollBar *contrastScrollBar, *thresholdScrollBar;
     QCheckBox *axesCheckBox, *bndboxCheckBox;
     QPushButton *backgroundColorButton;
+    QAbstractSlider *xcminSlider, *xcmaxSlider, *ycminSlider, *ycmaxSlider, *zcminSlider, *zcmaxSlider;
+    QCheckBox *saveSegCheckBox, *saveTrackCheckBox;
+    QPushButton *changeSaveFolderButton;
+    QLineEdit *saveFolder;
+    QString saveFolderName;
     // major widget
     QScrollArea *glWidgetArea = 0;
     int widget_type = raycast_type;
@@ -72,6 +77,7 @@ public:
     void connectSignal();
     QScrollBar* createContrastSlider();
     QScrollBar* createThreshodSlider();
+    QAbstractSlider* createCutPlaneSlider(int maxval, Qt::Orientation hv = Qt::Horizontal);
 //    QCheckBox* createAxesCheckBox();
 //    QCheckBox* createBndBoxCheckBox();
 public:
@@ -80,6 +86,7 @@ public:
     QString debugDataPath = QString("/home/ccw/Desktop/embryo_res_folder/"
                                     "downsample_crop_embryo_data_470x350x250x50/embryo_TM481.tif");
     //QString debugDataPath = QString("/home/ccw/Desktop/test_ims/cropped_16bit4speed/embryo_TM481.tif");
+    DataImporter *data4test = 0; // functions to import data
     QAction * debugButton;
     cellSegmentMain *cellSegmenter = nullptr;
     cellTrackingMain *cellTracker = nullptr;

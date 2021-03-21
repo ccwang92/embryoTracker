@@ -106,32 +106,86 @@ void MainWindow::createControlWidgets()
 /** ************* control panel on the right *******************/
     QVBoxLayout *rightSideControlLayout = new QVBoxLayout;
 
-    QWidget *volDisplayOptGroup = new QWidget;
+    QWidget *volDisplayOptGroup = new QGroupBox("Control");
+    //volDisplayOptGroup
     QGridLayout *layout_mainDisplayOptGroup = new QGridLayout(volDisplayOptGroup);
     contrastScrollBar = createContrastSlider();
     thresholdScrollBar = createThreshodSlider();
-
     axesCheckBox = new QCheckBox("Axes", volDisplayOptGroup);
     bndboxCheckBox = new QCheckBox("Bounding box", volDisplayOptGroup);
-    backgroundColorButton = new QPushButton("Canvas Color", volDisplayOptGroup);
-
-    layout_mainDisplayOptGroup->addWidget(new QLabel("Threshold"), 1, 0, 1, 5);
-    layout_mainDisplayOptGroup->addWidget(thresholdScrollBar, 1, 5, 1, 21-5);
-    layout_mainDisplayOptGroup->addWidget(axesCheckBox, 2, 0, 1, 5);
-    layout_mainDisplayOptGroup->addWidget(bndboxCheckBox, 2, 5, 1, 8);
-    layout_mainDisplayOptGroup->addWidget(new QLabel("Contrast"), 3, 0, 1, 5);
-    layout_mainDisplayOptGroup->addWidget(contrastScrollBar, 3, 5, 1, 21-5);
-    layout_mainDisplayOptGroup->addWidget(backgroundColorButton, 4, 0, 1, 8);
-
+    backgroundColorButton = new QPushButton("Change Canvas Color", volDisplayOptGroup);
+    layout_mainDisplayOptGroup->addWidget(new QLabel("Threshold"), 1, 0, 1, 4);
+    layout_mainDisplayOptGroup->addWidget(thresholdScrollBar, 1, 4, 1, 21-4);
+    layout_mainDisplayOptGroup->addWidget(new QLabel("Contrast"), 2, 0, 1, 4);
+    layout_mainDisplayOptGroup->addWidget(contrastScrollBar, 2, 4, 1, 21-4);
+    layout_mainDisplayOptGroup->addWidget(axesCheckBox, 3, 0, 1, 4);
+    layout_mainDisplayOptGroup->addWidget(bndboxCheckBox, 3, 4, 1, 17);
+    layout_mainDisplayOptGroup->addWidget(backgroundColorButton, 4, 3, 1, 18);
     rightSideControlLayout->addWidget(volDisplayOptGroup, Qt::AlignTop);
 /** ************* Volume control panel on the right *******************/
-    //rightSideControlLayout->setContentsMargins(0,0,0,0);
-/** ************* Angle control panel on the right *******************/
+    QWidget *volCutGroup = new QGroupBox("Volume Cut");
+    QGridLayout *vol_yxzCntGroup = new QGridLayout(volCutGroup);
+    int d1, d2, d3;
+    d1 = MAX(0, 300-1);
+    d2 = MAX(0, 300-1);
+    d3 = MAX(0, 300-1);
+    xcminSlider = createCutPlaneSlider(d1);
+    xcmaxSlider = createCutPlaneSlider(d1);
+    ycminSlider = createCutPlaneSlider(d2);
+    ycmaxSlider = createCutPlaneSlider(d2);
+    zcminSlider = createCutPlaneSlider(d3);
+    zcmaxSlider = createCutPlaneSlider(d3);
+
+    vol_yxzCntGroup->addWidget(new QLabel("X-cut"), 1, 0, 2, 4);
+    vol_yxzCntGroup->addWidget(xcminSlider, 1, 4, 1, 17);
+    vol_yxzCntGroup->addWidget(xcmaxSlider, 2, 4, 1, 17);
+
+    vol_yxzCntGroup->addWidget(new QLabel("Y-cut"), 3, 0, 2, 4);
+    vol_yxzCntGroup->addWidget(ycminSlider, 3, 4, 1, 17);
+    vol_yxzCntGroup->addWidget(ycmaxSlider, 4, 4, 1, 17);
+
+    vol_yxzCntGroup->addWidget(new QLabel("Z-cut"), 5, 0, 2, 4);
+    vol_yxzCntGroup->addWidget(zcminSlider, 5, 4, 1, 17);
+    vol_yxzCntGroup->addWidget(zcmaxSlider, 6, 4, 1, 17);
+
+    rightSideControlLayout->addWidget(volCutGroup, Qt::AlignTop);
+/** ************* Save Path panel on the right *******************/
+    QWidget *saveResultGroup = new QGroupBox("Save");
+    QGridLayout *saveResultsOptGroup = new QGridLayout(saveResultGroup);
+    saveSegCheckBox = new QCheckBox("Save Segmentation Results", saveResultGroup);
+    saveTrackCheckBox = new QCheckBox("Save Tracking Results", saveResultGroup);
+    changeSaveFolderButton = new QPushButton("Change Folder", saveResultGroup);
+    saveFolder = new QLineEdit;
+    saveFolderName = "";
+    saveFolder->setText(saveFolderName);
+    saveResultsOptGroup->addWidget(saveSegCheckBox, 1, 0, 1, 21);
+    saveResultsOptGroup->addWidget(saveTrackCheckBox, 2, 0, 1, 21);
+    saveResultsOptGroup->addWidget(new QLabel("Save Folder"), 3, 0, 1, 8);
+    saveResultsOptGroup->addWidget(saveFolder, 3, 8, 1, 13);
+    saveResultsOptGroup->addWidget(changeSaveFolderButton, 4, 10, 1, 11);
+    rightSideControlLayout->addWidget(saveResultGroup, Qt::AlignTop);
+// --------------------------------------------------------------------//
     viewHLayout->addLayout(rightSideControlLayout);
     // Put the layout to the mainwindow
     grpBox4display_canvas->setLayout(viewHLayout);
 }
 
+QAbstractSlider *MainWindow::createCutPlaneSlider(int maxval, Qt::Orientation hv)
+{
+//    QSlider *slider = new QSlider(hv);
+//    slider->setRange(0, maxval);
+//    slider->setSingleStep(1);
+//    slider->setPageStep(10);
+//    slider->setTickInterval(10);
+//    slider->setTickPosition(QSlider::TicksRight);
+    QScrollBar *slider = new QScrollBar(hv);
+    slider->setRange(0, maxval);
+    slider->setSingleStep(1);
+    slider->setPageStep(10);
+
+    //slider->setValue(0);
+    return slider;
+}
 QScrollBar* MainWindow::createContrastSlider(){
     QScrollBar *cstScrollBar = new QScrollBar(Qt::Orientation::Horizontal);
     //cstScrollBar->setFocusPolicy(Qt::StrongFocus);
