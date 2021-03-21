@@ -110,6 +110,7 @@ public:
 
 signals:
     void changeVolumeTimePoint(int);
+    //void changeBnfAxesOnOff(bool);
 public slots:
     virtual void mouseMoveEvent(QMouseEvent *event);
     virtual void mousePressEvent(QMouseEvent *event);

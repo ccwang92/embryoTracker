@@ -535,6 +535,7 @@ void RayCastCanvas::setBnfAxesOnOff()
     if(m_raycasting_volume){
         bShowAxes = !bShowAxes;
     }
+    //emit changeBnfAxesOnOff(bShowAxes);
 }
 
 

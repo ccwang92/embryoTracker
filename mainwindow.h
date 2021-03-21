@@ -36,6 +36,8 @@ public slots:
     void sendData4Segment();
     void sendData4Track();
     void transferRGBAVolume(int t);
+    void setBackgroundColor();
+    //void setAxesCheckBox(bool axesOn);
     // parameters
 public:
     QString win_title;

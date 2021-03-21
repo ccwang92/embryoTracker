@@ -51,12 +51,9 @@ void MainWindow::createControlWidgets()
     // reset view point
     resetViewPoint = new QAction(tr("&Reset ViewPoint"), this);
     resetViewPoint->setShortcut(tr("Ctrl+R"));
-    bndAxesShow = new QAction(tr("&BoundingBox"), this);
-    //resetViewPoint->setShortcut(tr("Ctrl+R"));
-    // status has not been defined
-    //importImageFileAct->setStatusTip(tr("Import general image series"));
+    //bndAxesShow = new QAction(tr("&Axes"), this);
     editMenu->addAction(resetViewPoint);
-    editMenu->addAction(bndAxesShow);
+    //editMenu->addAction(bndAxesShow);
 /** ************* process menu ********************/
     processMenu = new QMenu(tr("&Process"), this);
     menuBar->addMenu(processMenu);
@@ -112,15 +109,15 @@ void MainWindow::createControlWidgets()
     contrastScrollBar = createContrastSlider();
     thresholdScrollBar = createThreshodSlider();
     axesCheckBox = new QCheckBox("Axes", volDisplayOptGroup);
-    bndboxCheckBox = new QCheckBox("Bounding box", volDisplayOptGroup);
+    //bndboxCheckBox = new QCheckBox("Bounding box", volDisplayOptGroup);
     backgroundColorButton = new QPushButton("Change Canvas Color", volDisplayOptGroup);
     layout_mainDisplayOptGroup->addWidget(new QLabel("Threshold"), 1, 0, 1, 4);
     layout_mainDisplayOptGroup->addWidget(thresholdScrollBar, 1, 4, 1, 21-4);
     layout_mainDisplayOptGroup->addWidget(new QLabel("Contrast"), 2, 0, 1, 4);
     layout_mainDisplayOptGroup->addWidget(contrastScrollBar, 2, 4, 1, 21-4);
-    layout_mainDisplayOptGroup->addWidget(axesCheckBox, 3, 0, 1, 4);
-    layout_mainDisplayOptGroup->addWidget(bndboxCheckBox, 3, 4, 1, 17);
-    layout_mainDisplayOptGroup->addWidget(backgroundColorButton, 4, 3, 1, 18);
+    layout_mainDisplayOptGroup->addWidget(axesCheckBox, 3, 0, 1, 3);
+    //layout_mainDisplayOptGroup->addWidget(bndboxCheckBox, 3, 4, 1, 17);
+    layout_mainDisplayOptGroup->addWidget(backgroundColorButton, 3, 3, 1, 18);
     rightSideControlLayout->addWidget(volDisplayOptGroup, Qt::AlignTop);
 /** ************* Volume control panel on the right *******************/
     QWidget *volCutGroup = new QGroupBox("Volume Cut");
@@ -229,9 +226,10 @@ void MainWindow::connectSignal()
     if (resetViewPoint){
         connect(resetViewPoint, SIGNAL(triggered()), glWidget_raycast, SLOT(setLightPositionZero()));
     }
-    if (bndAxesShow){
-        connect(bndAxesShow, SIGNAL(triggered()), glWidget_raycast, SLOT(setBnfAxesOnOff()));
-    }
+//    if (bndAxesShow){
+//        connect(bndAxesShow, SIGNAL(triggered()), glWidget_raycast, SLOT(setBnfAxesOnOff()));
+//        //connect(bndAxesShow, SIGNAL(triggered()), axesCheckBox, SLOT(toggle()));
+//    }
     if (timeSlider) {
         connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
         connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(transferRGBAVolume(int)));
@@ -242,6 +240,13 @@ void MainWindow::connectSignal()
     }
     connect(this, SIGNAL(signalDataLoaded()), this, SLOT(updateControlPanel())); // simply for easy reading
 
+    if(backgroundColorButton){
+        connect(backgroundColorButton, SIGNAL(clicked()), this, SLOT(setBackgroundColor()));
+    }
+    if (axesCheckBox) {
+        connect(axesCheckBox, SIGNAL(toggled(bool)), glWidget_raycast, SLOT(setBnfAxesOnOff()));
+        //connect(glWidget_raycast, SIGNAL(changeBnfAxesOnOff(bool)), this, SLOT(setAxesCheckBox(bool)));
+    }
     /** cell segmentation and tracking algorithm call ***/
     if (segmentCell3d){
         connect(segmentCell3d, SIGNAL(triggered()), this, SLOT(sendData4Segment()));
@@ -444,3 +449,14 @@ void MainWindow::transferRGBAVolume(int t){
     glWidget_raycast->setVolumeTimePoint(t);
 }
 
+void MainWindow::setBackgroundColor(){
+    const QColor colour = QColorDialog::getColor(glWidget_raycast->getBackground(), this, "Select background colour");
+
+    if (colour.isValid()) {
+        glWidget_raycast->setBackground(colour);
+    }
+}
+
+//void MainWindow::setAxesCheckBox(bool axesOn){
+//    axesCheckBox->setChecked(axesOn);
+//}
