@@ -316,6 +316,25 @@ void RayCastCanvas::setVolume(long frame4display) {
         }
         resetMode(); // reset the renderering to gray-scale
     }
+    if(!m_gamma_init){
+        //double max_exist_intensity = data_importer->p_vmax[0];
+        double max_intensity;
+        if (data_importer->image4d->getDatatype() == V3D_UINT8){
+            max_intensity = 255;
+        }else if(data_importer->image4d->getDatatype() == V3D_UINT16){
+            max_intensity = 65535;
+        }else{
+            max_intensity = 0;
+            qDebug("unsupported image type");
+        }
+        if(data_importer->p_vmax[0] < max_intensity/4){
+            m_gamma = log(data_importer->p_vmax[0]/max_intensity) / log(0.25);
+        }else{
+            m_gamma = 1.0;
+        }
+        m_gamma_init = true;
+        m_gamma0 = m_gamma;
+    }
     update();
 
 
@@ -483,9 +502,10 @@ void RayCastCanvas::add_shader(const QString& name, const QString& vertex, const
  */
 void RayCastCanvas::setContrast(int relative_contrast/*[-100:100]*/)
 {
-    if (relative_contrast == 0) m_gamma = 1.0;
-    else if (relative_contrast > 0) m_gamma = 1.0 + relative_contrast/25.0;
-    else m_gamma = 1.0 + relative_contrast * 0.008;
+    //if (relative_contrast == 0) m_gamma = m_gamma;
+    //else
+    if (relative_contrast > 0) m_gamma = m_gamma0 + relative_contrast/25.0;
+    else m_gamma = m_gamma0 + relative_contrast * 0.008;
     //m_gamma = (relative_contrast+100.0)/40.0;
     update();
     //RayCastCanvas::raycasting(const QString& shader);
@@ -493,7 +513,23 @@ void RayCastCanvas::setContrast(int relative_contrast/*[-100:100]*/)
 void RayCastCanvas::setThreshold(int intensity_threshold){
 //    double p_min = data_importer->p_vmin[0];
 //    double p_max = data_importer->p_vmax[0];
-    m_min_valid_intensity = intensity_threshold / 100.0;
+    double max_intensity;
+    if (data_importer->image4d->getDatatype() == V3D_UINT8){
+        max_intensity = 255;
+    }else if(data_importer->image4d->getDatatype() == V3D_UINT16){
+        max_intensity = 65535;
+    }else{
+        max_intensity = 0;
+        qDebug("unsupported image type");
+    }
+    if(intensity_threshold == 0){
+        m_min_valid_intensity = 0;
+    }else if(intensity_threshold == 100){
+        m_min_valid_intensity = 1;
+    }else{
+        m_min_valid_intensity = pow(intensity_threshold,3) / 1000000.0;
+        m_min_valid_intensity *= data_importer->p_vmax[0] / max_intensity ;
+    }
     update();
 
 }
@@ -502,25 +538,28 @@ void RayCastCanvas::setRangeXMIN(int xmin){
     m_leftup_xyz.setX(xmin / 100.0);
     update();
 }
+void RayCastCanvas::setRangeXMAX(int xmax){
+    m_rightbottom_xyz.setX(xmax / 100.0);
+    update();
+}
+
 void RayCastCanvas::setRangeYMIN(int ymin){
     m_leftup_xyz.setY(ymin / 100.0);
     update();
 }
 
-void RayCastCanvas::setRangeZMIN(int zmin){
-    m_leftup_xyz.setZ(zmin / 100.0);
-    update();
-}
-void RayCastCanvas::setRangeXMAX(int xmax){
-    m_rightbottom_xyz.setX(xmax / 100.0);
-    update();
-}
 void RayCastCanvas::setRangeYMAX(int ymax){
     m_rightbottom_xyz.setY(ymax / 100.0);
     update();
 }
-void RayCastCanvas::setRangeZMAX(int zmax){
-    m_rightbottom_xyz.setY(zmax / 100.0);
+
+void RayCastCanvas::setRangeZMIN(int zmin){ //z-direction is different
+    m_rightbottom_xyz.setZ(1 - zmin / 100.0);
+    update();
+}
+
+void RayCastCanvas::setRangeZMAX(int zmax){//z-direction is different
+    m_leftup_xyz.setZ(1 - zmax / 100.0);
     update();
 }
 void RayCastCanvas::handleKeyPressEvent(QKeyEvent * e)  //090428 RZC: make public function to finally overcome the crash problem of hook MainWindow

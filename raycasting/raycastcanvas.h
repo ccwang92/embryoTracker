@@ -9,6 +9,7 @@
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
 #include <QMessageBox>
+#include <math.h>
 #include "mesh.h"
 #include "raycastvolume.h"
 #include "trackball.h"
@@ -170,7 +171,8 @@ private:
     GLfloat m_threshold = 50;                     /*!< Isosurface intensity threshold. */
 
     QColor m_background;                          /*!< Viewport background colour. */
-
+    bool m_gamma_init = false;
+    float m_gamma0 = 1.0f;
     GLfloat m_gamma = 1.0f;//2.2 /*!< Gamma correction parameter. */
 
     RayCastVolume *m_raycasting_volume;
