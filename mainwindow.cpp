@@ -123,15 +123,15 @@ void MainWindow::createControlWidgets()
     QWidget *volCutGroup = new QGroupBox("Volume Cut");
     QGridLayout *vol_yxzCntGroup = new QGridLayout(volCutGroup);
     int d1, d2, d3;
-    d1 = MAX(0, 300-1);
-    d2 = MAX(0, 300-1);
-    d3 = MAX(0, 300-1);
+    d1 = 100;
+    d2 = 100;
+    d3 = 100;
     xcminSlider = createCutPlaneSlider(d1);
-    xcmaxSlider = createCutPlaneSlider(d1);
+    xcmaxSlider = createCutPlaneSlider(d1); xcmaxSlider->setValue(d1);
     ycminSlider = createCutPlaneSlider(d2);
-    ycmaxSlider = createCutPlaneSlider(d2);
+    ycmaxSlider = createCutPlaneSlider(d2); ycmaxSlider->setValue(d1);
     zcminSlider = createCutPlaneSlider(d3);
-    zcmaxSlider = createCutPlaneSlider(d3);
+    zcmaxSlider = createCutPlaneSlider(d3); zcmaxSlider->setValue(d1);
 
     vol_yxzCntGroup->addWidget(new QLabel("X-cut"), 1, 0, 2, 4);
     vol_yxzCntGroup->addWidget(xcminSlider, 1, 4, 1, 17);
@@ -241,6 +241,19 @@ void MainWindow::connectSignal()
     if (thresholdScrollBar) {
         connect(thresholdScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setThreshold(int)));
     }
+//    xcminSlider = createCutPlaneSlider(d1);
+//    xcmaxSlider = createCutPlaneSlider(d1);
+//    ycminSlider = createCutPlaneSlider(d2);
+//    ycmaxSlider = createCutPlaneSlider(d2);
+//    zcminSlider = createCutPlaneSlider(d3);
+//    zcmaxSlider = createCutPlaneSlider(d3);
+    connect(xcminSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setRangeXMIN(int)));
+    connect(xcmaxSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setRangeXMAX(int)));
+    connect(ycminSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setRangeYMIN(int)));
+    connect(ycmaxSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setRangeYMAX(int)));
+    connect(zcminSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setRangeZMIN(int)));
+    connect(zcmaxSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setRangeZMAX(int)));
+
     connect(this, SIGNAL(signalDataLoaded()), this, SLOT(updateControlPanel())); // simply for easy reading
 
     if(backgroundColorButton){

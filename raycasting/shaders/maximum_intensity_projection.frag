@@ -47,6 +47,8 @@ uniform sampler2D jitter;
 uniform float gamma;
 uniform bool consider_transparency;
 uniform float min_valid_intensity;
+uniform vec3 leftup_xyz;
+uniform vec3 rightbottom_xyz;
 // Ray
 struct Ray {
     vec3 origin;
@@ -116,13 +118,22 @@ void main()
     ray_start += step_vector * texture(jitter, gl_FragCoord.xy / viewport_size).r;
 
     vec3 position = ray_start;
-
     float maximum_intensity = 0.0;
-
-    // Ray march until reaching the end of the volume
+    bool init_loc_invalid = false, ray_in_valid = true;
+//    if(position.x < leftup_xyz.x || position.y < leftup_xyz.y || position.z < leftup_xyz.z ||
+//            position.x > rightbottom_xyz.x || position.y > rightbottom_xyz.y || position.z > rightbottom_xyz.z){
+//        init_loc_invalid = true;
+//    }
+//    else{
+        // Ray march until reaching the end of the volume
     while (ray_length > 0) {
-
         float intensity = texture(volume, position).r;
+        if(position.x < leftup_xyz.x || position.y < leftup_xyz.y || position.z < leftup_xyz.z ||
+                position.x > rightbottom_xyz.x || position.y > rightbottom_xyz.y || position.z > rightbottom_xyz.z){
+            intensity = 0;
+//        }else{
+//            ray_in_valid = false;
+        }
 
         if (intensity > maximum_intensity) {
             maximum_intensity = intensity;
@@ -131,7 +142,17 @@ void main()
         ray_length -= step_length;
         position += step_vector;
     }
-
+//    if(init_loc_invalid && maximum_intensity == 0.0){
+//        vec4 colour = colour_transfer(maximum_intensity);
+//        colour.rgb = colour.a * colour.rgb + (1 - colour.a) * pow(background_colour, vec3(gamma)).rgb;
+//        colour.a = 1.0;
+//        a_colour.rgb = pow(colour.rgb, vec3(1.0 / gamma));
+//        a_colour.a = colour.a;
+//        return;
+//    }
+    if(maximum_intensity < min_valid_intensity){
+        maximum_intensity = 0;
+    }
     vec4 colour = colour_transfer(maximum_intensity);
 
     // Blend background : nullify
@@ -144,8 +165,8 @@ void main()
     a_colour.rgb = pow(colour.rgb, vec3(1.0 / gamma));
     a_colour.a = colour.a;
 
-    if(maximum_intensity < min_valid_intensity){
-        a_colour.rgb = vec3(0.0, 0.0, 0.0);
-        a_colour.a = colour.a;
-    }
+//    if(init_loc_invalid && !ray_in_valid){
+//        a_colour.rgb = background_colour;
+//    }
+//    }
 }

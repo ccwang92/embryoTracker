@@ -23,7 +23,7 @@ QVector3D to_vector3d(const QColor& colour) {
 RayCastCanvas::RayCastCanvas(QWidget *parent)
     : QOpenGLWidget {parent},
     m_stepLength(0.003),
-    m_background(QColor(204, 255, 255)),
+    m_background(QColor(0, 0, 0)),
     m_raycasting_volume {nullptr},
     m_active_mode("MIP")
 {
@@ -221,6 +221,8 @@ void RayCastCanvas::raycasting(const QString& shader)
             m_shaders[shader]->setUniformValue("jitter", 1);
             m_shaders[shader]->setUniformValue("consider_transparency", m_consider_transparency /*0*/);
             m_shaders[shader]->setUniformValue("min_valid_intensity", m_min_valid_intensity /*0*/);
+            m_shaders[shader]->setUniformValue("leftup_xyz", m_leftup_xyz /*0*/);
+            m_shaders[shader]->setUniformValue("rightbottom_xyz", m_rightbottom_xyz /*0*/);
 
             glClearColor(m_background.redF(), m_background.greenF(), m_background.blueF(), m_background.alphaF());
             glClear(GL_COLOR_BUFFER_BIT);
@@ -494,6 +496,32 @@ void RayCastCanvas::setThreshold(int intensity_threshold){
     m_min_valid_intensity = intensity_threshold / 100.0;
     update();
 
+}
+
+void RayCastCanvas::setRangeXMIN(int xmin){
+    m_leftup_xyz.setX(xmin / 100.0);
+    update();
+}
+void RayCastCanvas::setRangeYMIN(int ymin){
+    m_leftup_xyz.setY(ymin / 100.0);
+    update();
+}
+
+void RayCastCanvas::setRangeZMIN(int zmin){
+    m_leftup_xyz.setZ(zmin / 100.0);
+    update();
+}
+void RayCastCanvas::setRangeXMAX(int xmax){
+    m_rightbottom_xyz.setX(xmax / 100.0);
+    update();
+}
+void RayCastCanvas::setRangeYMAX(int ymax){
+    m_rightbottom_xyz.setY(ymax / 100.0);
+    update();
+}
+void RayCastCanvas::setRangeZMAX(int zmax){
+    m_rightbottom_xyz.setY(zmax / 100.0);
+    update();
 }
 void RayCastCanvas::handleKeyPressEvent(QKeyEvent * e)  //090428 RZC: make public function to finally overcome the crash problem of hook MainWindow
 {

@@ -120,6 +120,12 @@ public slots:
     virtual void setLightPositionZero();
     virtual void setContrast(int relative_contrast/*[-100:100]*/);
     virtual void setThreshold(int intensity_threshold);
+    virtual void setRangeXMIN(int xmin);
+    virtual void setRangeYMIN(int ymin);
+    virtual void setRangeZMIN(int zmin);
+    virtual void setRangeXMAX(int xmax);
+    virtual void setRangeYMAX(int ymax);
+    virtual void setRangeZMAX(int zmax);
     virtual void keyPressEvent(QKeyEvent *e){handleKeyPressEvent(e);}
     virtual void keyReleaseEvent(QKeyEvent *e){handleKeyReleaseEvent(e);}
     virtual void setBnfAxesOnOff();
@@ -152,6 +158,8 @@ private:
     GLfloat m_aspectRatio;                                                /*!< width / height */
     GLboolean m_consider_transparency = false;
     GLfloat m_min_valid_intensity = 0;
+    QVector3D m_leftup_xyz {0, 0, 0};
+    QVector3D m_rightbottom_xyz {1.0, 1.0, 1.0};
     QVector2D m_viewportSize;
     QVector3D m_rayOrigin; /*!< Camera position in model space coordinates. */
 
