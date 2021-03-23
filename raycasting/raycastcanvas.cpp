@@ -220,7 +220,7 @@ void RayCastCanvas::raycasting(const QString& shader)
             m_shaders[shader]->setUniformValue("volume", 0);
             m_shaders[shader]->setUniformValue("jitter", 1);
             m_shaders[shader]->setUniformValue("consider_transparency", m_consider_transparency /*0*/);
-            m_shaders[shader]->setUniformValue("consider_transparency", m_min_valid_intensity /*0*/);
+            m_shaders[shader]->setUniformValue("min_valid_intensity", m_min_valid_intensity /*0*/);
 
             glClearColor(m_background.redF(), m_background.greenF(), m_background.blueF(), m_background.alphaF());
             glClear(GL_COLOR_BUFFER_BIT);

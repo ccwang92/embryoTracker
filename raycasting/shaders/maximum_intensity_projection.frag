@@ -131,9 +131,7 @@ void main()
         ray_length -= step_length;
         position += step_vector;
     }
-//    if(maximum_intensity < min_valid_intensity){
-//        maximum_intensity = 1.0;
-//    }
+
     vec4 colour = colour_transfer(maximum_intensity);
 
     // Blend background : nullify
@@ -145,4 +143,9 @@ void main()
     // Gamma correction
     a_colour.rgb = pow(colour.rgb, vec3(1.0 / gamma));
     a_colour.a = colour.a;
+
+    if(maximum_intensity < min_valid_intensity){
+        a_colour.rgb = vec3(0.0, 0.0, 0.0);
+        a_colour.a = colour.a;
+    }
 }
