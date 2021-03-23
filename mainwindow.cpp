@@ -238,6 +238,9 @@ void MainWindow::connectSignal()
     if (contrastScrollBar) {
         connect(contrastScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setContrast(int)));
     }
+    if (thresholdScrollBar) {
+        connect(thresholdScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setContrast(int)));
+    }
     connect(this, SIGNAL(signalDataLoaded()), this, SLOT(updateControlPanel())); // simply for easy reading
 
     if(backgroundColorButton){
