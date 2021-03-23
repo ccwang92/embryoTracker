@@ -219,7 +219,8 @@ void RayCastCanvas::raycasting(const QString& shader)
             m_shaders[shader]->setUniformValue("gamma", m_gamma);
             m_shaders[shader]->setUniformValue("volume", 0);
             m_shaders[shader]->setUniformValue("jitter", 1);
-            m_shaders[shader]->setUniformValue("consider_transparency", consider_transparency /*0*/);
+            m_shaders[shader]->setUniformValue("consider_transparency", m_consider_transparency /*0*/);
+            m_shaders[shader]->setUniformValue("consider_transparency", m_min_valid_intensity /*0*/);
 
             glClearColor(m_background.redF(), m_background.greenF(), m_background.blueF(), m_background.alphaF());
             glClear(GL_COLOR_BUFFER_BIT);
@@ -486,6 +487,13 @@ void RayCastCanvas::setContrast(int relative_contrast/*[-100:100]*/)
     //m_gamma = (relative_contrast+100.0)/40.0;
     update();
     //RayCastCanvas::raycasting(const QString& shader);
+}
+void RayCastCanvas::setThreshold(int intensity_threshold){
+//    double p_min = data_importer->p_vmin[0];
+//    double p_max = data_importer->p_vmax[0];
+    m_min_valid_intensity = intensity_threshold / 100.0;
+    update();
+
 }
 void RayCastCanvas::handleKeyPressEvent(QKeyEvent * e)  //090428 RZC: make public function to finally overcome the crash problem of hook MainWindow
 {

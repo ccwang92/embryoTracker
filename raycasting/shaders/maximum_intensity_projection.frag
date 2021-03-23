@@ -46,6 +46,7 @@ uniform sampler2D jitter;
 
 uniform float gamma;
 uniform bool consider_transparency;
+uniform float min_valid_intensity;
 // Ray
 struct Ray {
     vec3 origin;
@@ -130,7 +131,9 @@ void main()
         ray_length -= step_length;
         position += step_vector;
     }
-
+//    if(maximum_intensity < min_valid_intensity){
+//        maximum_intensity = 1.0;
+//    }
     vec4 colour = colour_transfer(maximum_intensity);
 
     // Blend background : nullify

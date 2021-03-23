@@ -194,7 +194,7 @@ QScrollBar* MainWindow::createContrastSlider(){
 
 QScrollBar* MainWindow::createThreshodSlider(){
     QScrollBar *thresScrollBar = new QScrollBar(Qt::Orientation::Horizontal);
-    thresScrollBar->setRange(-100, 100);
+    thresScrollBar->setRange(0, 100);
     thresScrollBar->setSingleStep(1);
     thresScrollBar->setPageStep(10);
     return thresScrollBar;
@@ -239,7 +239,7 @@ void MainWindow::connectSignal()
         connect(contrastScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setContrast(int)));
     }
     if (thresholdScrollBar) {
-        connect(thresholdScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setContrast(int)));
+        connect(thresholdScrollBar, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setThreshold(int)));
     }
     connect(this, SIGNAL(signalDataLoaded()), this, SLOT(updateControlPanel())); // simply for easy reading
 

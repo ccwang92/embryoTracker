@@ -119,6 +119,7 @@ public slots:
     virtual void setVolumeTimePoint(int t);
     virtual void setLightPositionZero();
     virtual void setContrast(int relative_contrast/*[-100:100]*/);
+    virtual void setThreshold(int intensity_threshold);
     virtual void keyPressEvent(QKeyEvent *e){handleKeyPressEvent(e);}
     virtual void keyReleaseEvent(QKeyEvent *e){handleKeyReleaseEvent(e);}
     virtual void setBnfAxesOnOff();
@@ -149,7 +150,8 @@ private:
     const GLfloat m_fov = 30.0f;                                          /*!< Vertical field of view. */
     const GLfloat m_focalLength = 1.0 / qTan(M_PI / 180.0 * m_fov / 2.0); /*!< Focal length. */
     GLfloat m_aspectRatio;                                                /*!< width / height */
-    GLboolean consider_transparency = false;
+    GLboolean m_consider_transparency = false;
+    GLfloat m_min_valid_intensity = 0;
     QVector2D m_viewportSize;
     QVector3D m_rayOrigin; /*!< Camera position in model space coordinates. */
 
