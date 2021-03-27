@@ -9,7 +9,7 @@
 //   return 0.5 * erfc(-value * M_SQRT1_2);
 //}
 /** template functions needs to be implemented in header files. */
-template <typename T> vector<double> vec_cumsum(vector<T> v1){
+template <typename T> vector<double> vec_cumsum(vector<T> const &v1){
     assert(v1.size() > 0);
     vector<double> out(v1.size());
     out[0] = v1[0];
@@ -18,7 +18,7 @@ template <typename T> vector<double> vec_cumsum(vector<T> v1){
     }
     return out;
 }
-template <typename T> vector<T> vec_pointMultiply(vector<T> v1, vector<T> v2){
+template <typename T> vector<T> vec_pointMultiply(vector<T> const &v1, vector<T> const &v2){
     assert(v1.size() == v2.size());
     vector<T> out(v1.size());
     for (size_t i=0 ;i<v1.size(); i++){
@@ -26,7 +26,7 @@ template <typename T> vector<T> vec_pointMultiply(vector<T> v1, vector<T> v2){
     }
     return out;
 }
-template <typename T> vector<T> vec_Minus(vector<T> v1, vector<T> v2){
+template <typename T> vector<T> vec_Minus(vector<T> const &v1, vector<T> const &v2){
     assert(v1.size() == v2.size());
     vector<T> out(v1.size());
     for (size_t i=0 ;i<v1.size(); i++){
@@ -34,14 +34,14 @@ template <typename T> vector<T> vec_Minus(vector<T> v1, vector<T> v2){
     }
     return out;
 }
-template <typename T> vector<T> vec_Minus(vector<T> v1, T s2){
+template <typename T> vector<T> vec_Minus(vector<T> const &v1, T s2){
     vector<T> out(v1.size());
     for (size_t i=0 ;i<v1.size(); i++){
         out[i] = v1[i] - s2;
     }
     return out;
 }
-template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2){
+template <typename T> vector<T> vec_Add(vector<T> const &v1, vector<T> const &v2){
     assert(v1.size() == v2.size());
     vector<T> out(v1.size());
     for (size_t i=0 ;i<v1.size(); i++){
@@ -49,12 +49,12 @@ template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2){
     }
     return out;
 }
-template <typename T> vector<T> vec_Add(vector<T> &v1, T s2){
+template <typename T> vector<T> vec_Add(vector<T> const &v1, T s2){
     vector<T> v2(v1.size());
     transform(v1.begin(), v1.end(), v2.begin(), [s2](T x){return x+s2;});
     return v2;
 }
-template <typename T> vector<T> vec_pointDivide(vector<T> v1, vector<T> v2){
+template <typename T> vector<T> vec_pointDivide(vector<T> const &v1, vector<T> v2){
     assert(v1.size() == v2.size());
     vector<T> out(v1.size());
     for (size_t i=0 ;i<v1.size(); i++){
@@ -62,7 +62,7 @@ template <typename T> vector<T> vec_pointDivide(vector<T> v1, vector<T> v2){
     }
     return out;
 }
-template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, bool strict){
+template <typename T> vector<T> vec_smallerthan(vector<T> const &values, T threshold, bool strict){
     vector<T> out;
     if (strict){
         for (size_t i = 0; i < values.size(); i++){
@@ -77,7 +77,7 @@ template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, b
     }
     return out;
 }
-template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bool strict){
+template <typename T> vector<T> vec_largerthan(vector<T> const &values, T threshold, bool strict){
     vector<T> out;
     if (strict){
         for (size_t i = 0; i < values.size(); i++){
@@ -92,7 +92,7 @@ template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bo
     }
     return out;
 }
-template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool strict){
+template <typename T> vector<T> vec_atrange(vector<T> const &values, T ub, T lb, bool strict){
     assert(ub>=lb);
     vector<T> out;
     if (strict){
@@ -109,7 +109,7 @@ template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool s
     return out;
 }
 
-template <typename T> vector<size_t> vec_atrange(vector<size_t> &idx, vector<T> &values, T ub, T lb, bool strict){
+template <typename T> vector<size_t> vec_atrange(vector<size_t> const &idx, vector<T> const &values, T ub, T lb, bool strict){
     assert(ub>=lb && idx.size()==values.size());
     vector<size_t> out;
     if (strict){
@@ -320,7 +320,7 @@ template <typename T> double gammacdf(T x, T a, T b, bool upper){
     else return boost::math::gamma_p((double)a, (double)x/b);
 }
 // a super quick way for gamma fitting; reference: https://tminka.github.io/papers/minka-gamma.pdf
-template <typename T> void gammafit(vector<T> data, T &a, T &b){
+template <typename T> void gammafit(vector<T> const & data, T &a, T &b){
     T mean_val = vec_mean(data);
     vector<T> log_vals = vec_log(data);
     T mean_log = vec_mean(log_vals);
@@ -339,23 +339,48 @@ template <typename T> void gammafit(vector<T> data, T &a, T &b){
 }
 // has no been implemented, the log-likely hood function is so complicated and needs more literature survey
 // At current stage, we temporally use full data for gamma fitting.
-template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b, int uptTimes){
+template <typename T> void truncatedGammafit(vector<T>const &  data, T &a, T &b, int uptTimes){
     //gammafit(data, a, b); //this could cause unexpected results
-    //// !!!! for debug purpose we use constant here:
-    if(uptTimes ==0){
-        a = 1.562289;
-        b = 1.299215;
-    }else if(uptTimes == 1){
-        // if round two
-        a = 2.935459;
-        b = 0.371381;
-    }else{
-        // final round
-        a = 3.604205;
-        b = 0.660987;
+//    //// !!!! for debug purpose we use constant here:
+//    if(uptTimes ==0){
+//        a = 1.562289;
+//        b = 1.299215;
+//    }else if(uptTimes == 1){
+//        // if round two
+//        a = 2.935459;
+//        b = 0.371381;
+//    }else{
+//        // final round
+//        a = 3.604205;
+//        b = 0.660987;
+//    }
+    // newton method to estimate the truncated gamma distribution
+    T a_init, b_init;
+    vector<T> non_zero_data = vec_largerthan(data, 0, true);
+    gammafit(non_zero_data, a_init, b_init);
+
+    T truncThr = vec_max(non_zero_data);
+    T truncThr0 = truncThr * 2;
+
+    vector<T> sorted_non_zero_data;
+    sort(non_zero_data, sorted_non_zero_data);
+    float tol = 0.01 * sorted_non_zero_data(int(sorted_non_zero_data.size()*0.99));
+
+    a = a_init, b = b_init;
+    while ((truncThr0-truncThr) > tol){
+        truncThr0 = truncThr;
+
+        float truncThr = b_init / boost::math::gamma_q_inv(a_init,1-0.05);
+        vector<T> truncedVec = vec_atrange(non_zero_data, 0, truncThr, false);
+
+        //mle(truncedVec, 'pdf',pdf_truncgamma, a_init, b_init, a, b);
+        a_init = a;
+        b_init = b;
     }
+
+
 }
-template <typename T> vector<T> vec_log(vector<T> &data){
+template <typename T> vector<T> vec_log(vector<T> const & data){
     vector<T> log_v(data.size());
     FOREACH_i(data) {
         if (data[i] < 0){

@@ -188,17 +188,17 @@ template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, int size[3]);
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, int size[3]);
 
-template <typename T> vector<double> vec_cumsum(vector<T> v1);
-template <typename T> vector<T> vec_pointMultiply(vector<T> v1, vector<T> v2);
-template <typename T> vector<T> vec_Minus(vector<T> v1, vector<T> v2);
-template <typename T> vector<T> vec_Minus(vector<T> v1, T s2);
-template <typename T> vector<T> vec_Add(vector<T> v1, vector<T> v2);
-template <typename T> vector<T> vec_Add(vector<T> &v1, T s2);
-template <typename T> vector<T> vec_pointDivide(vector<T> v1, vector<T> v2);
-template <typename T> vector<T> vec_smallerthan(vector<T> values, T threshold, bool strict = true);
-template <typename T> vector<T> vec_largerthan(vector<T> values, T threshold, bool strict = true);
-template <typename T> vector<T> vec_atrange(vector<T> values, T ub, T lb, bool strict = true);
-template <typename T> vector<size_t> vec_atrange(vector<size_t> &idx, vector<T> &values, T ub, T lb, bool strict = true);
+template <typename T> vector<double> vec_cumsum(vector<T> const &v1);
+template <typename T> vector<T> vec_pointMultiply(vector<T> const &v1, vector<T> const &v2);
+template <typename T> vector<T> vec_Minus(vector<T> const &v1, vector<T> const &v2);
+template <typename T> vector<T> vec_Minus(vector<T> const &v1, T s2);
+template <typename T> vector<T> vec_Add(vector<T> const &v1, vector<T> const &v2);
+template <typename T> vector<T> vec_Add(vector<T> const &v1, T s2);
+template <typename T> vector<T> vec_pointDivide(vector<T> const &v1, vector<T> const &v2);
+template <typename T> vector<T> vec_smallerthan(vector<T> const &values, T threshold, bool strict = true);
+template <typename T> vector<T> vec_largerthan(vector<T> const &values, T threshold, bool strict = true);
+template <typename T> vector<T> vec_atrange(vector<T> const &values, T ub, T lb, bool strict = true);
+template <typename T> vector<size_t> vec_atrange(vector<size_t> const &idx, vector<T> const &values, T ub, T lb, bool strict = true);
 template <typename T> T normalCDF(T x, T m = 0, T s = 1);
 template <typename T> T normalPDF(T x, T m = 0, T s = 1);
 template <typename T> T zscore2pvalue(T z);
@@ -208,9 +208,9 @@ template <typename T> float binocdf(T num_cls0, T num_all, float p);
 
 template <typename T> double chi2inv(T p, int df = 1); // inverse chi-square distribution
 template <typename T> double gammacdf(T x, T a, T b, bool upper = true); // gamma cdf function
-template <typename T> void gammafit(vector<T> data, T &a, T &b);// gamma fitting use MLE
-template <typename T> void truncatedGammafit(vector<T> data, T &a, T &b, int uptTimes = 0); // not done
-template <typename T> vector<T> vec_log(vector<T> &data);
+template <typename T> void gammafit(vector<T> const & data, T &a, T &b);// gamma fitting use MLE
+template <typename T> void truncatedGammafit(vector<T> const & data, T &a, T &b, int uptTimes = 0); // not done
+template <typename T> vector<T> vec_log(vector<T> const & data);
 
 template <typename T> float vec_stddev(vector<T> const & func);
 template <typename T> float vec_variance(vector<T> const & func);
