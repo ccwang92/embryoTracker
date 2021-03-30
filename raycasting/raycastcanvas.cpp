@@ -327,7 +327,7 @@ void RayCastCanvas::setVolume(long frame4display) {
             max_intensity = 0;
             qDebug("unsupported image type");
         }
-        if(data_importer->p_vmax[0] < max_intensity/4){
+        if(data_importer->p_vmax[0] > 10 && data_importer->p_vmax[0] < max_intensity/4){
             m_gamma = log(data_importer->p_vmax[0]/max_intensity) / log(0.25);
         }else{
             m_gamma = 1.0;

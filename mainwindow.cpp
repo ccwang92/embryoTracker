@@ -329,23 +329,26 @@ MainWindow::~MainWindow()
 }
 void MainWindow::debugAlgorithm()
 {
-    if(cellTracker != nullptr){ // already finish the tracking
-        tracking_result_exist = !tracking_result_exist;
-        return;
-    }
     //float kk = chi2inv(0.5, 2);
     algorithmDebug = true;
     this->data4test->debugMode = true;
     this->importImageSeries();
     //// send data to do segmentation on all frames
     for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
-        qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
-        glWidget_raycast->setVolumeTimePoint(i);
+        glWidget_raycast->curr_timePoint_in_canvas = i;
+        //// segement
         this->sendData4Segment();
+        qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
     }
-    glWidget_raycast->setVolumeTimePoint(0);
+//    glWidget_raycast->setVolumeTimePoint(0);
     //// send segmentation results for cell linking
-    this->sendData4Track();
+//    this->sendData4Track();
+    qInfo("start tracking");
+    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+    cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
+    chrono::steady_clock::time_point end = chrono::steady_clock::now();
+    qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
+    qFatal("Debug successed! No need to continue");
 }
 void MainWindow::sendData4Segment()
 {
@@ -363,6 +366,18 @@ void MainWindow::sendData4Segment()
     /// way 2: try to load saved data. Detect cells if failed.
     cellSegmenter->processSingleFrameAndReturn(glWidget_raycast,
                    data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
+    //// display results in canvas
+    int i = glWidget_raycast->curr_timePoint_in_canvas;
+    long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*cellSegmenter->data_rows_cols_slices[1]*
+            cellSegmenter->data_rows_cols_slices[2];
+    unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*i; // sub-matrix pointer
+    Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
+    Mat4b rgb_mat4display;
+    label2rgb3d(cellSegmenter->cell_label_maps[i], *single_frame, rgb_mat4display);
+    glWidget_raycast->setMode("Alpha blending rgba");
+    glWidget_raycast->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, cellSegmenter->data_rows_cols_slices[1],
+            cellSegmenter->data_rows_cols_slices[0], cellSegmenter->data_rows_cols_slices[2], 4);
+
 }
 
 void MainWindow::sendData4Track()
@@ -376,13 +391,14 @@ void MainWindow::sendData4Track()
         if(!cellSegmenter){ // already finish the tracking
             //// send data to do segmentation on all frames
             for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
-                glWidget_raycast->setVolumeTimePoint(i);
+                //glWidget_raycast->setVolumeTimePoint(i);
+                glWidget_raycast->curr_timePoint_in_canvas = i;
                 this->sendData4Segment();
-                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+                                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
             }
         }
         //glWidget_raycast->setVolumeTimePoint(0);
-        cellTracker = new cellTrackingMain(*cellSegmenter);
+        cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
 
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
         qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);

@@ -5,7 +5,7 @@
 class cellTrackingMain
 {
 public:
-    cellTrackingMain(cellSegmentMain &cellSegment, bool debugMode = true);
+    cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool debugMode = true);
     ~cellTrackingMain(){};
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
@@ -159,6 +159,7 @@ private:    // TODO: missing cell module
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
     void merge_broken_tracks();
+    bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
 public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;

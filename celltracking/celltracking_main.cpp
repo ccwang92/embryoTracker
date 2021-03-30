@@ -1,9 +1,10 @@
 ﻿#include "celltracking_main.h"
 #include <stack>          // std::stack
 #include <deque>
+#include <fstream> // for file stream
 #include "CINDA/src_c/cinda_funcs.c"
 
-cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode)
+cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool _debugMode)
 {
     debugMode = _debugMode;
     tracking_sucess =false;
@@ -40,7 +41,54 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, bool _debugMode
     tracking_sucess = true;
     size_t total_cells = accumulate(cellSegment.number_cells.begin(), cellSegment.number_cells.end(), 0);
     qInfo("----------------%ld cells after iterative correction-------------------", total_cells);
+    saveTrackResults(cellSegment, fileNames);
 }
+
+bool cellTrackingMain::saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames){
+    //save segment results
+    for (int i=0; i<fileNames.size(); i++){
+        QString fileName = fileNames.at(i);
+        string fileNameNoExt = fileName.left(fileName.lastIndexOf('.')).toStdString();
+        string label_file_name = fileNameNoExt + "_label_map_int32_final.bin";
+        ofstream label_file(label_file_name, ios::binary);
+        if (!label_file.is_open()) return false;
+        // tmp is local variable, which will be released soon, so we need copyTo
+        label_file.write((const char*)(cellSegment.cell_label_maps[i].data),
+                         cellSegment.cell_label_maps[i].elemSize() * cellSegment.cell_label_maps[i].total());
+        label_file.close();
+    }
+    // write neighbor infor
+    QString fileName = fileNames.at(0);
+    string fileNameNoExt = fileName.left(fileName.lastIndexOf('/')).toStdString();
+    string movieInfo_txt_name = fileNameNoExt + "/movieInfo.txt";
+    ofstream movieInfo_txt(movieInfo_txt_name);
+    movieInfo_txt << "p cell num: " << movieInfo.nodes.size() << "\n";
+    movieInfo_txt << "p gamma: " << movieInfo.ovGammaParam[0] << " " << movieInfo.ovGammaParam[1] << "\n";
+    movieInfo_txt << "p jumpRatio: " << p4tracking.jumpCost[0] << " "<< p4tracking.jumpCost[1] << " "<< p4tracking.jumpCost[2] << "\n";
+    movieInfo_txt << "p enexObz: " << p4tracking.c_en << " "<< p4tracking.c_ex << " "<< p4tracking.observationCost << "\n";
+    movieInfo_txt << "c node info: id, frame, label_in_frame \n";
+    FOREACH_i(movieInfo.nodes){
+        movieInfo_txt <<"n "<< i <<" "<< movieInfo.frames[i] << " " << movieInfo.labelInMap[i] << "\n";
+    }
+    movieInfo_txt << "c link info: id1, id2, distance, link_cost \n";
+    long long arc_cnt = 0;
+    float linkCostUpBound = INFINITY;
+    for(size_t i=0; i < movieInfo.nodes.size(); i++){
+        nodeInfo &node = movieInfo.nodes[i];
+        if(movieInfo.voxIdx[i].size() == 0) continue;
+        // link with neighbors
+        for(nodeRelation neighbor : node.neighbors){
+            if(neighbor.link_cost < linkCostUpBound){
+                movieInfo_txt <<"a "<< node.node_id <<" "<< neighbor.node_id << " "
+                             << neighbor.dist_c2n << " " << neighbor.link_cost << "\n";
+                arc_cnt ++;
+            }
+        }
+    }
+    movieInfo_txt.close();
+    return true;
+}
+
 /**
  * @brief merge_broken_tracks: for node-neighbor pair with cost of dist_c2n or dist_n2c smaller than obz_cost, link them
  */

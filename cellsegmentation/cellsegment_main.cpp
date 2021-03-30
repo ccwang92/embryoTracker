@@ -215,7 +215,6 @@ bool cellSegmentMain::saveSegResults(const QString &fileName){
     stbVartrend_file.write((const char*) (&stblizedVarTrends[curr_time_point]),
                            sizeof(float)*stblizedVarTrends[curr_time_point].size());
     stbVartrend_file.close();
-
     return true;
 }
 void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const QString &fileName){
@@ -248,13 +247,6 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const
     }
     qInfo("----------------totally: %ld cells are detected", number_cells[curr_time_point]);
     //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
-    //// display volume in canvas
-    Mat4b rgb_mat4display;
-    label2rgb3d(cell_label_maps[curr_time_point], *single_frame, rgb_mat4display);
-    glWidget->setMode("Alpha blending rgba");
-    glWidget->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, data_rows_cols_slices[1],
-            data_rows_cols_slices[0], data_rows_cols_slices[2], 4);
-
     delete single_frame;
 }
 /**
