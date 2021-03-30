@@ -235,11 +235,11 @@ template <typename T> T normInv(T p, T mu = 0, T sigma = 1)
 
     if (p == 0)
     {
-        return -MAXFLOAT;
+        return -INFINITY;
     }
     if (p == 1)
     {
-        return MAXFLOAT;
+        return INFINITY;
     }
     if (sigma == 0)
     {
