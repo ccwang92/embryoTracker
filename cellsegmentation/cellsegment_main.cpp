@@ -99,28 +99,28 @@ bool cellSegmentMain::loadSegResults(const QString &fileName){
     //ccShowSlice3Dmat(principalCurv2d[curr_time_point], CV_32F);
     // read 3d principal map
     QString p3d_file_name = fileNameNoExt + "_principal3d_map_single.bin";
-    QFile p3d_file = QFile(p3d_file_name);
+    QFile p3d_file(p3d_file_name);
     if (!p3d_file.open(QIODevice::ReadOnly))  return false;
     Mat(3, normalized_data4d.size, CV_32F, p3d_file.readAll().data()).copyTo(principalCurv3d[curr_time_point]);
     p3d_file.close();
     //ccShowSlice3Dmat(principalCurv3d[curr_time_point], CV_32F);
     // read variance map
     QString varmap_file_name = fileNameNoExt + "_var_map_single.bin";
-    QFile varmap_file = QFile(varmap_file_name);
+    QFile varmap_file(varmap_file_name);
     if (!varmap_file.open(QIODevice::ReadOnly))  return false;
     Mat(3, normalized_data4d.size, CV_32F, varmap_file.readAll().data()).copyTo(varMaps[curr_time_point]);
     varmap_file.close();
     //ccShowSlice3Dmat(varMaps[curr_time_point], CV_32F);
     // read stablized variance map
     QString stbVarmap_file_name = fileNameNoExt + "_stb_var_map_single.bin";
-    QFile stbVarmap_file = QFile(stbVarmap_file_name);
+    QFile stbVarmap_file(stbVarmap_file_name);
     if (!stbVarmap_file.open(QIODevice::ReadOnly))  return false;
     Mat(3, normalized_data4d.size, CV_32F, stbVarmap_file.readAll().data()).copyTo(stblizedVarMaps[curr_time_point]);
     stbVarmap_file.close();
     //ccShowSlice3Dmat(stblizedVarMaps[curr_time_point], CV_32F);
     // read variance trend
     QString vartrend_file_name = fileNameNoExt + "_var_trend_single.bin";
-    QFile vartrend_file = QFile(vartrend_file_name);
+    QFile vartrend_file(vartrend_file_name);
     if (!vartrend_file.open(QIODevice::ReadOnly))  return false;
     //QByteArray arr = vartrend_file.read(4);
     QByteArray tmp_in = vartrend_file.read(4);
@@ -136,7 +136,7 @@ bool cellSegmentMain::loadSegResults(const QString &fileName){
 
     // read stablized variance trend
     QString stbVartrend_file_name = fileNameNoExt + "_stb_var_trend_single.bin";
-    QFile stbVartrend_file = QFile(stbVartrend_file_name);
+    QFile stbVartrend_file(stbVartrend_file_name);
     if (!stbVartrend_file.open(QIODevice::ReadOnly))  return false;
     QByteArray stb_var = stbVartrend_file.read(4);
     QByteArray arr2 = stbVartrend_file.readAll();// #1-200 elements

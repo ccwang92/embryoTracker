@@ -337,8 +337,21 @@ template <typename T> void gammafit(vector<T> const & data, T &a, T &b){
     }
     b = mean_val / a;
 }
-// has no been implemented, the log-likely hood function is so complicated and needs more literature survey
-// At current stage, we temporally use full data for gamma fitting.
+
+template <typename T> double sum_nll_truncGamma(vector<T>const &  sorted_data, double truncThr, double a, double b){
+    double out = 0;
+    double denominator = b * boost::math::gamma_p(a, truncThr/b);
+    FOREACH_i(sorted_data){
+        if(sorted_data[i] > truncThr) break;
+        out += -log(boost::math::gamma_p_derivative(a, sorted_data[i]/b) / denominator);
+    }
+    return out;
+}
+/**
+ * fit truncatedGamma distribution with newton's method; Note that it is not sure that the derivative exist or not,
+ * so we may reduce to gradient decent if the step from second-order derivative is too large.
+ * a==>k, b==>theta
+ */
 template <typename T> void truncatedGammafit(vector<T>const &  data, T &a, T &b, int uptTimes){
     //gammafit(data, a, b); //this could cause unexpected results
 //    //// !!!! for debug purpose we use constant here:
@@ -355,30 +368,59 @@ template <typename T> void truncatedGammafit(vector<T>const &  data, T &a, T &b,
 //        b = 0.660987;
 //    }
     // newton method to estimate the truncated gamma distribution
-    T a_init, b_init;
-    vector<T> non_zero_data = vec_largerthan(data, 0, true);
-    gammafit(non_zero_data, a_init, b_init);
+    float a_init, b_init;
+    float threshold = 0;
+    vector<T> sorted_non_zero_data = vec_largerthan(data, threshold, true);
+    sort(sorted_non_zero_data.begin(), sorted_non_zero_data.end());
+    gammafit(sorted_non_zero_data, a_init, b_init);
 
-    T truncThr = vec_max(non_zero_data);
+    T truncThr = sorted_non_zero_data[sorted_non_zero_data.size()-1];
     T truncThr0 = truncThr * 2;
 
-    vector<T> sorted_non_zero_data;
-    sort(non_zero_data, sorted_non_zero_data);
-    float tol = 0.01 * sorted_non_zero_data(int(sorted_non_zero_data.size()*0.99));
+//    vector<T> sorted_non_zero_data;
+//    sort(non_zero_data, sorted_non_zero_data);
+    float tol = 0.01 * sorted_non_zero_data[(int)(sorted_non_zero_data.size()*0.99)];
 
-    a = a_init, b = b_init;
+    //a = a_init, b = b_init;
+    double a_out = a_init;
+    double b_out = b_init;
     while ((truncThr0-truncThr) > tol){
         truncThr0 = truncThr;
+        truncThr = b_out * boost::math::gamma_p_inv(a_out, 1-0.05);
+        //vector<T> truncedVec = vec_atrange(non_zero_data, 0, truncThr, false);
+        // start Newton method for parameter estimation
+        double epsilon = 0.001, diff = INFINITY;
+        double epsilon_a = 0.0001, epsilon_b = epsilon_a * b_out / a_out;
+        int loop_cnt = 0;
+        while(diff > epsilon && loop_cnt < uptTimes){
+            double v = sum_nll_truncGamma(sorted_non_zero_data, (double)truncThr, a_out, b_out);
+            double v1 = sum_nll_truncGamma(sorted_non_zero_data, (double)truncThr, a_out+epsilon_a, b_out);
+            double v2 = sum_nll_truncGamma(sorted_non_zero_data, (double)truncThr, a_out-epsilon_a, b_out);
+            double f1 = (v1 - v2) / (2*epsilon_a);
+            double f2 = abs(((v1-v)/epsilon_a - (v-v2)/epsilon_a)/epsilon_a);
+            double a_new = a_out - f1*MIN(0.1*abs(a_out/f1), 1/f2);
 
-        float truncThr = b_init / boost::math::gamma_q_inv(a_init,1-0.05);
-        vector<T> truncedVec = vec_atrange(non_zero_data, 0, truncThr, false);
+            v1 = sum_nll_truncGamma(sorted_non_zero_data, (double)truncThr, a_out, b_out+epsilon_b);
+            v2 = sum_nll_truncGamma(sorted_non_zero_data, (double)truncThr, a_out, b_out-epsilon_b);
+            f1 = (v1 - v2) / (2*epsilon_b);
+            f2 = abs(((v1-v)/epsilon_b - (v-v2)/epsilon_b)/epsilon_b);
 
+            double b_new = b_out - f1*MIN(0.1*abs(b_out/f1), 1/f2);
+            diff = abs(b_new-b_out) + abs(a_new-a_out);
+            if (a_new < 0 || b_new < 0){
+                a = a_init, b = b_init;
+                qInfo("Truncated Gamma fitting failed, use original gamma fitting, a:%.4f, b:%.4f", a, b);
+                return;
+            }
+            a_out = (T)a_new;
+            b_out = (T)b_new;
+            loop_cnt++;
+        }
         //mle(truncedVec, 'pdf',pdf_truncgamma, a_init, b_init, a, b);
-        a_init = a;
-        b_init = b;
     }
 
-
+    a = a_out, b = b_out;
+    qInfo("Truncated Gamma fitting results, a:%.4f, b:%.4f", a, b);
 }
 template <typename T> vector<T> vec_log(vector<T> const & data){
     vector<T> log_v(data.size());

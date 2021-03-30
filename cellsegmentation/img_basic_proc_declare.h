@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <iomanip>      // std::setprecision
 #include <set>
+#include <unordered_map>
+#include <unordered_set>
 #include <iterator>
 #include "maxflow_bk/graph.h" //max-flow BK algorithm
 
@@ -69,6 +71,9 @@ enum missingCellLocations {MISS_AT_TRACK_START=0, MISS_AT_TRACK_END, MISS_AS_JUM
     for(int k=0; k<x.size[2]; k++)
 
 #define EPSILON_0 0.00001
+
+#define byte unsigned char
+
 const int n8_y[] = { -1, -1, -1,  1, 1, 1,  0, 0 };// 8 shifts to neighbors
 const int n8_x[] = { -1,  0,  1, -1, 0, 1, -1, 1 };// used in functions
 
@@ -209,7 +214,7 @@ template <typename T> float binocdf(T num_cls0, T num_all, float p);
 template <typename T> double chi2inv(T p, int df = 1); // inverse chi-square distribution
 template <typename T> double gammacdf(T x, T a, T b, bool upper = true); // gamma cdf function
 template <typename T> void gammafit(vector<T> const & data, T &a, T &b);// gamma fitting use MLE
-template <typename T> void truncatedGammafit(vector<T> const & data, T &a, T &b, int uptTimes = 0); // not done
+template <typename T> void truncatedGammafit(vector<T> const & data, T &a, T &b, int uptTimes = 100); // not done
 template <typename T> vector<T> vec_log(vector<T> const & data);
 
 template <typename T> float vec_stddev(vector<T> const & func);
