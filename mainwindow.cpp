@@ -329,25 +329,47 @@ MainWindow::~MainWindow()
 }
 void MainWindow::debugAlgorithm()
 {
-    //float kk = chi2inv(0.5, 2);
-    algorithmDebug = true;
-    this->data4test->debugMode = true;
-    this->importImageSeries();
-    //// send data to do segmentation on all frames
-    for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
-        glWidget_raycast->curr_timePoint_in_canvas = i;
-        //// segement
-        this->sendData4Segment();
-        qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+    // directly work on 4 folders
+    QString filename = QFileDialog::getOpenFileName(this);
+    int x = filename.lastIndexOf('/');
+    QString folderName = filename.left(x);
+    x = folderName.lastIndexOf('/');
+    folderName = folderName.left(x);
+    QDirIterator it(folderName, QDir::Dirs | QDir::NoDotAndDotDot); //QDirIterator::Subdirectories);//QStringList() << "*.jpg", QDir::Files,
+    while (it.hasNext()){
+        debugDataPath = it.next();
+        qInfo()<<debugDataPath;
+        if(!debugDataPath.isEmpty()){
+            QFileInfo check_file(QDir(debugDataPath).filePath("movieInfo.txt"));
+            if(check_file.exists() && check_file.isFile()){
+                continue;
+            }
+            debugDataPath = QDir(debugDataPath).filePath("1.tif");
+            algorithmDebug = true;
+            this->data4test->debugMode = true;
+            //QString fileName =
+            this->importImageSeries();
+            //// send data to do segmentation on all frames
+            for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
+                glWidget_raycast->curr_timePoint_in_canvas = i;
+                //// segement
+                this->sendData4Segment();
+                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+            }
+        //    glWidget_raycast->setVolumeTimePoint(0);
+            //// send segmentation results for cell linking
+        //    this->sendData4Track();
+            qInfo("start tracking");
+            chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+            cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
+            chrono::steady_clock::time_point end = chrono::steady_clock::now();
+            qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
+            delete cellSegmenter;
+            cellSegmenter = nullptr;
+            delete cellTracker;
+            cellTracker = nullptr;
+        }
     }
-//    glWidget_raycast->setVolumeTimePoint(0);
-    //// send segmentation results for cell linking
-//    this->sendData4Track();
-    qInfo("start tracking");
-    chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-    cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
-    chrono::steady_clock::time_point end = chrono::steady_clock::now();
-    qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
     qFatal("Debug successed! No need to continue");
 }
 void MainWindow::sendData4Segment()
@@ -356,7 +378,7 @@ void MainWindow::sendData4Segment()
         QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
         return;
     }
-    if(!cellSegmenter){
+    if(cellSegmenter == nullptr){
         cellSegmenter = new cellSegmentMain((void *)data4test->image4d->getRawData(),
                                             data4test->image4d->getDatatype(),
                                             glWidget_raycast->bufSize);
@@ -367,16 +389,16 @@ void MainWindow::sendData4Segment()
     cellSegmenter->processSingleFrameAndReturn(glWidget_raycast,
                    data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
     //// display results in canvas
-    int i = glWidget_raycast->curr_timePoint_in_canvas;
-    long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*cellSegmenter->data_rows_cols_slices[1]*
-            cellSegmenter->data_rows_cols_slices[2];
-    unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*i; // sub-matrix pointer
-    Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
-    Mat4b rgb_mat4display;
-    label2rgb3d(cellSegmenter->cell_label_maps[i], *single_frame, rgb_mat4display);
-    glWidget_raycast->setMode("Alpha blending rgba");
-    glWidget_raycast->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, cellSegmenter->data_rows_cols_slices[1],
-            cellSegmenter->data_rows_cols_slices[0], cellSegmenter->data_rows_cols_slices[2], 4);
+//    int i = glWidget_raycast->curr_timePoint_in_canvas;
+//    long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*cellSegmenter->data_rows_cols_slices[1]*
+//            cellSegmenter->data_rows_cols_slices[2];
+//    unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*i; // sub-matrix pointer
+//    Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
+//    Mat4b rgb_mat4display;
+//    label2rgb3d(cellSegmenter->cell_label_maps[i], *single_frame, rgb_mat4display);
+//    glWidget_raycast->setMode("Alpha blending rgba");
+//    glWidget_raycast->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, cellSegmenter->data_rows_cols_slices[1],
+//            cellSegmenter->data_rows_cols_slices[0], cellSegmenter->data_rows_cols_slices[2], 4);
 
 }
 
