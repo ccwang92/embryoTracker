@@ -63,7 +63,8 @@ void MainWindow::createControlWidgets()
     processMenu->addAction(trackCell3d);
 /** *************** Debug algorithms *****************/
     debugButton = new QAction(tr("Debug"), this);
-    menuBar->addAction(debugButton);
+    //menuBar->addAction(debugButton);
+    processMenu->addAction(debugButton);
     /** *************** About *************************/
     QMenu * aboutMenu = new QMenu(tr("About"), this);
     menuBar->addMenu(aboutMenu);
