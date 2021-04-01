@@ -245,6 +245,9 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const
             qDebug("Failed to save the segmentation results to hard drive");
         }
     }
+    if(number_cells[curr_time_point] > 50000){
+        qDebug("!!!!!!!!!!!!!:We should not detect that many cells !");
+    }
     qInfo("----------------totally: %ld cells are detected", number_cells[curr_time_point]);
     //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     delete single_frame;
@@ -533,6 +536,7 @@ void cellSegmentMain::regionWiseAnalysis4d(Mat *data_grayim3d, Mat *dataVolFloat
     }
     //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
     //ccShowSlice3Dmat(threshold_maps[curr_time_point], CV_8U);
+    removeSmallCC(cell_label_maps[curr_time_point], cell_cnt, p4segVol.min_cell_sz, true);
     number_cells[curr_time_point] = cell_cnt;
 }
 
