@@ -241,9 +241,9 @@ void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const
         time_points_processed[curr_time_point] = true;
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
         qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
-        if(!saveSegResults(fileName)){
-            qDebug("Failed to save the segmentation results to hard drive");
-        }
+//        if(!saveSegResults(fileName)){
+//            qDebug("Failed to save the segmentation results to hard drive");
+//        }
     }
     if(number_cells[curr_time_point] > 50000){
         qDebug("!!!!!!!!!!!!!:We should not detect that many cells !");
