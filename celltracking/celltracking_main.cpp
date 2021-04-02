@@ -3210,13 +3210,18 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
         }else{ // split success
             // 1. nullify the current region
             // nullifyCellOrNode(node_idx); // leave it to movieIinfo_update
+            unsigned char thres_cur =
+                    cellSegment.cell_label_maps[movieInfo.frames[node_idx]].at<unsigned char>(movieInfo.voxIdx[node_idx][0]);
+            assert(thres_cur > 0);
             // 2. save the two new regions in
             simpleNodeInfo newC1, newC2;
             newCells.push_back(newC1);
             newCells.push_back(newC2);
             newCells[newCells.size() - 2].frame = movieInfo.frames[node_idx];
+            newCells[newCells.size() - 2].threshold = thres_cur;
             newCells[newCells.size() - 2].voxIdx = splitRegs[0];
             newCells[newCells.size() - 1].frame = movieInfo.frames[node_idx];
+            newCells[newCells.size() - 1].threshold = thres_cur;
             newCells[newCells.size() - 1].voxIdx = splitRegs[1];
             return true;
         }

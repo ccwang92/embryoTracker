@@ -15,6 +15,7 @@ MainWindow::MainWindow()
     setCentralWidget(grpBox4display_canvas);
     //layout->addWidget(rightSideControlLayout);
     //setLayout(mainLayout);
+    this->setWindowTitle("Bi-QAV");
     connectSignal();
     cellSegmenter = 0;
 }
