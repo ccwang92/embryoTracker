@@ -339,6 +339,11 @@ void cellSegmentMain::cellSegmentSingleFrame(Mat *data_grayim3d, size_t curr_fra
  */
 void cellSegmentMain::retrieve_seeds(Mat *smoothed_VolFloat, Mat *label_map_1stRound, size_t cell_num_1stRound,
                                      Mat *cellGapMap, Mat &idMap_2ndRound, int &seed_num_2ndRound){
+    if(cell_num_1stRound == 0){
+        idMap_2ndRound = Mat::zeros(label_map_1stRound->dims, label_map_1stRound->size, CV_32S);
+        seed_num_2ndRound = 0;
+        return;
+    }
     // 1. extract the cell size and intensity
     vector<vector<size_t>> voxList_exist_cells;
     extractVoxIdxList(label_map_1stRound, voxList_exist_cells, cell_num_1stRound);
