@@ -61,12 +61,12 @@ private:
     void nullifyCellOrNode(size_t node_idx, cellSegmentMain *cellSegment = nullptr); //
     void nullifyCellOrNode(size_t node_idx[], cellSegmentMain *cellSegment = nullptr); //
     void nullifyCellOrNode(vector<size_t> node_idx, cellSegmentMain *cellSegment = nullptr); //
-    void appendNewCellOrNode(cellSegmentMain &cellSegment, simpleNodeInfo &newCell, size_t append_loc_idx);
+    void appendNewCellOrNode(cellSegmentMain &cellSegment, newFoundCellInfo &newCell, size_t append_loc_idx);
 private: // remaining for split/merge module
     void split_merge_module(cellSegmentMain &cellSegment);
 
     void handleMergeSplitRegions();
-    void regionRefresh(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+    void regionRefresh(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells, vector<size_t> &uptCell_idxs);
 
     void detectPeerRegions(vector<splitMergeNodeInfo> &split_merge_node_info,
                            unordered_map<long, long> &node_id2split_merge_node_id);
@@ -109,14 +109,14 @@ private: // remaining for split/merge module
 
 
     bool handleNonSplitReg_link2oneSeed(size_t node_idx, size_t seeds[2]);
-    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], bool &oneSeedIsGood, vector<simpleNodeInfo> &newCells);
+    bool separateRegion(cellSegmentMain &cellSegment, size_t node_idx, size_t seeds[2], bool &oneSeedIsGood, vector<newFoundCellInfo> &newCells);
 
-    bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<simpleNodeInfo> &newCells);
+    bool mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<newFoundCellInfo> &newCells);
 private:    // TODO: missing cell module
     void missing_cell_module(cellSegmentMain &cellSegment);
-    void retrieve_missing_cells(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+    void retrieve_missing_cells(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells,
                                 vector<size_t> &uptCell_idxs);
-    bool deal_single_missing_case(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+    bool deal_single_missing_case(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells,
                                   vector<size_t> &uptCell_idxs, size_t cur_node_idx, int missing_type);
 
     bool extractSeedFromGivenCell(cellSegmentMain &cellSegment, int missing_type,
@@ -144,7 +144,7 @@ private:    // TODO: missing cell module
 
     bool redetectCellinTrackingwithSeed(cellSegmentMain &cellSegment, vector<size_t> seed_idx4fgRefine, int seed_label_in_map, int frame,
                                         vector<vector<size_t>> valid_seeds_loc_idx, size_t parentKid_idx[2], int missing_type,
-                                        vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+                                        vector<newFoundCellInfo> &newCells, vector<size_t> &uptCell_idxs);
     pair<int, int> newlyAddedCellValidTest(cellSegmentMain &cellSegment, singleCellSeed &seed, vector<size_t> &new_cell_idx,
                                                    int new_cell_frame, vector<size_t> ajd_cell_idx, size_t parentKid_idx[2],
                                                     int missing_type, vector<vector<size_t>> &extra_new_cells_loc_idx);
@@ -157,9 +157,14 @@ private:    // TODO: missing cell module
                                                vector<size_t> valid_loc_idx, int valid_loc_frame,
                                                vector<vector<size_t>> &splitted_reg_loc_idx);
 private:
-    void movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs);
+    void movieInfo_update(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells, vector<size_t> &uptCell_idxs);
     void merge_broken_tracks();
     bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
+private: // combine all results from batch processing
+    bool loadBatchResults(const QStringList &folderNames);
+    bool batchResultsFusion(const QStringList &folderNames);
+    void spaceFusion(const QStringList &subfolderName);
+    void temporalFusion(const QStringList &folderNames);
 public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;

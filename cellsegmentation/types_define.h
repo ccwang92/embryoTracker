@@ -165,11 +165,20 @@ struct splitMergeNodeInfo{
     bool invalid;
 };
 // save the newly found cells and refresh the data after all
-struct simpleNodeInfo{
+struct newFoundCellInfo{
     int frame;
     unsigned char threshold;
     std::vector<size_t> voxIdx;
 };
+//struct simpleNodeInfo{
+//    long long node_id;
+//    size_t kids;
+//    float kid_cost;
+//    int kid_num = 0;
+//    long long nodeId2One2OneTrackId, nodeLocInTrack;
+//    float in_cost, out_cost, detect_confidence;
+//    std::vector<nodeRelation> neighbors; // candidate kids
+//};
 
 struct nodeInfo{
     long long node_id;

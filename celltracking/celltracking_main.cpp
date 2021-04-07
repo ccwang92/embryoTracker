@@ -2655,7 +2655,7 @@ int cellTrackingMain::regionSplitMergeJudge(cellSegmentMain &cellSegment, size_t
  * @brief regionRefresh: based on the tracking results, check if the region should be split or merge
  * @param cellSegment
  */
-void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells, vector<size_t> &uptCell_idxs){
+void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells, vector<size_t> &uptCell_idxs){
     //vector<tuple<size_t, int, float>> all_merge_split_peers;
     for(vector<size_t> track : movieInfo.tracks){
         if(track.size() < 2 || track[0] < 0){
@@ -2770,7 +2770,7 @@ void cellTrackingMain::regionRefresh(cellSegmentMain &cellSegment, vector<simple
         unordered_set<size_t> splitted_reg_ids, merged_reg_ids;
         FOREACH_i(merged_split_peers){
             //separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
-            //size_t seeds[2], vector<simpleNodeInfo> &newCells)
+            //size_t seeds[2], vector<newFoundCellInfo> &newCells)
             size_t curr_node_idx = get<0>(merged_split_peers[i]);
             if(splitted_reg_ids.find(curr_node_idx)!=splitted_reg_ids.end() ||
                     merged_reg_ids.find(curr_node_idx)!=splitted_reg_ids.end()){
@@ -2986,7 +2986,7 @@ void cellTrackingMain::infinitifyCellRelation(size_t n1, size_t n2){
  * @param newCells
  * @param append_loc_idx: the location to append in voxIdx
  */
-void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, simpleNodeInfo &newCell,
+void cellTrackingMain::appendNewCellOrNode(cellSegmentMain &cellSegment, newFoundCellInfo &newCell,
                                            size_t append_loc_idx){
     // 1. update movieInfo
     int frame = newCell.frame;
@@ -3182,7 +3182,7 @@ void cellTrackingMain::nullifyCellOrNode(vector<size_t> node_idx, cellSegmentMai
  * @param seeds
  */
 bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_idx,
-                                      size_t seeds[2], bool &oneSeedIsGood, vector<simpleNodeInfo> &newCells){
+                                      size_t seeds[2], bool &oneSeedIsGood, vector<newFoundCellInfo> &newCells){
     //newCells.resize(0);
     // first check that the regions is valid
     if(isValid(node_idx, &cellSegment)){
@@ -3220,7 +3220,7 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
                     cellSegment.threshold_maps[movieInfo.frames[node_idx]].at<unsigned char>(movieInfo.voxIdx[node_idx][0]);
             assert(thres_cur > 0);
             // 2. save the two new regions in
-            simpleNodeInfo newC1, newC2;
+            newFoundCellInfo newC1, newC2;
             newCells.push_back(newC1);
             newCells.push_back(newC2);
             newCells[newCells.size() - 2].frame = movieInfo.frames[node_idx];
@@ -3260,13 +3260,13 @@ bool cellTrackingMain::handleNonSplitReg_link2oneSeed(size_t node_idx, size_t se
  * @param cellSegment
  * @param seeds
  */
-bool cellTrackingMain::mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<simpleNodeInfo> &newCells){
+bool cellTrackingMain::mergedRegionGrow(cellSegmentMain &cellSegment, size_t seeds[2], vector<newFoundCellInfo> &newCells){
     assert(movieInfo.frames[seeds[0]] == movieInfo.frames[seeds[1]]);
     int curr_frame = movieInfo.frames[seeds[0]];
     if(p4tracking.stableNodeTest && movieInfo.nodes[seeds[0]].stable_status == NOT_STABLE &&
             movieInfo.nodes[seeds[1]].stable_status == NOT_STABLE){
         if(isValid(seeds[0], &cellSegment) && isValid(seeds[1], &cellSegment)){
-            simpleNodeInfo newC;
+            newFoundCellInfo newC;
             newCells.push_back(newC);
             newCells[newCells.size() - 1].frame = curr_frame;
             newCells[newCells.size() - 1].voxIdx = movieInfo.voxIdx[seeds[0]];
@@ -3296,7 +3296,7 @@ void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
     // 1. build the graph allowing split and merge and conduct min-cost circulation based tracking
     handleMergeSplitRegions();
     // 2. for each one2two or two2one linking, choose to split or merge the correspond nodes
-    vector<simpleNodeInfo> newCells;
+    vector<newFoundCellInfo> newCells;
     vector<size_t> uptCell_idxs;
     regionRefresh(cellSegment, newCells, uptCell_idxs);
 
@@ -3309,7 +3309,7 @@ void cellTrackingMain::split_merge_module(cellSegmentMain &cellSegment){
  * @param newCells
  * @param uptCell_idxs
  */
-void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells,
                                         vector<size_t> &uptCell_idxs){
     if(vec_unique(uptCell_idxs)){
         qFatal("There is duplicated updating! check first func: regionRefresh() first");
@@ -3325,7 +3325,7 @@ void cellTrackingMain::movieInfo_update(cellSegmentMain &cellSegment, vector<sim
         nullifyCellOrNode(uptCell_idxs[i], &cellSegment);
     }
     FOREACH_i(newCells){
-        simpleNodeInfo &sNi = newCells[i];
+        newFoundCellInfo &sNi = newCells[i];
         size_t new_idx;
         if(uptCell_framewise[sNi.frame].size() > 0){
             new_idx = *uptCell_framewise[sNi.frame].begin();
@@ -3355,7 +3355,7 @@ void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
     mccTracker_one2one();
 
     // step 2. re-detect missed cells (manipulate existing cells if needed)
-    vector<simpleNodeInfo> newCells;
+    vector<newFoundCellInfo> newCells;
     vector<size_t> uptCell_idxs;
     retrieve_missing_cells(cellSegment, newCells, uptCell_idxs);
 
@@ -3366,7 +3366,7 @@ void cellTrackingMain::missing_cell_module(cellSegmentMain &cellSegment){
  * @brief retrieve_missing_cells:
  * @param cellSegment
  */
-void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells,
                                               vector<size_t> &uptCell_idxs){
     // check the cell one by one
     for(size_t i=0; i<movieInfo.nodes.size(); i++){
@@ -3421,7 +3421,7 @@ void cellTrackingMain::retrieve_missing_cells(cellSegmentMain &cellSegment, vect
  * @param uptCell_idxs
  * @param missing_type
  */
-bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, vector<simpleNodeInfo> &newCells,
+bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells,
                                                 vector<size_t> &uptCell_idxs, size_t cur_node_idx, int missing_type){
     vector<int> missing_frames;
     vector<size_t> seed_loc_idx;
@@ -3492,7 +3492,7 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
         //---debug end --//
         int seed_label4fgRefine = cellSegment.number_cells[frame] + 1;// make sure no existing cell has this label
         setValMat(cellSegment.cell_label_maps[frame], CV_32S, seed_idx4fgRefine, seed_label4fgRefine);
-        //vector<simpleNodeInfo> newCells_currentRun;
+        //vector<newFoundCellInfo> newCells_currentRun;
         size_t parentKid_idx[] = {parent_idx, kid_idx};
         size_t init_uptCellSize = uptCell_idxs.size();
         if(!redetectCellinTrackingwithSeed(cellSegment, seed_idx4fgRefine, seed_label4fgRefine, frame,
@@ -3551,7 +3551,7 @@ bool cellTrackingMain::deal_single_missing_case(cellSegmentMain &cellSegment, ve
  */
 bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegment, vector<size_t> seed_idx4fgRefine,
                                     int seed_label_in_map, int frame, vector<vector<size_t>> valid_seeds_loc_idx,
-                                    size_t parentKid_idx[2], int missing_type, vector<simpleNodeInfo> &newCells,
+                                    size_t parentKid_idx[2], int missing_type, vector<newFoundCellInfo> &newCells,
                                     vector<size_t> &uptCell_idxs){
     if(seed_idx4fgRefine.size() < cellSegment.p4segVol.min_seed_size){
         return false;
@@ -3635,7 +3635,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                                 -seed.crop_range_yxz[2].start};
         bool indeed_add_cell = false;
         for(int i=0; i<newCells_idx_small.size(); i++){
-            simpleNodeInfo tmp;
+            newFoundCellInfo tmp;
             tmp.frame = frame;
             tmp.threshold = seed.bestFgThreshold;
             coordinateTransfer(newCells_idx_small[i], grownSeedMap3d.size, tmp.voxIdx,
@@ -3692,7 +3692,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
             return false;
         }else{
             if(res.first == 2 || res.first == 5){
-                simpleNodeInfo tmp;
+                newFoundCellInfo tmp;
                 tmp.frame = frame;
                 tmp.threshold = seed.bestFgThreshold;
                 tmp.voxIdx = vec_merge(new_cell_loc_idx, movieInfo.voxIdx[adj_cell_id[0]]);
@@ -3704,7 +3704,7 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 movieInfo.nodes[adj_cell_id[0]].node_id = -1;
             }else if(res.first == 3){
                 assert(extra_new_cells_loc_idx.size() == 2);
-                simpleNodeInfo tmp;
+                newFoundCellInfo tmp;
                 tmp.frame = frame;
                 tmp.threshold = cellSegment.threshold_maps[frame].at<unsigned char>(movieInfo.voxIdx[adj_cell_id[0]][0]);
                 tmp.voxIdx = extra_new_cells_loc_idx[0];
@@ -3719,14 +3719,14 @@ bool cellTrackingMain::redetectCellinTrackingwithSeed(cellSegmentMain &cellSegme
                 movieInfo.nodes[adj_cell_id[0]].node_id = -1;
             }else if(res.first == 6){
                 assert(extra_new_cells_loc_idx.size() == 1);
-                simpleNodeInfo tmp;
+                newFoundCellInfo tmp;
                 tmp.frame = frame;
                 tmp.voxIdx = extra_new_cells_loc_idx[0];
                 tmp.threshold = seed.bestFgThreshold;
                 newCells.push_back(tmp);
                 //uptCell_idxs.push_back(adj_cell_id[0]);
             }else{ // case 1 and 4, we can directly add the new cell
-                simpleNodeInfo tmp;
+                newFoundCellInfo tmp;
                 tmp.frame = frame;
                 tmp.voxIdx = new_cell_loc_idx;
                 tmp.threshold = seed.bestFgThreshold;
@@ -4480,4 +4480,25 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
                                         node_loc_idx, movieInfo.frames[node_idx[0]], sz, dummy_c2n, dummy_c2n);
     cost = distance2cost(dist);
     return (cost<abs(p4tracking.observationCost));
+}
+
+
+
+
+///--------------------------------------combine results from batch processing--------------------------//
+/// The key principal of cell fusion is to determine if two cells from overlapped regions are the same or not.
+/// We used a IoU=0.5 as principal, if ov > IoU, they are the same. Otherwise, we keep the one that further to
+/// the spatial or temporal boundary.
+bool cellTrackingMain::batchResultsFusion(const QStringList &folderNames){
+
+}
+/**
+ * @brief spaceFusion: fuse data in vertical and horizontal directions
+ * @param subfolderName
+ */
+void cellTrackingMain::spaceFusion(const QStringList &subfolderName){
+
+}
+void cellTrackingMain::temporalFusion(const QStringList &folderNames){
+
 }
