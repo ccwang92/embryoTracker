@@ -66,9 +66,15 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
 bool cellSegmentMain::loadSegResults(const QString &fileName){
     QString fileNameNoExt = fileName.left(fileName.lastIndexOf('.'));
     // read label data
-    QString label_file_name = fileNameNoExt + "_label_map_int32.bin";
+    QString label_file_name = fileNameNoExt + "_label_map_int32_final.bin";
+    QFileInfo check_file(label_file_name);
+    if(!(check_file.exists() && check_file.isFile())){
+        label_file_name = fileNameNoExt + "_label_map_int32.bin";
+    }
     QFile label_file(label_file_name);
-    if (!label_file.open(QIODevice::ReadOnly)) return false;
+    if (!label_file.open(QIODevice::ReadOnly)){
+        return false;
+    }
     //QByteArray tmp = label_file.readAll();
     // tmp is local variable, which will be released soon, so we need copyTo
     Mat(3, normalized_data4d.size, CV_32S, label_file.readAll().data()).copyTo(cell_label_maps[curr_time_point]);

@@ -1278,18 +1278,20 @@ void cellTrackingMain::driftCorrection(){
         }
     }
     for(int i=1;i < movieInfo.frame_shift_xyz.size(); i++){
-        movieInfo.frame_shift_xyz[i][0] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][0] /= MAX(1, samples4driftCumulate[i]);
         movieInfo.frame_shift_xyz[i][0] += movieInfo.frame_shift_xyz[i-1][0];
-        movieInfo.frame_shift_xyz[i][1] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][1] /= MAX(1, samples4driftCumulate[i]);
         movieInfo.frame_shift_xyz[i][1] += movieInfo.frame_shift_xyz[i-1][1];
-        movieInfo.frame_shift_xyz[i][2] /= samples4driftCumulate[i];
+        movieInfo.frame_shift_xyz[i][2] /= MAX(1, samples4driftCumulate[i]);
         movieInfo.frame_shift_xyz[i][2] += movieInfo.frame_shift_xyz[i-1][2];
     }
 }
 void cellTrackingMain::updateGammaParam(){
     vector<float> nn_dist;
     calCellFootprintsDistance(nn_dist); // the nearest neighbor
-    truncatedGammafit(nn_dist, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+    if (nn_dist.size() > 200){
+        truncatedGammafit(nn_dist, movieInfo.ovGammaParam[0], movieInfo.ovGammaParam[1]);
+    }
 }
 void cellTrackingMain::updateArcCost(bool updatePreNei){
     for(nodeInfo &n : movieInfo.nodes){
