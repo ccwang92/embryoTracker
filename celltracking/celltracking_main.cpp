@@ -1213,7 +1213,11 @@ void cellTrackingMain::updateJumpCost(){
         }
     }
     FOREACH_i(p4tracking.jumpCost){
-        p4tracking.jumpCost[i] = (float)((double)jumpArcs[i] / overall_arcs);
+        if(overall_arcs == 0){//there is no meaningful arcs
+            p4tracking.jumpCost[i] = 1.0;
+        }else{
+            p4tracking.jumpCost[i] = (float)((double)jumpArcs[i] / overall_arcs);
+        }
     }
 }
 /**
