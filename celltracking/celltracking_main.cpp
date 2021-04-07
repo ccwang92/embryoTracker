@@ -3217,7 +3217,7 @@ bool cellTrackingMain::separateRegion(cellSegmentMain &cellSegment, size_t node_
             // 1. nullify the current region
             // nullifyCellOrNode(node_idx); // leave it to movieIinfo_update
             unsigned char thres_cur =
-                    cellSegment.cell_label_maps[movieInfo.frames[node_idx]].at<unsigned char>(movieInfo.voxIdx[node_idx][0]);
+                    cellSegment.threshold_maps[movieInfo.frames[node_idx]].at<unsigned char>(movieInfo.voxIdx[node_idx][0]);
             assert(thres_cur > 0);
             // 2. save the two new regions in
             simpleNodeInfo newC1, newC2;
