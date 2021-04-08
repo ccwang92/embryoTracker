@@ -4489,16 +4489,22 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
 /// The key principal of cell fusion is to determine if two cells from overlapped regions are the same or not.
 /// We used a IoU=0.5 as principal, if ov > IoU, they are the same. Otherwise, we keep the one that further to
 /// the spatial or temporal boundary.
-bool cellTrackingMain::batchResultsFusion(const QStringList &folderNames){
+bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName){
 
 }
 /**
  * @brief spaceFusion: fuse data in vertical and horizontal directions
  * @param subfolderName
  */
-void cellTrackingMain::spaceFusion(const QStringList &subfolderName){
+void cellTrackingMain::spaceFusion(const QString &subfolderName){
+    vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
+    QDir root_directory(subfolderName+"/"+crop_names[0]);
+    QStringList images = root_directory.entryList(QStringList() << "*.bin" ,QDir::Files);// <<"*.tif" << "*.JPG" if we want two type images
+    foreach(QString filename, images) { //QT's version of for_each
+
+    }
 
 }
-void cellTrackingMain::temporalFusion(const QStringList &folderNames){
+void cellTrackingMain::temporalFusion(const QString &folderNames){
 
 }

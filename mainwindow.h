@@ -96,7 +96,7 @@ public:
     Mat3b colormap4tracking_res;
 public slots:
     void debugAlgorithm();
-
+    void debugBatchFusion();
 
 };
 #endif // MAINWINDOW_H

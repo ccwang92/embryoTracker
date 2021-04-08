@@ -161,10 +161,10 @@ private:
     void merge_broken_tracks();
     bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
 private: // combine all results from batch processing
-    bool loadBatchResults(const QStringList &folderNames);
-    bool batchResultsFusion(const QStringList &folderNames);
-    void spaceFusion(const QStringList &subfolderName);
-    void temporalFusion(const QStringList &folderNames);
+    bool loadBatchResults(const QString &dataFolderName, const QString &resFolderName);
+    bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName);
+    void spaceFusion(const QString &subfolderName);
+    void temporalFusion(const QString &folderNames);
 public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;

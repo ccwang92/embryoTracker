@@ -329,6 +329,52 @@ void MainWindow::importImageSeries()
 MainWindow::~MainWindow()
 {
 }
+void MainWindow::debugBatchFusion(){
+    // directly work on 4 folders
+    QString dataFolderName =  QFileDialog::getExistingDirectory(this, tr("Open Directory"), "/home",
+                                                          QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    QString resFolderName =  QFileDialog::getExistingDirectory(this, tr("Open Directory"), dataFolderName,
+                                                          QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+
+
+    folderName = folderName.left(x);
+    QDirIterator it(folderName, QDir::Dirs | QDir::NoDotAndDotDot); //QDirIterator::Subdirectories);//QStringList() << "*.jpg", QDir::Files,
+    while (it.hasNext()){
+        debugDataPath = it.next();
+        qInfo()<<debugDataPath;
+        if(!debugDataPath.isEmpty()){
+            QFileInfo check_file(QDir(debugDataPath).filePath("movieInfo.txt"));
+            if(check_file.exists() && check_file.isFile()){
+                continue;
+            }
+            debugDataPath = QDir(debugDataPath).filePath("1.tif");
+            algorithmDebug = true;
+            this->data4test->debugMode = true;
+            //QString fileName =
+            this->importImageSeries();
+            //// send data to do segmentation on all frames
+            for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
+                glWidget_raycast->curr_timePoint_in_canvas = i;
+                //// segement
+                this->sendData4Segment();
+                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+            }
+        //    glWidget_raycast->setVolumeTimePoint(0);
+            //// send segmentation results for cell linking
+        //    this->sendData4Track();
+            qInfo("start tracking");
+            chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+            cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
+            chrono::steady_clock::time_point end = chrono::steady_clock::now();
+            qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
+            delete cellSegmenter;
+            cellSegmenter = nullptr;
+            delete cellTracker;
+            cellTracker = nullptr;
+        }
+    }
+    qFatal("Debug successed! No need to continue");
+}
 void MainWindow::debugAlgorithm()
 {
     // directly work on 4 folders
