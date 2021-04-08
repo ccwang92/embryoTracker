@@ -4489,6 +4489,9 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
 /// The key principal of cell fusion is to determine if two cells from overlapped regions are the same or not.
 /// We used a IoU=0.5 as principal, if ov > IoU, they are the same. Otherwise, we keep the one that further to
 /// the spatial or temporal boundary.
+cellTrackingMain::cellTrackingMain(const QString &dataFolderName, const QString &resFolderName){
+    batchResultsFusion(dataFolderName, resFolderName);
+}
 bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName){
 
 }
@@ -4498,10 +4501,24 @@ bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const Q
  */
 void cellTrackingMain::spaceFusion(const QString &subfolderName){
     vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
+    vector<int> fixed_crop_sz = {493, 366, 259};
+    vector<int> overlap_sz = {50, 50, 24};
     QDir root_directory(subfolderName+"/"+crop_names[0]);
     QStringList images = root_directory.entryList(QStringList() << "*.bin" ,QDir::Files);// <<"*.tif" << "*.JPG" if we want two type images
     foreach(QString filename, images) { //QT's version of for_each
-
+        vector<Mat1i> mat_crops(4); //mat_fl, mat_fr, mat_bl, mat_br;
+        for(int i=0; i<crop_names.size(); i++){
+            QString label_file_name = subfolderName + "/" + crop_names[i] + "/" + filename;
+            QFile label_file(label_file_name);
+            if (!label_file.open(QIODevice::ReadOnly)){
+                qFatal("lost files!");
+            }
+            //QByteArray tmp = label_file.readAll();
+            // tmp is local variable, which will be released soon, so we need copyTo
+            Mat(3, fixed_crop_sz.data(), CV_32S, label_file.readAll().data()).copyTo(mat_crops[i]);
+            label_file.close();
+        }
+        // do data fusion at spatial domain
     }
 
 }

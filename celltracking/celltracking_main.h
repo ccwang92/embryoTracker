@@ -6,6 +6,7 @@ class cellTrackingMain
 {
 public:
     cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool debugMode = true);
+    cellTrackingMain(const QString &dataFolderName, const QString &resFolderName);
     ~cellTrackingMain(){};
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
