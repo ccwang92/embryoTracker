@@ -2,8 +2,10 @@
 #include <stack>          // std::stack
 #include <deque>
 #include <fstream> // for file stream
+#include <algorithm>    // std::fill
 #include "CINDA/src_c/cinda_funcs.c"
-
+using namespace std;
+using namespace cv;
 cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool _debugMode)
 {
     debugMode = _debugMode;
@@ -4519,8 +4521,69 @@ void cellTrackingMain::spaceFusion(const QString &subfolderName){
             label_file.close();
         }
         // do data fusion at spatial domain
+
+
     }
 
+}
+
+void spaceFusion_leftRight(Mat &left, Mat &right, Mat1i fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
+    double l_max_id, r_max_id;
+    minMaxIdx(left, nullptr, &l_max_id);
+    minMaxIdx(right, nullptr, &r_max_id);
+    vector<vector<size_t>> l_cell_voxIdx, r_cell_voxIdx;
+    extractVoxIdxList(&left, l_cell_voxIdx, (int)l_max_id);
+    extractVoxIdxList(&right, r_cell_voxIdx, (int)r_max_id);
+
+    oldLabel2newLabel.resize(2);
+    oldLabel2newLabel[0].resize(l_max_id+1);
+    FOREACH_i(oldLabel2newLabel[0]){ // use the left one as baseline
+        oldLabel2newLabel[0][i] = i;
+    }
+    oldLabel2newLabel[1].resize(r_max_id+1);
+    fill(oldLabel2newLabel[1].begin(), oldLabel2newLabel[1].end(), 0);
+    // check the right one
+    FOREACH_i(r_cell_voxIdx){
+        vector<int> y, x, z;
+        vec_ind2sub(r_cell_voxIdx[i], y, x, z, right.size);
+        if (vec_min(x) >= ov_sz){ // located in non-overlapping area
+            oldLabel2newLabel[0][i+1] = i + 1 + l_max_id;
+        }else{
+            vector<size_t> to_left_idx;
+            to_left_idx.reserve(x.size());
+            size_t tmp;
+            for(int j=0; j<x.size(); j++){
+                if(x[j] < ov_sz){
+                    vol_sub2ind(tmp, y[j], x[j] + left.size[1]-ov_sz+1, z[j], left.size);
+                    to_left_idx.emplace_back(tmp);
+                }
+            }
+            vector<float> left_vals = extractValsGivenIdx(&left, to_left_idx, CV_32S);
+            unordered_map<float, size_t> freqs = frequecy_cnt(left_vals);
+            int best_id = 0, best_ov_sz = 0;
+            for(auto ele:freqs){
+                if(ele.second>best_ov_sz){
+                    best_id = (int) ele.first;
+                    best_ov_sz = ele.first;
+                }
+            }
+            //first test if there is a cell in left with IoU>0.5
+            if(best_id != 0 && best_ov_sz*2>=(r_cell_voxIdx[i].size() + l_cell_voxIdx[best_id].size())){
+                oldLabel2newLabel[1][i+1] = oldLabel2newLabel[1][best_id];
+            }else{ // if there is no cells in left with IOU>0.5
+                if(vec_mean(x) < (left.size[1]-ov_sz/2)){
+                    //case 1: the cell is the right half panel=> set cells in left half panel as 0
+                    oldLabel2newLabel[1][i+1] = i + 1 + l_max_id;
+                    for(auto ele:freqs){
+                        oldLabel2newLabel[0][ele.first] = 0;
+                    }
+                }else{
+                    //case 2: the cell is the left half panel=> set this cell as 0
+                    oldLabel2newLabel[1][i+1] = 0;
+                }
+            }
+        }
+    }
 }
 void cellTrackingMain::temporalFusion(const QString &folderNames){
 
