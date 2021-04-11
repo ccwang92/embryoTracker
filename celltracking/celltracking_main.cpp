@@ -4495,7 +4495,21 @@ cellTrackingMain::cellTrackingMain(const QString &dataFolderName, const QString 
     batchResultsFusion(dataFolderName, resFolderName);
 }
 bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName){
+    // step 1. fuse data in one batch, mainly using spatial fusion
 
+}
+
+bool cellTrackingMain::oneBatchResultsFusion(const QString &dataFolderName, const QString &resFolderName){
+
+}
+inline size_t key(int time,int section, int label) {
+    return (size_t) label << 32 | (unsigned int) (time << 2 + section);
+}
+inline void key2value(size_t k, int &time,int &section, int &label) {
+    label = k >> 32;
+    int ts = k & 0xFFFF;
+    section = ts & 3;
+    time = ts >> 2;
 }
 /**
  * @brief spaceFusion: fuse data in vertical and horizontal directions
@@ -4507,6 +4521,7 @@ void cellTrackingMain::spaceFusion(const QString &subfolderName){
     vector<int> overlap_sz = {50, 50, 24};
     QDir root_directory(subfolderName+"/"+crop_names[0]);
     QStringList images = root_directory.entryList(QStringList() << "*.bin" ,QDir::Files);// <<"*.tif" << "*.JPG" if we want two type images
+
     foreach(QString filename, images) { //QT's version of for_each
         vector<Mat1i> mat_crops(4); //mat_fl, mat_fr, mat_bl, mat_br;
         for(int i=0; i<crop_names.size(); i++){
@@ -4521,6 +4536,19 @@ void cellTrackingMain::spaceFusion(const QString &subfolderName){
             label_file.close();
         }
         // do data fusion at spatial domain
+        Mat lr_fuse_mat_u, lr_fuse_mat_d, ud_fuse_mat;
+        vector<vector<int>> u_label_map_lr, d_label_map_lr, label_map_ud;
+        spaceFusion_leftRight(mat_crops[0], mat_crops[1], lr_fuse_mat_u, overlap_sz[1], u_label_map_lr);
+        spaceFusion_leftRight(mat_crops[2], mat_crops[3], lr_fuse_mat_d, overlap_sz[1], d_label_map_lr);
+        spaceFusion_upDown(lr_fuse_mat_u, lr_fuse_mat_d, ud_fuse_mat, overlap_sz[2], label_map_ud);
+
+        QRegExp rx("(\\d+)");
+        if(rx.indexIn(filename) == -1) qFatal("Wrong file name");
+        int frame = rx.cap(1).toInt();
+        FOREACH_i(u_label_map_lr){
+            oldinfo2newLabel[key(frame, 0, label)] = ;
+        }
+        fuse_batch_processed_cell_cnt
     }
 
 }
@@ -4532,7 +4560,7 @@ void cellTrackingMain::spaceFusion(const QString &subfolderName){
  * @param ov_sz : on the x-axis
  * @param oldLabel2newLabel
  */
-void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
+void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
     double l_max_id, r_max_id;
     minMaxIdx(left, nullptr, &l_max_id);
     minMaxIdx(right, nullptr, &r_max_id);
@@ -4625,7 +4653,7 @@ void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vect
  * @param ov_sz: along y-axis
  * @param oldLabel2newLabel
  */
-void spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
+void cellTrackingMain::spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
     double u_max_id, d_max_id;
     minMaxIdx(up, nullptr, &u_max_id);
     minMaxIdx(down, nullptr, &d_max_id);
