@@ -163,16 +163,20 @@ private:
     bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
 private: // combine all results from batch processing
     bool loadBatchResults(const QString &dataFolderName, const QString &resFolderName);
-    bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName);
-    bool oneBatchResultsFusion(const QString &batchFolderName);
-    void spatialFusion(const QString &subfolderName);
-    void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel);
-    void spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel);
-    void temporalFusion(const QString &folderNames);
+    bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
+    bool oneBatchResultsFusion(int batch_id, const QString &batchFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
+    void spatialFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
+    void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel);
+    void spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel);
+    void temporalFusion(Mat &kept, Mat &mov);
+
 private:
-    unordered_map<size_t, size_t> oldinfo2newLabel; // <time, section(fl, fr, bl, br), labelinMap> ==> new node id
-    unordered_map<size_t, size_t> newLabel2newinfo; // new node id ==> <time, labelinMap>
+    unordered_map<size_t, size_t> oldinfo2newIdx; // <time, section(fl, fr, bl, br), labelinMap> ==> new node id
+    unordered_map<size_t, size_t> newIdx2newinfo; // new node id ==> <time, new labelinMap>
+    unordered_map<size_t, size_t> newinfo2newIdx; // <time, new labelinMap> ==> new node id
     size_t fuse_batch_processed_cell_cnt = 0;
+    vector<pair<int, Mat>> overlapped_frames;
+    int frame_processed = -1;
 public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;

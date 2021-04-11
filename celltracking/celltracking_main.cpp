@@ -4484,36 +4484,36 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
     return (cost<abs(p4tracking.observationCost));
 }
 
-
-
-
 ///--------------------------------------combine results from batch processing--------------------------//
 /// The key principal of cell fusion is to determine if two cells from overlapped regions are the same or not.
 /// We used a IoU=0.5 as principal, if ov > IoU, they are the same. Otherwise, we keep the one that further to
 /// the spatial or temporal boundary.
 cellTrackingMain::cellTrackingMain(const QString &dataFolderName, const QString &resFolderName){
     vector<int> fixed_crop_sz = {493, 366, 259};
-    vector<int> overlap_sz = {50, 50, 24};
-    batchResultsFusion(dataFolderName, resFolderName);
+    vector<int> overlap_sz = {50, 50, 24, 5}; // y, x, z, t
+    batchResultsFusion(dataFolderName, resFolderName, fixed_crop_sz, overlap_sz);
 }
-bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, vector<int> fixed_crop_sz, vector<int> overlap_sz){
+bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName,
+                                          vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
+    overlapped_frames.reserve(p4tracking.k);
     // step 1. fuse data in one batch, mainly using spatial fusion
 
 }
 
-bool cellTrackingMain::oneBatchResultsFusion(const QString &batchFolderName){
+bool cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &batchFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
     // for one batch of results, we only need spaticalFusion
-    spatialFusion(batchFolderName);
+    spatialFusion(batch_id, batchFolderName, fixed_crop_sz, overlap_sz);
 }
 // for crop detections
-inline size_t key(int time,int section, int label) {
-    return (size_t) label << 32 | (unsigned int) (time << 2 + section);
+inline size_t key(int batch, int time,int section, int label) {
+    return (size_t) label << 32 | (unsigned int) ((time << 6) + (batch << 2) + section);
 }
-inline void dekey(size_t k, int &time,int &section, int &label) {
+inline void dekey(size_t k, int &batch, int &time,int &section, int &label) {
     label = k >> 32;
     int ts = k & 0xFFFF;
     section = ts & 3;
-    time = ts >> 2;
+    batch = (ts & 63) >> 2;
+    time = ts >> 6;
 }
 // for fused detections
 inline size_t newkey(int time,int label) {
@@ -4527,14 +4527,27 @@ inline void denewkey(size_t k, int &time, int &label) {
  * @brief spaceFusion: fuse data in vertical and horizontal directions
  * @param subfolderName
  */
-void cellTrackingMain::spatialFusion(const QString &subfolderName){
+void cellTrackingMain::spatialFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
     vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
-    vector<int> fixed_crop_sz = {493, 366, 259};
-    vector<int> overlap_sz = {50, 50, 24};
+//    vector<int> fixed_crop_sz = {493, 366, 259};
+//    vector<int> overlap_sz = {50, 50, 24};
     QDir root_directory(subfolderName+"/"+crop_names[0]);
     QStringList images = root_directory.entryList(QStringList() << "*.bin" ,QDir::Files);// <<"*.tif" << "*.JPG" if we want two type images
 
+    //// Get the frame that temporally overlapped and use them to update overlapped_frames
+    /// The principal is get the last p4tracking.k frames
+    QRegExp rx("(\\d+)");
+    if(rx.indexIn(images[images.count()-1]) == -1) qFatal("Wrong file name");
+    int frame2save = rx.cap(1).toInt() - p4tracking.k + 1;
+    int frame_saved_cnt = 0;
     foreach(QString filename, images) { //QT's version of for_each
+        QRegExp rx("(\\d+)");
+        if(rx.indexIn(filename) == -1) qFatal("Wrong file name");
+        int frame = rx.cap(1).toInt();
+        if(frame < overlapped_frames.begin()->first){
+            //// if temperally processed && out of the scope of jump
+            continue;
+        }
         vector<Mat1i> mat_crops(4); //mat_fl, mat_fr, mat_bl, mat_br;
         for(int i=0; i<crop_names.size(); i++){
             QString label_file_name = subfolderName + "/" + crop_names[i] + "/" + filename;
@@ -4554,41 +4567,51 @@ void cellTrackingMain::spatialFusion(const QString &subfolderName){
         spaceFusion_leftRight(mat_crops[2], mat_crops[3], lr_fuse_mat_d, overlap_sz[1], d_label_map_lr);
         spaceFusion_upDown(lr_fuse_mat_u, lr_fuse_mat_d, ud_fuse_mat, overlap_sz[2], label_map_ud);
 
-        QRegExp rx("(\\d+)");
-        if(rx.indexIn(filename) == -1) qFatal("Wrong file name");
-        int frame = rx.cap(1).toInt();
-        int max_label = 0;
-        size_t new_idx;
-        FOREACH_i(u_label_map_lr){
-            FOREACH_j(u_label_map_lr[i]){
-                if(u_label_map_lr[i][j]==0 || label_map_ud[0][u_label_map_lr[i][j]]==0){
-                    continue;
+        //// if temperally never processed
+        if(frame > overlapped_frames.rbegin()->first){
+            int max_label = 0;
+            size_t new_idx;
+            FOREACH_i(u_label_map_lr){
+                FOREACH_j(u_label_map_lr[i]){
+                    if(u_label_map_lr[i][j]==0 || label_map_ud[0][u_label_map_lr[i][j]]==0){
+                        continue;
+                    }
+                    new_idx = fuse_batch_processed_cell_cnt + label_map_ud[0][u_label_map_lr[i][j]];
+                    oldinfo2newIdx[key(batch_id, frame, i, j)] = new_idx;
+                    newIdx2newinfo[new_idx] = newkey(frame, label_map_ud[0][u_label_map_lr[i][j]]);
+                    newinfo2newIdx[newkey(frame, label_map_ud[0][u_label_map_lr[i][j]])] = new_idx;
+                    max_label = MAX(max_label, label_map_ud[0][u_label_map_lr[i][j]]);
                 }
-                new_idx = fuse_batch_processed_cell_cnt + label_map_ud[0][u_label_map_lr[i][j]];
-                oldinfo2newLabel[key(frame, i, j)] = new_idx;
-                newLabel2newinfo[new_idx] = newkey(frame, label_map_ud[0][u_label_map_lr[i][j]]);
-                max_label = MAX(max_label, label_map_ud[0][u_label_map_lr[i][j]]);
             }
-        }
-        FOREACH_i(d_label_map_lr){
-            FOREACH_j(d_label_map_lr[i]){
-                if(d_label_map_lr[i][j]==0 || label_map_ud[1][d_label_map_lr[i][j]]==0){
-                    continue;
+            FOREACH_i(d_label_map_lr){
+                FOREACH_j(d_label_map_lr[i]){
+                    if(d_label_map_lr[i][j]==0 || label_map_ud[1][d_label_map_lr[i][j]]==0){
+                        continue;
+                    }
+                    new_idx = fuse_batch_processed_cell_cnt + label_map_ud[1][d_label_map_lr[i][j]];
+                    oldinfo2newIdx[key(batch_id, frame, i+2, j)] = new_idx;
+                    newIdx2newinfo[new_idx] = newkey(frame, label_map_ud[1][d_label_map_lr[i][j]]);
+                    newinfo2newIdx[newkey(frame, label_map_ud[1][d_label_map_lr[i][j]])] = new_idx;
+                    max_label = MAX(max_label, label_map_ud[1][d_label_map_lr[i][j]]);
                 }
-                new_idx = fuse_batch_processed_cell_cnt + label_map_ud[1][d_label_map_lr[i][j]];
-                oldinfo2newLabel[key(frame, i+2, j)] = new_idx;
-                newLabel2newinfo[new_idx] = newkey(frame, label_map_ud[1][d_label_map_lr[i][j]]);
-
-                max_label = MAX(max_label, label_map_ud[1][d_label_map_lr[i][j]]);
             }
+            fuse_batch_processed_cell_cnt += max_label;
+            // save the 16bit unsigned results as label map
+            ud_fuse_mat.convertTo(ud_fuse_mat, CV_16UC1);
+            QString full_im_name = subfolderName + "/" + filename.left(12)+".tif";
+            imwrite(full_im_name.toStdString(), ud_fuse_mat);
+        }else{ //// if temperally processed,
+            int ov_label_map_id = frame - overlapped_frames.begin()->first;
+            temporalFusion(overlapped_frames[ov_label_map_id].second, ud_fuse_mat);
         }
-        fuse_batch_processed_cell_cnt += max_label;
-        // save the 16bit unsigned results as label map
-        ud_fuse_mat.convertTo(ud_fuse_mat, CV_16UC1);
-        QString full_im_name = subfolderName + "/" + filename.left(12)+".tif";
-        imwrite(full_im_name.toStdString(), ud_fuse_mat);
+        //// start to save the overlapped results for next round
+        if(frame == frame2save){
+            overlapped_frames[frame_saved_cnt++] = make_pair(frame, ud_fuse_mat);
+            frame2save++;
+        }
     }
 }
+
 /**
  * @brief spaceFusion_leftRight
  * @param left
@@ -4597,7 +4620,7 @@ void cellTrackingMain::spatialFusion(const QString &subfolderName){
  * @param ov_sz : on the x-axis
  * @param oldLabel2newLabel
  */
-void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
+void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel){
     double l_max_id, r_max_id;
     minMaxIdx(left, nullptr, &l_max_id);
     minMaxIdx(right, nullptr, &r_max_id);
@@ -4690,7 +4713,7 @@ void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMa
  * @param ov_sz: along y-axis
  * @param oldLabel2newLabel
  */
-void cellTrackingMain::spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
+void cellTrackingMain::spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel){
     double u_max_id, d_max_id;
     minMaxIdx(up, nullptr, &u_max_id);
     minMaxIdx(down, nullptr, &d_max_id);
@@ -4775,6 +4798,6 @@ void cellTrackingMain::spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int
         setValMat(fusedMat, CV_32S, idx_fuse_mat, oldLabel2newLabel[1][i+1]);
     }
 }
-void cellTrackingMain::temporalFusion(const QString &folderNames){
+void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id){
 
 }
