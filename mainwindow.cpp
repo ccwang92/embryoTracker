@@ -335,6 +335,7 @@ void MainWindow::debugBatchFusion(){
                                                           QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
     QString resFolderName =  QFileDialog::getExistingDirectory(this, tr("Open Batch Results Directory"), dataFolderName,
                                                           QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    
     qFatal("Debug successed! No need to continue");
 }
 void MainWindow::debugAlgorithm()

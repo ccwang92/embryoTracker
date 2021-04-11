@@ -4521,13 +4521,18 @@ void cellTrackingMain::spaceFusion(const QString &subfolderName){
             label_file.close();
         }
         // do data fusion at spatial domain
-
-
     }
 
 }
-
-void spaceFusion_leftRight(Mat &left, Mat &right, Mat1i fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
+/**
+ * @brief spaceFusion_leftRight
+ * @param left
+ * @param right
+ * @param fusedMat
+ * @param ov_sz : on the x-axis
+ * @param oldLabel2newLabel
+ */
+void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
     double l_max_id, r_max_id;
     minMaxIdx(left, nullptr, &l_max_id);
     minMaxIdx(right, nullptr, &r_max_id);
@@ -4554,7 +4559,7 @@ void spaceFusion_leftRight(Mat &left, Mat &right, Mat1i fusedMat, int ov_sz, vec
             size_t tmp;
             for(int j=0; j<x.size(); j++){
                 if(x[j] < ov_sz){
-                    vol_sub2ind(tmp, y[j], x[j] + left.size[1]-ov_sz+1, z[j], left.size);
+                    vol_sub2ind(tmp, y[j], x[j] + left.size[1]-ov_sz, z[j], left.size);
                     to_left_idx.emplace_back(tmp);
                 }
             }
@@ -4568,10 +4573,10 @@ void spaceFusion_leftRight(Mat &left, Mat &right, Mat1i fusedMat, int ov_sz, vec
                 }
             }
             //first test if there is a cell in left with IoU>0.5
-            if(best_id != 0 && best_ov_sz*2>=(r_cell_voxIdx[i].size() + l_cell_voxIdx[best_id].size())){
-                oldLabel2newLabel[1][i+1] = oldLabel2newLabel[1][best_id];
+            if(best_id != 0 && best_ov_sz*2>=(r_cell_voxIdx[i].size() + l_cell_voxIdx[best_id-1].size())){
+                oldLabel2newLabel[1][i+1] = oldLabel2newLabel[0][best_id];
             }else{ // if there is no cells in left with IOU>0.5
-                if(vec_mean(x) < (left.size[1]-ov_sz/2)){
+                if(vec_mean(x) > (left.size[1]-ov_sz/2)){
                     //case 1: the cell is the right half panel=> set cells in left half panel as 0
                     oldLabel2newLabel[1][i+1] = i + 1 + l_max_id;
                     for(auto ele:freqs){
@@ -4583,6 +4588,126 @@ void spaceFusion_leftRight(Mat &left, Mat &right, Mat1i fusedMat, int ov_sz, vec
                 }
             }
         }
+    }
+    int fuse_sz[3] = {left.size[0], left.size[1], left.size[2]};
+    fuse_sz[0] += (right.size[0] - ov_sz);
+    fusedMat = Mat::zeros(3, fuse_sz, CV_32S);
+    unordered_set<int> used;
+    for(int i=0; i<l_cell_voxIdx.size(); i++){
+        if (oldLabel2newLabel[0][i+1] == 0){ // removed regions
+            continue;
+        }
+        vector<int> y, x, z;
+        vec_ind2sub(l_cell_voxIdx[i], y, x, z, left.size);
+        vector<size_t> idx_fuse_mat;
+        vec_sub2ind(idx_fuse_mat, y, x, z, fusedMat.size);
+        used.insert(oldLabel2newLabel[0][i+1]);
+        setValMat(fusedMat, CV_32S, idx_fuse_mat, (float)oldLabel2newLabel[0][i+1]);
+    }
+
+    for(int i=0; i<r_cell_voxIdx.size(); i++){
+        if (oldLabel2newLabel[1][i+1] == 0 ||
+                used.find(oldLabel2newLabel[1][i+1]) != used.end() ){ // removed regions
+            continue;
+        }
+        vector<int> y, x, z;
+        vec_ind2sub(r_cell_voxIdx[i], y, x, z, right.size);
+        vector<size_t> idx_fuse_mat;
+        vec_sub2ind(idx_fuse_mat, y, vec_Add(x, left.size[1]-ov_sz), z, fusedMat.size);
+        setValMat(fusedMat, CV_32S, idx_fuse_mat, oldLabel2newLabel[1][i+1]);
+    }
+}
+/**
+ * @brief spaceFusion_upDown
+ * @param up
+ * @param down
+ * @param fusedMat
+ * @param ov_sz: along y-axis
+ * @param oldLabel2newLabel
+ */
+void spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel){
+    double u_max_id, d_max_id;
+    minMaxIdx(up, nullptr, &u_max_id);
+    minMaxIdx(down, nullptr, &d_max_id);
+    vector<vector<size_t>> u_cell_voxIdx, d_cell_voxIdx;
+    extractVoxIdxList(&up, u_cell_voxIdx, (int)u_max_id);
+    extractVoxIdxList(&down, d_cell_voxIdx, (int)d_max_id);
+
+    oldLabel2newLabel.resize(2);
+    oldLabel2newLabel[0].resize(u_max_id+1);
+    FOREACH_i(oldLabel2newLabel[0]){ // use the left one as baseline
+        oldLabel2newLabel[0][i] = i;
+    }
+    oldLabel2newLabel[1].resize(d_max_id+1);
+    fill(oldLabel2newLabel[1].begin(), oldLabel2newLabel[1].end(), 0);
+    // check the right one
+    FOREACH_i(d_cell_voxIdx){
+        vector<int> y, x, z;
+        vec_ind2sub(d_cell_voxIdx[i], y, x, z, down.size);
+        if (vec_min(y) >= ov_sz){ // located in non-overlapping area
+            oldLabel2newLabel[0][i+1] = i + 1 + u_max_id;
+        }else{
+            vector<size_t> to_up_idx;
+            to_up_idx.reserve(x.size());
+            size_t tmp;
+            for(int j=0; j<y.size(); j++){
+                if(y[j] < ov_sz){
+                    vol_sub2ind(tmp, y[j]+up.size[0]-ov_sz, x[j], z[j], up.size);
+                    to_up_idx.emplace_back(tmp);
+                }
+            }
+            vector<float> up_vals = extractValsGivenIdx(&up, to_up_idx, CV_32S);
+            unordered_map<float, size_t> freqs = frequecy_cnt(up_vals);
+            int best_id = 0, best_ov_sz = 0;
+            for(auto ele:freqs){
+                if(ele.second>best_ov_sz){
+                    best_id = (int) ele.first;
+                    best_ov_sz = ele.first;
+                }
+            }
+            //first test if there is a cell in left with IoU>0.5
+            if(best_id != 0 && best_ov_sz*2>=(d_cell_voxIdx[i].size() + u_cell_voxIdx[best_id-1].size())){
+                oldLabel2newLabel[1][i+1] = oldLabel2newLabel[0][best_id];
+            }else{ // if there is no cells in left with IOU>0.5
+                if(vec_mean(y) > (up.size[0]-ov_sz/2)){
+                    //case 1: the cell is the right half panel=> set cells in left half panel as 0
+                    oldLabel2newLabel[1][i+1] = i + 1 + u_max_id;
+                    for(auto ele:freqs){
+                        oldLabel2newLabel[0][ele.first] = 0;
+                    }
+                }else{
+                    //case 2: the cell is the left half panel=> set this cell as 0
+                    oldLabel2newLabel[1][i+1] = 0;
+                }
+            }
+        }
+    }
+    int fuse_sz[3] = {up.size[0], up.size[1], up.size[2]};
+    fuse_sz[0] += (down.size[0] - ov_sz);
+    fusedMat = Mat::zeros(3, fuse_sz, CV_32S);
+    unordered_set<int> used;
+    for(int i=0; i<u_cell_voxIdx.size(); i++){
+        if (oldLabel2newLabel[0][i+1] == 0){ // removed regions
+            continue;
+        }
+        vector<int> y, x, z;
+        vec_ind2sub(u_cell_voxIdx[i], y, x, z, up.size);
+        vector<size_t> idx_fuse_mat;
+        vec_sub2ind(idx_fuse_mat, y, x, z, fusedMat.size);
+        used.insert(oldLabel2newLabel[0][i+1]);
+        setValMat(fusedMat, CV_32S, idx_fuse_mat, (float)oldLabel2newLabel[0][i+1]);
+    }
+
+    for(int i=0; i<d_cell_voxIdx.size(); i++){
+        if (oldLabel2newLabel[1][i+1] == 0 ||
+                used.find(oldLabel2newLabel[1][i+1]) != used.end() ){ // removed regions
+            continue;
+        }
+        vector<int> y, x, z;
+        vec_ind2sub(d_cell_voxIdx[i], y, x, z, down.size);
+        vector<size_t> idx_fuse_mat;
+        vec_sub2ind(idx_fuse_mat, vec_Add(y, up.size[0]-ov_sz), x, z, fusedMat.size);
+        setValMat(fusedMat, CV_32S, idx_fuse_mat, oldLabel2newLabel[1][i+1]);
     }
 }
 void cellTrackingMain::temporalFusion(const QString &folderNames){
