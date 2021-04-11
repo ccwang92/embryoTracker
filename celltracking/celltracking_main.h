@@ -164,14 +164,14 @@ private:
 private: // combine all results from batch processing
     bool loadBatchResults(const QString &dataFolderName, const QString &resFolderName);
     bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName);
-    bool oneBatchResultsFusion(const QString &dataFolderName, const QString &resFolderName);
-    void spaceFusion(const QString &subfolderName);
+    bool oneBatchResultsFusion(const QString &batchFolderName);
+    void spatialFusion(const QString &subfolderName);
     void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel);
     void spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> oldLabel2newLabel);
     void temporalFusion(const QString &folderNames);
 private:
     unordered_map<size_t, size_t> oldinfo2newLabel; // <time, section(fl, fr, bl, br), labelinMap> ==> new node id
-    unordered_map<size_t, size_t> newLabel2oldinfo; // new node id ==> <time, section(fl, fr, bl, br), labelinMap>
+    unordered_map<size_t, size_t> newLabel2newinfo; // new node id ==> <time, labelinMap>
     size_t fuse_batch_processed_cell_cnt = 0;
 public:
     allCellsCensus movieInfo;

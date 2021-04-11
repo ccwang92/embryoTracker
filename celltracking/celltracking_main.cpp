@@ -4492,30 +4492,42 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
 /// We used a IoU=0.5 as principal, if ov > IoU, they are the same. Otherwise, we keep the one that further to
 /// the spatial or temporal boundary.
 cellTrackingMain::cellTrackingMain(const QString &dataFolderName, const QString &resFolderName){
+    vector<int> fixed_crop_sz = {493, 366, 259};
+    vector<int> overlap_sz = {50, 50, 24};
     batchResultsFusion(dataFolderName, resFolderName);
 }
-bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName){
+bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, vector<int> fixed_crop_sz, vector<int> overlap_sz){
     // step 1. fuse data in one batch, mainly using spatial fusion
 
 }
 
-bool cellTrackingMain::oneBatchResultsFusion(const QString &dataFolderName, const QString &resFolderName){
-
+bool cellTrackingMain::oneBatchResultsFusion(const QString &batchFolderName){
+    // for one batch of results, we only need spaticalFusion
+    spatialFusion(batchFolderName);
 }
+// for crop detections
 inline size_t key(int time,int section, int label) {
     return (size_t) label << 32 | (unsigned int) (time << 2 + section);
 }
-inline void key2value(size_t k, int &time,int &section, int &label) {
+inline void dekey(size_t k, int &time,int &section, int &label) {
     label = k >> 32;
     int ts = k & 0xFFFF;
     section = ts & 3;
     time = ts >> 2;
 }
+// for fused detections
+inline size_t newkey(int time,int label) {
+    return (size_t) label << 32 | (unsigned int) time;
+}
+inline void denewkey(size_t k, int &time, int &label) {
+    label = k >> 32;
+    time = k & 0xFFFF;
+}
 /**
  * @brief spaceFusion: fuse data in vertical and horizontal directions
  * @param subfolderName
  */
-void cellTrackingMain::spaceFusion(const QString &subfolderName){
+void cellTrackingMain::spatialFusion(const QString &subfolderName){
     vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
     vector<int> fixed_crop_sz = {493, 366, 259};
     vector<int> overlap_sz = {50, 50, 24};
@@ -4545,12 +4557,37 @@ void cellTrackingMain::spaceFusion(const QString &subfolderName){
         QRegExp rx("(\\d+)");
         if(rx.indexIn(filename) == -1) qFatal("Wrong file name");
         int frame = rx.cap(1).toInt();
+        int max_label = 0;
+        size_t new_idx;
         FOREACH_i(u_label_map_lr){
-            oldinfo2newLabel[key(frame, 0, label)] = ;
+            FOREACH_j(u_label_map_lr[i]){
+                if(u_label_map_lr[i][j]==0 || label_map_ud[0][u_label_map_lr[i][j]]==0){
+                    continue;
+                }
+                new_idx = fuse_batch_processed_cell_cnt + label_map_ud[0][u_label_map_lr[i][j]];
+                oldinfo2newLabel[key(frame, i, j)] = new_idx;
+                newLabel2newinfo[new_idx] = newkey(frame, label_map_ud[0][u_label_map_lr[i][j]]);
+                max_label = MAX(max_label, label_map_ud[0][u_label_map_lr[i][j]]);
+            }
         }
-        fuse_batch_processed_cell_cnt
-    }
+        FOREACH_i(d_label_map_lr){
+            FOREACH_j(d_label_map_lr[i]){
+                if(d_label_map_lr[i][j]==0 || label_map_ud[1][d_label_map_lr[i][j]]==0){
+                    continue;
+                }
+                new_idx = fuse_batch_processed_cell_cnt + label_map_ud[1][d_label_map_lr[i][j]];
+                oldinfo2newLabel[key(frame, i+2, j)] = new_idx;
+                newLabel2newinfo[new_idx] = newkey(frame, label_map_ud[1][d_label_map_lr[i][j]]);
 
+                max_label = MAX(max_label, label_map_ud[1][d_label_map_lr[i][j]]);
+            }
+        }
+        fuse_batch_processed_cell_cnt += max_label;
+        // save the 16bit unsigned results as label map
+        ud_fuse_mat.convertTo(ud_fuse_mat, CV_16UC1);
+        QString full_im_name = subfolderName + "/" + filename.left(12)+".tif";
+        imwrite(full_im_name.toStdString(), ud_fuse_mat);
+    }
 }
 /**
  * @brief spaceFusion_leftRight
