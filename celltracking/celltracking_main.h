@@ -171,7 +171,7 @@ private: // combine all results from batch processing
     void temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int frame,
                                        vector<vector<int>> &u_label_map_lr, vector<vector<int>> &d_label_map_lr,
                                        vector<vector<int>> &label_map_ud);
-
+    void oneBatchMovieInfoParse(int batch_id, const QString &subfolderName);
 private:
     unordered_map<size_t, size_t> oldinfo2newIdx; // <time, section(fl, fr, bl, br), labelinMap> ==> new node id
     unordered_map<size_t, size_t> newIdx2newinfo; // new node id ==> <time, new labelinMap>

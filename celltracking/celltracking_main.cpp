@@ -4503,9 +4503,30 @@ bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const Q
         oneBatchResultsFusion(batch_id, data_batches[batch_id], fixed_crop_sz, overlap_sz);
     }
     // step 2. load all the cell information (movieInfo.txt), build movieInfo
-
+    for(int batch_id=0; batch_id<data_batches.count(); batch_id++){
+        oneBatchMovieInfoParse(batch_id, data_batches[batch_id]);
+    }
 }
-
+void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfolderName){
+    vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
+    QRegExp rx("(\\d+)");
+    if(rx.indexIn(subfolderName) == -1) qFatal("Wrong file name");
+    int start_frame = rx.cap(1).toInt();
+    for(int i=0; i<crop_names.size(); i++){
+        QString txt_file_name = subfolderName + "/" + crop_names[i] + "/" + "movieInfo.txt";
+        QFile txt_file(txt_file_name);
+        if (!txt_file.open(QIODevice::ReadOnly)){
+            QMessageBox::information(0, "error", txt_file.errorString());
+        }
+        QTextStream in(&txt_file);
+        movieInfo.nodes.resize(fuse_batch_processed_cell_cnt);//
+        while(!in.atEnd()) {
+            QString line = in.readLine();
+            QStringList fields = line.split(",");
+            // start parsing each line
+        }
+    }
+}
 // for crop detections
 inline size_t key(int batch, int time,int section, int label) {
     return (size_t) label << 32 | (unsigned int) ((time << 6) + (batch << 2) + section);
@@ -4578,7 +4599,7 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
                     if(u_label_map_lr[i][j]==0 || label_map_ud[0][u_label_map_lr[i][j]]==0){
                         continue;
                     }
-                    new_idx = fuse_batch_processed_cell_cnt + label_map_ud[0][u_label_map_lr[i][j]];
+                    new_idx = fuse_batch_processed_cell_cnt + label_map_ud[0][u_label_map_lr[i][j]] - 1;
                     oldinfo2newIdx[key(batch_id, frame, i, j)] = new_idx;
                     newIdx2newinfo[new_idx] = newkey(frame, label_map_ud[0][u_label_map_lr[i][j]]);
                     newinfo2newIdx[newkey(frame, label_map_ud[0][u_label_map_lr[i][j]])] = new_idx;
@@ -4590,14 +4611,14 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
                     if(d_label_map_lr[i][j]==0 || label_map_ud[1][d_label_map_lr[i][j]]==0){
                         continue;
                     }
-                    new_idx = fuse_batch_processed_cell_cnt + label_map_ud[1][d_label_map_lr[i][j]];
+                    new_idx = fuse_batch_processed_cell_cnt + label_map_ud[1][d_label_map_lr[i][j]] - 1;
                     oldinfo2newIdx[key(batch_id, frame, i+2, j)] = new_idx;
                     newIdx2newinfo[new_idx] = newkey(frame, label_map_ud[1][d_label_map_lr[i][j]]);
                     newinfo2newIdx[newkey(frame, label_map_ud[1][d_label_map_lr[i][j]])] = new_idx;
                     max_label = MAX(max_label, label_map_ud[1][d_label_map_lr[i][j]]);
                 }
             }
-            fuse_batch_processed_cell_cnt += max_label;
+            fuse_batch_processed_cell_cnt += max_label; // count start from 1 and idx starts from 0;
             // save the 16bit unsigned results as label map
             Mat ud_fuse_mat_u16;
             ud_fuse_mat.convertTo(ud_fuse_mat_u16, CV_16UC1);
