@@ -164,11 +164,13 @@ private:
 private: // combine all results from batch processing
     bool loadBatchResults(const QString &dataFolderName, const QString &resFolderName);
     bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
-    bool oneBatchResultsFusion(int batch_id, const QString &batchFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
-    void spatialFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
+//    bool oneBatchResultsFusion(int batch_id, const QString &batchFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
+    void oneBatchResultsFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
     void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel);
     void spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel);
-    void temporalFusion(Mat &kept, Mat &mov);
+    void temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int frame,
+                                       vector<vector<int>> &u_label_map_lr, vector<vector<int>> &d_label_map_lr,
+                                       vector<vector<int>> &label_map_ud);
 
 private:
     unordered_map<size_t, size_t> oldinfo2newIdx; // <time, section(fl, fr, bl, br), labelinMap> ==> new node id

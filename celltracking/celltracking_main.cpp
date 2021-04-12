@@ -4496,14 +4496,16 @@ cellTrackingMain::cellTrackingMain(const QString &dataFolderName, const QString 
 bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName,
                                           vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
     overlapped_frames.reserve(p4tracking.k);
-    // step 1. fuse data in one batch, mainly using spatial fusion
+    // step 1. fuse data in one batch; get the mapping function: batch_id, frame, label ==> newIdx
+    QDir root_directory(dataFolderName);
+    QStringList data_batches = root_directory.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
+    for(int batch_id=0; batch_id<data_batches.count(); batch_id++){
+        oneBatchResultsFusion(batch_id, data_batches[batch_id], fixed_crop_sz, overlap_sz);
+    }
+    // step 2. load all the cell information (movieInfo.txt), build movieInfo
 
 }
 
-bool cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &batchFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
-    // for one batch of results, we only need spaticalFusion
-    spatialFusion(batch_id, batchFolderName, fixed_crop_sz, overlap_sz);
-}
 // for crop detections
 inline size_t key(int batch, int time,int section, int label) {
     return (size_t) label << 32 | (unsigned int) ((time << 6) + (batch << 2) + section);
@@ -4527,7 +4529,7 @@ inline void denewkey(size_t k, int &time, int &label) {
  * @brief spaceFusion: fuse data in vertical and horizontal directions
  * @param subfolderName
  */
-void cellTrackingMain::spatialFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
+void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
     vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
 //    vector<int> fixed_crop_sz = {493, 366, 259};
 //    vector<int> overlap_sz = {50, 50, 24};
@@ -4597,12 +4599,14 @@ void cellTrackingMain::spatialFusion(int batch_id, const QString &subfolderName,
             }
             fuse_batch_processed_cell_cnt += max_label;
             // save the 16bit unsigned results as label map
-            ud_fuse_mat.convertTo(ud_fuse_mat, CV_16UC1);
+            Mat ud_fuse_mat_u16;
+            ud_fuse_mat.convertTo(ud_fuse_mat_u16, CV_16UC1);
             QString full_im_name = subfolderName + "/" + filename.left(12)+".tif";
-            imwrite(full_im_name.toStdString(), ud_fuse_mat);
+            imwrite(full_im_name.toStdString(), ud_fuse_mat_u16);
         }else{ //// if temperally processed,
             int ov_label_map_id = frame - overlapped_frames.begin()->first;
-            temporalFusion(overlapped_frames[ov_label_map_id].second, ud_fuse_mat);
+            temporalFusion(overlapped_frames[ov_label_map_id].second, ud_fuse_mat, batch_id, frame,
+                           u_label_map_lr, d_label_map_lr, label_map_ud);
         }
         //// start to save the overlapped results for next round
         if(frame == frame2save){
@@ -4798,6 +4802,68 @@ void cellTrackingMain::spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int
         setValMat(fusedMat, CV_32S, idx_fuse_mat, oldLabel2newLabel[1][i+1]);
     }
 }
-void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id){
+/**
+ * @brief temporalFusion: merge two overlapped frames
+ * @param kept: as reference; cells in this frame are kept
+ * @param mov: the merged label maps (fl, fr, bl, br)
+ * @param mov_batch_id
+ * @param frame
+ * @param u_label_map_lr
+ * @param d_label_map_lr
+ * @param label_map_ud
+ */
+void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int frame,
+                                      vector<vector<int>> &u_label_map_lr, vector<vector<int>> &d_label_map_lr,
+                                      vector<vector<int>> &label_map_ud){
+    double kept_max_id, mov_max_id;
+    minMaxIdx(kept, nullptr, &kept_max_id);
+    minMaxIdx(mov, nullptr, &mov_max_id);
+    unordered_map<int, vector<int>> mov_label2crop;
+    FOREACH_i(u_label_map_lr){
+        FOREACH_j(u_label_map_lr[i]){
+            if(u_label_map_lr[i][j]==0 || label_map_ud[0][u_label_map_lr[i][j]]==0){
+                continue;
+            }
+            mov_label2crop[label_map_ud[0][u_label_map_lr[i][j]]] = {mov_batch_id, frame, (int)i, (int)j};
+        }
+    }
+    FOREACH_i(d_label_map_lr){
+        FOREACH_j(d_label_map_lr[i]){
+            if(d_label_map_lr[i][j]==0 || label_map_ud[1][d_label_map_lr[i][j]]==0){
+                continue;
+            }
+            mov_label2crop[label_map_ud[1][d_label_map_lr[i][j]]] = {mov_batch_id, frame, (int)i+2, (int)j};
+        }
+    }
 
+    vector<vector<size_t>> kept_cell_voxIdx, mov_cell_voxIdx;
+    extractVoxIdxList(&kept, kept_cell_voxIdx, (int)kept_max_id);
+    extractVoxIdxList(&mov, mov_cell_voxIdx, (int)mov_max_id);
+
+    // keep those cells in mov that IoU>0.5 with cells in kept
+    FOREACH_i(mov_cell_voxIdx){
+        int labelInMap = i+1;
+        if(mov_label2crop.find(labelInMap) == mov_label2crop.end()){
+            continue;
+        }
+        vector<float> kept_vals = extractValsGivenIdx(&kept, mov_cell_voxIdx[i], CV_32S);
+        unordered_map<float, size_t> freqs = frequecy_cnt(kept_vals);
+        int best_id = 0, best_ov_sz = 0;
+        for(auto ele:freqs){
+            if(ele.second>best_ov_sz){
+                best_id = (int) ele.first;
+                best_ov_sz = ele.first;
+            }
+        }
+        //first test if there is a cell in left with IoU>0.5
+        if(best_id != 0 && best_ov_sz*2>=(mov_cell_voxIdx[i].size() + kept_cell_voxIdx[best_id-1].size())){
+            size_t mov_key = key(mov_label2crop[labelInMap][0], mov_label2crop[labelInMap][1], mov_label2crop[labelInMap][2], mov_label2crop[labelInMap][3]);
+            size_t kept_key = newkey(frame, best_id);
+            if(newinfo2newIdx.find(kept_key) == newinfo2newIdx.end()){
+                qFatal("refer to a non-exist cell in reference frame");
+            }
+            oldinfo2newIdx[mov_key] = newinfo2newIdx[kept_key];
+        }
+
+    }
 }
