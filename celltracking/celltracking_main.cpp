@@ -4503,28 +4503,9 @@ bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const Q
         oneBatchResultsFusion(batch_id, data_batches[batch_id], fixed_crop_sz, overlap_sz);
     }
     // step 2. load all the cell information (movieInfo.txt), build movieInfo
+    movieInfo.nodes.resize(fuse_batch_processed_cell_cnt);//
     for(int batch_id=0; batch_id<data_batches.count(); batch_id++){
         oneBatchMovieInfoParse(batch_id, data_batches[batch_id]);
-    }
-}
-void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfolderName){
-    vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
-    QRegExp rx("(\\d+)");
-    if(rx.indexIn(subfolderName) == -1) qFatal("Wrong file name");
-    int start_frame = rx.cap(1).toInt();
-    for(int i=0; i<crop_names.size(); i++){
-        QString txt_file_name = subfolderName + "/" + crop_names[i] + "/" + "movieInfo.txt";
-        QFile txt_file(txt_file_name);
-        if (!txt_file.open(QIODevice::ReadOnly)){
-            QMessageBox::information(0, "error", txt_file.errorString());
-        }
-        QTextStream in(&txt_file);
-        movieInfo.nodes.resize(fuse_batch_processed_cell_cnt);//
-        while(!in.atEnd()) {
-            QString line = in.readLine();
-            QStringList fields = line.split(",");
-            // start parsing each line
-        }
     }
 }
 // for crop detections
@@ -4546,6 +4527,73 @@ inline void denewkey(size_t k, int &time, int &label) {
     label = k >> 32;
     time = k & 0xFFFF;
 }
+
+void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfolderName){
+    vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
+    QRegExp rx("(\\d+)");
+    if(rx.indexIn(subfolderName) == -1) qFatal("Wrong file name");
+    int start_frame = rx.cap(1).toInt();
+    for(int i=0; i<crop_names.size(); i++){
+        QString txt_file_name = subfolderName + "/" + crop_names[i] + "/" + "movieInfo.txt";
+        QFile txt_file(txt_file_name);
+        if (!txt_file.open(QIODevice::ReadOnly)){
+            QMessageBox::information(0, "error", txt_file.errorString());
+        }
+        QTextStream in(&txt_file);
+        long long cell_num;
+        sscanf(in.readLine().toStdString().c_str(), "p %*c %*c %ld", &cell_num);
+        for(int i=0; i<2; i++){
+            // skip the first 3 lines
+            //            p cell num: 65164
+            //            p gamma: 1.50283 8.1355
+            //            p jumpRatio: 0.691873 0.162243 0.145884
+            in.readLine();
+        }
+        double en_cost, ex_cost, boz_cost;
+        sscanf(in.readLine().toStdString().c_str(), "p %lf %lf %lf", &en_cost, &ex_cost, &boz_cost);
+        unordered_map<int, pair<int,int>> cell_id2frame_label;
+        while(!in.atEnd()) {
+            string line = in.readLine().toStdString();
+            // start parsing each line
+            switch (line[0]) {
+            case 'c':                  /* skip lines with comments */
+            case '\n':                 /* skip empty lines   */
+            case 'n':{
+                int id, frame, labelInMap;
+                sscanf(line.c_str(), "%*c %d %d %d", &id, &frame, &labelInMap);
+                if(labelInMap != 0){
+                    cell_id2frame_label[id] = make_pair(start_frame+frame, labelInMap);
+                }
+            }
+            case '\0':                 /* skip empty lines at the end of file */
+                break;
+            case 'p':
+            case 'a':{
+                int tail = 0;
+                int head = 0;
+                double distance, link_cost;
+                sscanf(line.c_str(), "%*c %d %d %ld %lf", &tail, &head, &distance, &link_cost);
+                size_t real_tail, real_head;
+                real_tail = key(batch_id, cell_id2frame_label[tail].first, i, cell_id2frame_label[tail].second);
+                real_head = key(batch_id, cell_id2frame_label[head].first, i, cell_id2frame_label[head].second);
+                if(oldinfo2newIdx.find(real_tail)!=oldinfo2newIdx.end() && oldinfo2newIdx.find(real_head)!=oldinfo2newIdx.end()){
+                    real_tail = oldinfo2newIdx[real_tail];
+                    real_head = oldinfo2newIdx[real_head];
+                    nodeRelation tmp;
+                    tmp.node_id = real_head;
+                    tmp.dist_c2n = distance;
+                    tmp.link_cost = link_cost;
+                    movieInfo.nodes[real_tail].neighbors.push_back(tmp);
+                }
+                break;
+            }
+            default:
+                break;
+            }
+        }
+    }
+}
+
 /**
  * @brief spaceFusion: fuse data in vertical and horizontal directions
  * @param subfolderName
@@ -4856,7 +4904,6 @@ void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int
             mov_label2crop[label_map_ud[1][d_label_map_lr[i][j]]] = {mov_batch_id, frame, (int)i+2, (int)j};
         }
     }
-
     vector<vector<size_t>> kept_cell_voxIdx, mov_cell_voxIdx;
     extractVoxIdxList(&kept, kept_cell_voxIdx, (int)kept_max_id);
     extractVoxIdxList(&mov, mov_cell_voxIdx, (int)mov_max_id);
