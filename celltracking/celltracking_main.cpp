@@ -4572,18 +4572,27 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
                 int tail = 0;
                 int head = 0;
                 double distance, link_cost;
-                sscanf(line.c_str(), "%*c %d %d %ld %lf", &tail, &head, &distance, &link_cost);
+                sscanf(line.c_str(), "%*c %d %d %lf %lf", &tail, &head, &distance, &link_cost);
                 size_t real_tail, real_head;
                 real_tail = key(batch_id, cell_id2frame_label[tail].first, i, cell_id2frame_label[tail].second);
                 real_head = key(batch_id, cell_id2frame_label[head].first, i, cell_id2frame_label[head].second);
                 if(oldinfo2newIdx.find(real_tail)!=oldinfo2newIdx.end() && oldinfo2newIdx.find(real_head)!=oldinfo2newIdx.end()){
                     real_tail = oldinfo2newIdx[real_tail];
                     real_head = oldinfo2newIdx[real_head];
-                    nodeRelation tmp;
-                    tmp.node_id = real_head;
-                    tmp.dist_c2n = distance;
-                    tmp.link_cost = link_cost;
-                    movieInfo.nodes[real_tail].neighbors.push_back(tmp);
+                    bool append_flag = true;
+                    for(auto &nn : movieInfo.nodes[real_tail].neighbors){
+                        if(nn.node_id == real_head){
+                            append_flag = true;
+                            break;
+                        }
+                    }
+                    if(append_flag){
+                        nodeRelation tmp;
+                        tmp.node_id = real_head;
+                        tmp.dist_c2n = distance;
+                        tmp.link_cost = link_cost;
+                        movieInfo.nodes[real_tail].neighbors.push_back(tmp);
+                    }
                 }
                 break;
             }
