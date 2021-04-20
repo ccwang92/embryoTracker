@@ -15,7 +15,7 @@ MainWindow::MainWindow()
     setCentralWidget(grpBox4display_canvas);
     //layout->addWidget(rightSideControlLayout);
     //setLayout(mainLayout);
-    this->setWindowTitle("Bi-QAV");
+    this->setWindowTitle("BIQAV");
     connectSignal();
     cellSegmenter = 0;
 }
@@ -400,16 +400,16 @@ void MainWindow::sendData4Segment()
     cellSegmenter->processSingleFrameAndReturn(glWidget_raycast,
                    data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
     //// display results in canvas
-//    int i = glWidget_raycast->curr_timePoint_in_canvas;
-//    long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*cellSegmenter->data_rows_cols_slices[1]*
-//            cellSegmenter->data_rows_cols_slices[2];
-//    unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*i; // sub-matrix pointer
-//    Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
-//    Mat4b rgb_mat4display;
-//    label2rgb3d(cellSegmenter->cell_label_maps[i], *single_frame, rgb_mat4display);
-//    glWidget_raycast->setMode("Alpha blending rgba");
-//    glWidget_raycast->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, cellSegmenter->data_rows_cols_slices[1],
-//            cellSegmenter->data_rows_cols_slices[0], cellSegmenter->data_rows_cols_slices[2], 4);
+    int i = glWidget_raycast->curr_timePoint_in_canvas;
+    long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*cellSegmenter->data_rows_cols_slices[1]*
+            cellSegmenter->data_rows_cols_slices[2];
+    unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*i; // sub-matrix pointer
+    Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
+    Mat4b rgb_mat4display;
+    label2rgb3d(cellSegmenter->cell_label_maps[i], *single_frame, rgb_mat4display);
+    glWidget_raycast->setMode("Alpha blending rgba");
+    glWidget_raycast->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, cellSegmenter->data_rows_cols_slices[1],
+            cellSegmenter->data_rows_cols_slices[0], cellSegmenter->data_rows_cols_slices[2], 4);
 
 }
 
@@ -443,7 +443,57 @@ void MainWindow::sendData4Track()
     }
     transferRGBAVolume(0);
 }
+void MainWindow::cellTraceAppend(int t){
+    glWidget_raycast->show_track_result = tracking_result_exist;
+    if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
+        glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
+        // re-set the rgb_frame
+        long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*
+                cellSegmenter->data_rows_cols_slices[1]*cellSegmenter->data_rows_cols_slices[2];
+        unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
+        Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
+        //label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, glWidget_raycast->rgb_frame);
 
+        // build a map based on tracking results
+        // 1. build color map
+        if(colormap4tracking_res.empty()){
+            int max_cell_num = vec_max(cellSegmenter->number_cells);
+            int color_num = MAX((size_t)max_cell_num, cellTracker->movieInfo.tracks.size());
+            colorMapGen((double)color_num, colormap4tracking_res);
+        }
+//        label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
+        // 2. build label map
+        Mat1i mapedLabelMap = Mat::zeros(cellSegmenter->cell_label_maps[t].dims,
+                                         cellSegmenter->cell_label_maps[t].size, CV_32S);
+        vector<bool> color_used (colormap4tracking_res.size[0] + 1, false);
+        //qDebug("%d-%d", colormap4tracking_res.size[0], colormap4tracking_res.size[1]);
+        FOREACH_i_MAT(cellSegmenter->cell_label_maps[t]){
+            size_t idx = cellSegmenter->cell_label_maps[t].at<int>(i);
+            if(idx == 0) continue;
+            idx --;
+            idx += t == 0 ? 0 : cellTracker->cumulative_cell_nums[t-1];
+            if(cellTracker->movieInfo.nodes[idx].nodeId2trackId >= 0){
+                color_used[cellTracker->movieInfo.nodes[idx].nodeId2trackId] = true;
+            }
+        }
+        size_t next_available = 0;
+        vector<int> mapped_idx (color_used.size(), -1);
+        FOREACH_i_MAT(cellSegmenter->cell_label_maps[t]){
+            size_t org_idx = cellSegmenter->cell_label_maps[t].at<int>(i);
+            if(org_idx == 0) continue;
+            size_t idx = org_idx-1;
+            idx += t == 0 ? 0 : cellTracker->cumulative_cell_nums[t-1];
+            int track_id = cellTracker->movieInfo.nodes[idx].nodeId2trackId;
+            if(track_id >= 0 && cellTracker->movieInfo.tracks[track_id].size() > 1){
+                mapedLabelMap.at<int>(i) = track_id + 1;
+            }else{
+                continue;
+            }
+        }
+        label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
+    }
+    glWidget_raycast->setVolumeTimePoint(t);
+}
 void MainWindow::transferRGBAVolume(int t){
     glWidget_raycast->show_track_result = tracking_result_exist;
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
@@ -489,19 +539,19 @@ void MainWindow::transferRGBAVolume(int t){
                 mapedLabelMap.at<int>(i) = track_id + 1;
             }else{
                 continue;
-//                if(mapped_idx[org_idx] >= 0){
-//                    mapedLabelMap.at<int>(i) = mapped_idx[org_idx];
-//                }else{
-//                    while(color_used[next_available]){
-//                        next_available ++;
-//                    }
-//                    mapedLabelMap.at<int>(i) = next_available + 1;
-//                    mapped_idx[org_idx] = next_available + 1;
-//                    if(next_available >= color_used.size()){
-//                        qDebug("%d", next_available);
-//                    }
-//                    color_used[next_available] = true;
-//                }
+                //                if(mapped_idx[org_idx] >= 0){
+                //                    mapedLabelMap.at<int>(i) = mapped_idx[org_idx];
+                //                }else{
+                //                    while(color_used[next_available]){
+                //                        next_available ++;
+                //                    }
+                //                    mapedLabelMap.at<int>(i) = next_available + 1;
+                //                    mapped_idx[org_idx] = next_available + 1;
+                //                    if(next_available >= color_used.size()){
+                //                        qDebug("%d", next_available);
+                //                    }
+                //                    color_used[next_available] = true;
+                //                }
             }
         }
         label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);

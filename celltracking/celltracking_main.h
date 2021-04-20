@@ -7,6 +7,7 @@ class cellTrackingMain
 public:
     cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool debugMode = true);
     cellTrackingMain(const QString &dataFolderName, const QString &resFolderName);
+    cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames);
     ~cellTrackingMain(){};
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
@@ -39,7 +40,7 @@ private:
     float distance2cost(float distance, float punish);
     void extractNeighborIds(vector<Mat> &cell_label_maps, size_t node_idx, vector<size_t> & nei_idxs);
     void extractPreNeighborIds(vector<Mat> &cell_label_maps, size_t cell_idx, vector<size_t> &nei_idxs);
-    void mccTracker_one2one(bool get_jumpCost_only = false);
+    void mccTracker_one2one(bool get_jumpCost_only = false, bool get_res_from_txt = false);
     void mccTracker_splitMerge(vector<splitMergeNodeInfo> &split_merge_node_info);
     void track2parentKid();
     void refreshTracks(); //remove the empty tracks
@@ -161,6 +162,7 @@ private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells, vector<size_t> &uptCell_idxs);
     void merge_broken_tracks();
     bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
+    bool loadTrackResults(vector<int> data_size_yxzt, const QStringList &fileNames);
 private: // combine all results from batch processing
     bool loadBatchResults(const QString &dataFolderName, const QString &resFolderName);
     bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);

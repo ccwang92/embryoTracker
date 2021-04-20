@@ -6,6 +6,28 @@
 #include "CINDA/src_c/cinda_funcs.c"
 using namespace std;
 using namespace cv;
+
+// inline functions for crop detections
+inline size_t key(int batch, int time,int section, int label) {
+    return (size_t) label << 32 | (unsigned int) ((time << 6) + (batch << 2) + section);
+}
+inline void dekey(size_t k, int &batch, int &time,int &section, int &label) {
+    label = k >> 32;
+    int ts = k & 0xFFFF;
+    section = ts & 3;
+    batch = (ts & 63) >> 2;
+    time = ts >> 6;
+}
+// for fused detections
+inline size_t newkey(int time,int label) {
+    return (size_t) label << 32 | (unsigned int) time;
+}
+inline void denewkey(size_t k, int &time, int &label) {
+    label = k >> 32;
+    time = k & 0xFFFF;
+}
+
+
 cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool _debugMode)
 {
     debugMode = _debugMode;
@@ -45,7 +67,13 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringLi
     qInfo("----------------%ld cells after iterative correction-------------------", total_cells);
     saveTrackResults(cellSegment, fileNames);
 }
-
+cellTrackingMain::cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames){
+    if(!loadTrackResults(data_size_yxzt, fileNames)){
+        qDebug("Fail to load files");
+    }
+    bool get_res_from_txt = true, get_jumpCost_only = false;
+    mccTracker_one2one(get_jumpCost_only, get_res_from_txt);
+}
 bool cellTrackingMain::saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames){
     //save segment results
     for (int i=0; i<fileNames.size(); i++){
@@ -90,7 +118,95 @@ bool cellTrackingMain::saveTrackResults(cellSegmentMain &cellSegment, const QStr
     movieInfo_txt.close();
     return true;
 }
+bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStringList &fileNames){
+    ///-------------------------read movieInfo information from txt file-----------------------//
+    QString fileName = fileNames.at(0);
+    QString movieInfo_txt_name = fileName.left(fileName.lastIndexOf('/')) + "/movieInfo.txt";
+    QFile txt_file(movieInfo_txt_name);
+    QTextStream in(&txt_file);
+    long long cell_num;
+    sscanf(in.readLine().toStdString().c_str(), "p %*c %*c %ld", &cell_num);
+    for(int i=0; i<2; i++){
+        // skip the first 2 lines
+        //            p gamma: 1.50283 8.1355
+        //            p jumpRatio: 0.691873 0.162243 0.145884
+        in.readLine();
+    }
+    movieInfo.nodes.resize(cell_num);
+    movieInfo.frames.resize(cell_num);
+    movieInfo.xCoord.resize(cell_num);
+    movieInfo.yCoord.resize(cell_num);
+    movieInfo.zCoord.resize(cell_num);
 
+    double en_cost, ex_cost, boz_cost;
+    sscanf(in.readLine().toStdString().c_str(), "p %lf %lf %lf", &en_cost, &ex_cost, &boz_cost);
+    p4tracking.c_en = en_cost;// cost of appearance and disappearance in the scene
+    p4tracking.c_ex = ex_cost;
+    p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex) + 0.00001; // make sure detections are all included
+
+    unordered_map<size_t, size_t> frame_label2cell_id;
+
+    while(!in.atEnd()) {
+        string line = in.readLine().toStdString();
+        // start parsing each line
+        switch (line[0]) {
+        case 'c':                  /* skip lines with comments */
+        case '\n':                 /* skip empty lines   */
+        case 'n':{
+            int id, frame, labelInMap;
+            sscanf(line.c_str(), "%*c %d %d %d", &id, &frame, &labelInMap);
+            if(labelInMap != 0){
+                frame_label2cell_id[newkey(frame, labelInMap)] = id;
+            }
+        }
+        case '\0':                 /* skip empty lines at the end of file */
+            break;
+        case 'p':
+        case 'a':{
+            int tail = 0;
+            int head = 0;
+            double distance, link_cost;
+            sscanf(line.c_str(), "%*c %d %d %lf %lf", &tail, &head, &distance, &link_cost);
+
+            nodeRelation tmp;
+            tmp.node_id = head;
+            tmp.dist_c2n = distance;
+            tmp.link_cost = link_cost;
+            movieInfo.nodes[tail].neighbors.push_back(tmp);
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    ///----------------------------------read node location information from .bin files--------------//
+    for (int i=0; i<fileNames.size(); i++){
+        QString fileName = fileNames.at(i);
+        QString label_file_name = fileName.left(fileName.lastIndexOf('.')) + "_label_map_int32_final.bin";
+        QFile label_file(label_file_name);
+        if (!label_file.open(QIODevice::ReadOnly)){
+            qFatal("lost files!");
+        }
+        Mat mat_cur_time;
+        Mat(3, data_size_yxzt.data(), CV_32S, label_file.readAll().data()).copyTo(mat_cur_time);
+        label_file.close();
+
+        double max_id;
+        minMaxIdx(mat_cur_time, nullptr, &max_id);
+        vector<vector<size_t>> cell_voxIdx;
+        extractVoxIdxList(&mat_cur_time, cell_voxIdx, (int)max_id);
+
+        FOREACH_j(cell_voxIdx){
+            vector<int> y, x, z;
+            vec_ind2sub(cell_voxIdx[i], y, x, z, mat_cur_time.size);
+            size_t tmp = frame_label2cell_id[newkey(i, (int)j+1)];
+            movieInfo.xCoord[tmp] = vec_mean(x);
+            movieInfo.yCoord[tmp] = vec_mean(y);
+            movieInfo.zCoord[tmp] = vec_mean(z);
+        }
+    }
+    return true;
+}
 /**
  * @brief merge_broken_tracks: for node-neighbor pair with cost of dist_c2n or dist_n2c smaller than obz_cost, link them
  */
@@ -824,7 +940,7 @@ void cellTrackingMain::extractPreNeighborIds(vector<Mat> &cell_label_maps, size_
 /**
  * @brief mccTracker_one2one: build the graph without split and merge settings, but allows jump
  */
-void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
+void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only, bool get_res_from_txt){
     //////////////////////////////////////////////////////////////////////////////////////////////////////////
     //      We directly use the interface I wrote for python with the following function name               //
     // long long* pyCS2(long *msz, double *mtail, double *mhead, double *mlow, double *macap, double *mcost)//
@@ -910,16 +1026,17 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only){
             curr_track.clear();
         }
     }
-
-    // update the jumpCost in p4tracking if no split/merge allowed
-    updateJumpCost();
-    if(!get_jumpCost_only){ // means this time of tracking is just to estimate jump cost and/or drift
-        node2trackUpt(true);
-        // update parent and kids given tracks
-        track2parentKid();
-        updateArcCost();
-        // by the way, also update stable segmentations
-        stableSegmentFixed();
+    if(!get_res_from_txt){
+        // update the jumpCost in p4tracking if no split/merge allowed
+        updateJumpCost();
+        if(!get_jumpCost_only){ // means this time of tracking is just to estimate jump cost and/or drift
+            node2trackUpt(true);
+            // update parent and kids given tracks
+            track2parentKid();
+            updateArcCost();
+            // by the way, also update stable segmentations
+            stableSegmentFixed();
+        }
     }
     delete[] msz;
     delete[] mtail;
@@ -4507,25 +4624,6 @@ bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const Q
     for(int batch_id=0; batch_id<data_batches.count(); batch_id++){
         oneBatchMovieInfoParse(batch_id, data_batches[batch_id]);
     }
-}
-// for crop detections
-inline size_t key(int batch, int time,int section, int label) {
-    return (size_t) label << 32 | (unsigned int) ((time << 6) + (batch << 2) + section);
-}
-inline void dekey(size_t k, int &batch, int &time,int &section, int &label) {
-    label = k >> 32;
-    int ts = k & 0xFFFF;
-    section = ts & 3;
-    batch = (ts & 63) >> 2;
-    time = ts >> 6;
-}
-// for fused detections
-inline size_t newkey(int time,int label) {
-    return (size_t) label << 32 | (unsigned int) time;
-}
-inline void denewkey(size_t k, int &time, int &label) {
-    label = k >> 32;
-    time = k & 0xFFFF;
 }
 
 void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfolderName){
