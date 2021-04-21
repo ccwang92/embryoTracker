@@ -63,7 +63,7 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     delete data4d;
 }
 // this function contains redundant operation due to copyTo
-bool cellSegmentMain::loadSegResults(const QString &fileName){
+bool cellSegmentMain::loadSegResults(const QString &fileName, bool track_needed){
     QString fileNameNoExt = fileName.left(fileName.lastIndexOf('.'));
     // read label data
     QString label_file_name = fileNameNoExt + "_label_map_int32_final.bin";
@@ -89,6 +89,9 @@ bool cellSegmentMain::loadSegResults(const QString &fileName){
     minMaxIdx(cell_label_maps[curr_time_point], nullptr, &tmp_maxVal);//minMaxLoc for 2d
     number_cells[curr_time_point] = round(tmp_maxVal);
     //ccShowSliceLabelMat(cell_label_maps[curr_time_point]);
+    if(!track_needed){ //simply for segmentation visualization
+        return true;
+    }
     // read threshold data
     QString threshod_file_name = fileNameNoExt + "_threshold_map_uint8.bin";
     QFile threshold_file(threshod_file_name);
@@ -223,15 +226,17 @@ bool cellSegmentMain::saveSegResults(const QString &fileName){
     stbVartrend_file.close();
     return true;
 }
-void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const QString &fileName){
+void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const QString &fileName, bool track_needed){
     long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
     curr_time_point = glWidget->curr_timePoint_in_canvas;
     ///
     /// \brief We fist test if there is saved binary file for use
     ///
-    if(time_points_processed[curr_time_point]==false && !fileName.isEmpty()){
-        if(loadSegResults(fileName)){
-            time_points_processed[curr_time_point] = true;
+    if(!fileName.isEmpty()){
+        if(time_points_processed[curr_time_point]==false || (track_needed && threshold_maps[curr_time_point].empty())){
+            if(loadSegResults(fileName, track_needed)){
+                time_points_processed[curr_time_point] = true;
+            }
         }
     }
     ///

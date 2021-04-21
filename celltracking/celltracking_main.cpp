@@ -67,9 +67,9 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringLi
     qInfo("----------------%ld cells after iterative correction-------------------", total_cells);
     saveTrackResults(cellSegment, fileNames);
 }
-cellTrackingMain::cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames){
+cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames){
     tracking_sucess =false;
-    if(!loadTrackResults(data_size_yxzt, fileNames)){
+    if(!loadTrackResults(cellSegment, data_size_yxzt, fileNames)){
         qDebug("Fail to load files");
     }
     bool get_res_from_txt = true, get_jumpCost_only = false;
@@ -120,7 +120,7 @@ bool cellTrackingMain::saveTrackResults(cellSegmentMain &cellSegment, const QStr
     movieInfo_txt.close();
     return true;
 }
-bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStringList &fileNames){
+bool cellTrackingMain::loadTrackResults(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames){
     ///-------------------------read movieInfo information from txt file-----------------------//
     QString fileName = fileNames.at(0);
     QString movieInfo_txt_name = fileName.left(fileName.lastIndexOf('/')) + "/movieInfo.txt";
@@ -214,9 +214,10 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
             vector<int> y, x, z;
             vec_ind2sub(cell_voxIdx[j], y, x, z, mat_cur_time.size);
             size_t tmp = frame_label2cell_id[newkey(i, (int)j+1)];
-            //            if(tmp == 0){
-            //                qDebug("check");
-            //            }
+            //extractSumGivenIdx(mat_cur_time, vector<size_t> idx, int datatype)
+//            if (movieInfo.xCoord[tmp] > 330) {
+//                qDebug("check point");
+//            }
             movieInfo.xCoord[tmp] = vec_mean(x);
             movieInfo.yCoord[tmp] = vec_mean(y);
             movieInfo.zCoord[tmp] = vec_mean(z);

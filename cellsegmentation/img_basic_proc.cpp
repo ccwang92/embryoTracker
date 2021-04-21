@@ -2697,7 +2697,7 @@ void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yx
             int sign = 1;
             if(end_yxz[2] < start_yxz[2]) sign = -1;
             float g_y = (end_yxz[0] - start_yxz[0])/(end_yxz[2] - start_yxz[2]);
-            float g_x = (end_yxz[1] - start_yxz[2])/(end_yxz[2] - start_yxz[2]);
+            float g_x = (end_yxz[1] - start_yxz[1])/(end_yxz[2] - start_yxz[2]);
             for(int i=0; i<steps; i++){
                 float y = start_yxz[0] + g_y*i*sign;
                 float x = start_yxz[1] + g_x*i*sign;

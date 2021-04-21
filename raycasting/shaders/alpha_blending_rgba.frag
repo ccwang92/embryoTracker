@@ -133,9 +133,9 @@ void main()
 //        vec4 c = colour_transfer(intensity);
         vec4 c = texture(volume, position);
         // Alpha-blending
-        colour.rgb = c.a * c.rgb + (1 - c.a) * colour.a * colour.rgb;
+        colour.rgb = c.a * c.rgb + (1 - c.a) * colour.rgb;//colour.a *
         colour.a = c.a + (1 - c.a) * colour.a;
-        if (c.a >= 0.9){
+        if (c.a == 1.0){
             trace_exist = true;
             break;
         }
@@ -145,9 +145,9 @@ void main()
         ray_length -= step_length;
         position += step_vector;
     }
-    if(!trace_exist){
-        colour.rgb = vec3(0.0, max_g, 0.0);
-    }
+//    if(!trace_exist){
+//        colour.rgb = vec3(0.0, max_g, 0.0);
+//    }
     // Blend background
     if (consider_transparency){
         colour.rgb = colour.a * colour.rgb + (1 - colour.a) * pow(background_colour, vec3(gamma)).rgb;

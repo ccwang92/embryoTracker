@@ -399,7 +399,7 @@ void MainWindow::sendData4Segment()
     //cellSegmenter->processSingleFrameAndReturn(glWidget_raycast);
     /// way 2: try to load saved data. Detect cells if failed.
     cellSegmenter->processSingleFrameAndReturn(glWidget_raycast,
-                   data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas));
+                   data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas), seg4track);
     //// display results in canvas
     int i = glWidget_raycast->curr_timePoint_in_canvas;
     long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*cellSegmenter->data_rows_cols_slices[1]*
@@ -438,16 +438,18 @@ void MainWindow::sendData4Track()
             yxzt_sz.push_back(glWidget_raycast->bufSize[2]);
             yxzt_sz.push_back(glWidget_raycast->bufSize[4]);
             //glWidget_raycast->setVolumeTimePoint(0);
-            cellTracker = new cellTrackingMain(yxzt_sz, data4test->filelist);
+            cellTracker = new cellTrackingMain(*cellSegmenter, yxzt_sz, data4test->filelist);
         }else{
             if(!cellSegmenter){ // already finish the tracking
                 //// send data to do segmentation on all frames
+                seg4track = true;
                 for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
                     //glWidget_raycast->setVolumeTimePoint(i);
                     glWidget_raycast->curr_timePoint_in_canvas = i;
                     this->sendData4Segment();
                     qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
                 }
+                seg4track = false;
             }
             //glWidget_raycast->setVolumeTimePoint(0);
             cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);

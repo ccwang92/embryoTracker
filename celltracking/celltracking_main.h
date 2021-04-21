@@ -7,7 +7,7 @@ class cellTrackingMain
 public:
     cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool debugMode = true);
     cellTrackingMain(const QString &dataFolderName, const QString &resFolderName);
-    cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames);
+    cellTrackingMain(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames);
     ~cellTrackingMain(){};
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
@@ -162,7 +162,7 @@ private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells, vector<size_t> &uptCell_idxs);
     void merge_broken_tracks();
     bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
-    bool loadTrackResults(vector<int> data_size_yxzt, const QStringList &fileNames);
+    bool loadTrackResults(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames);
 public:
     void extractTraceLocations(vector<int> data_size_yxzt, int width = 1);
 private: // combine all results from batch processing
