@@ -431,7 +431,8 @@ void MainWindow::sendData4Track()
                                                     data4test->image4d->getDatatype(),
                                                     glWidget_raycast->bufSize);
             }
-            vector<int> yxzt_sz(4);
+            vector<int> yxzt_sz;
+            yxzt_sz.reserve(4);
             yxzt_sz.push_back(glWidget_raycast->bufSize[1]);
             yxzt_sz.push_back(glWidget_raycast->bufSize[0]);
             yxzt_sz.push_back(glWidget_raycast->bufSize[2]);
@@ -465,7 +466,8 @@ void MainWindow::sendData4Track()
 void MainWindow::cellTraceAppend(int t){
     glWidget_raycast->show_track_result = tracking_result_exist;
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
-        vector<int> yxzt_sz(4);
+        vector<int> yxzt_sz;
+        yxzt_sz.reserve(4);
         yxzt_sz.push_back(glWidget_raycast->bufSize[1]);
         yxzt_sz.push_back(glWidget_raycast->bufSize[0]);
         yxzt_sz.push_back(glWidget_raycast->bufSize[2]);
@@ -490,8 +492,16 @@ void MainWindow::cellTraceAppend(int t){
         // 2. build label map
         Mat1i mapedLabelMap = Mat::zeros(3, yxzt_sz.data(), CV_32S);
 
-        for(int i=0; i<=t; i++){
-            for(int j=0; j<cellTracker->trace_sets[i].size(); j++){
+        for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
+            if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
+                continue;
+            }
+            int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
+            int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
+            if(end_time < t || start_time > t){ // if the trace has stopped before time t
+                continue;
+            }
+            for(int i=0; i<=t; i++){
                 for(auto idx : cellTracker->trace_sets[i][j]){
                     mapedLabelMap.at<int>(idx) = j + 1;
                 }

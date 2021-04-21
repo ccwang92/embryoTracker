@@ -2655,27 +2655,33 @@ void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yx
                 yxz_sz[1], yxz_sz[1]*yxz_sz[0]));
     }else{
         size_t page_sz = yxz_sz[1]*yxz_sz[0];
-        if(start_yxz[0] != end_yxz[0]){
-            int steps = ceil(abs(end_yxz[0] - start_yxz[0]));
+        vector<float> diff = vec_Minus(end_yxz, start_yxz);
+        if(abs(diff[0]) > MAX(abs(diff[2]), abs(diff[1]))){
+            int steps = floor(abs(end_yxz[0] - start_yxz[0]));
+            int sign = 1;
+            if(end_yxz[0] < start_yxz[0]) sign = -1;
             float g_x = (end_yxz[1] - start_yxz[1])/(end_yxz[0] - start_yxz[0]);
             float g_z = (end_yxz[2] - start_yxz[2])/(end_yxz[0] - start_yxz[0]);
             for(int i=0; i<steps; i++){
-                float y = start_yxz[0] + i;
-                float x = start_yxz[1] + g_x*i;
-                float z = start_yxz[2] + g_z*i;
+                float y = start_yxz[0] + i*sign;
+                float x = start_yxz[1] + g_x*i*sign;
+                float z = start_yxz[2] + g_z*i*sign;
 
                 out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
                 out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
                 out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
                 out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
             }
-        }else if(start_yxz[1] != end_yxz[1]){
-            int steps = ceil(abs(end_yxz[1] - start_yxz[1]));
+        }else if(abs(diff[1]) > abs(diff[2])){
+            int steps = floor(abs(end_yxz[1] - start_yxz[1]));
+            int sign = 1;
+            if(end_yxz[1] < start_yxz[1]) sign = -1;
+            float g_y = (end_yxz[0] - start_yxz[0])/(end_yxz[1] - start_yxz[1]);
             float g_z = (end_yxz[2] - start_yxz[2])/(end_yxz[1] - start_yxz[1]);
             for(int i=0; i<steps; i++){
-                float y = start_yxz[0];
-                float x = start_yxz[1] + i;
-                float z = start_yxz[2] + g_z*i;
+                float y = start_yxz[0] + g_y*i*sign;
+                float x = start_yxz[1] + i*sign;
+                float z = start_yxz[2] + g_z*i*sign;
 
                 out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
                 out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
@@ -2683,11 +2689,15 @@ void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yx
                 out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
             }
         }else{
-            int steps = ceil(abs(end_yxz[2] - start_yxz[2]));
+            int steps = floor(abs(end_yxz[2] - start_yxz[2]));
+            int sign = 1;
+            if(end_yxz[2] < start_yxz[2]) sign = -1;
+            float g_y = (end_yxz[0] - start_yxz[0])/(end_yxz[2] - start_yxz[2]);
+            float g_x = (end_yxz[1] - start_yxz[2])/(end_yxz[2] - start_yxz[2]);
             for(int i=0; i<steps; i++){
-                float y = start_yxz[0];
-                float x = start_yxz[1];
-                float z = start_yxz[2] + i;
+                float y = start_yxz[0] + g_y*i*sign;
+                float x = start_yxz[1] + g_x*i*sign;
+                float z = start_yxz[2] + i*sign;
 
                 out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
                 out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));

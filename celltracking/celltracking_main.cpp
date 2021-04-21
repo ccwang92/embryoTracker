@@ -68,11 +68,13 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringLi
     saveTrackResults(cellSegment, fileNames);
 }
 cellTrackingMain::cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames){
+    tracking_sucess =false;
     if(!loadTrackResults(data_size_yxzt, fileNames)){
         qDebug("Fail to load files");
     }
     bool get_res_from_txt = true, get_jumpCost_only = false;
     mccTracker_one2one(get_jumpCost_only, get_res_from_txt);
+    tracking_sucess = true;
 }
 bool cellTrackingMain::saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames){
     //save segment results
@@ -123,9 +125,11 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
     QString fileName = fileNames.at(0);
     QString movieInfo_txt_name = fileName.left(fileName.lastIndexOf('/')) + "/movieInfo.txt";
     QFile txt_file(movieInfo_txt_name);
+    txt_file.open(QFile::Text | QFile::ReadOnly);
     QTextStream in(&txt_file);
-    long long cell_num;
-    sscanf(in.readLine().toStdString().c_str(), "p %*c %*c %ld", &cell_num);
+    long cell_num;
+    //QString tmp = in.readLine();
+    sscanf(in.readLine().toStdString().c_str(), "p cell num: %ld", &cell_num);
     for(int i=0; i<2; i++){
         // skip the first 2 lines
         //            p gamma: 1.50283 8.1355
@@ -139,29 +143,36 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
     movieInfo.zCoord.resize(cell_num);
 
     double en_cost, ex_cost, boz_cost;
-    sscanf(in.readLine().toStdString().c_str(), "p %lf %lf %lf", &en_cost, &ex_cost, &boz_cost);
+    sscanf(in.readLine().toStdString().c_str(), "p enexObz: %lf %lf %lf", &en_cost, &ex_cost, &boz_cost);
     p4tracking.c_en = en_cost;// cost of appearance and disappearance in the scene
     p4tracking.c_ex = ex_cost;
     p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex) + 0.00001; // make sure detections are all included
 
+    FOREACH_i(movieInfo.nodes){
+        movieInfo.nodes[i].node_id = i;
+        movieInfo.nodes[i].in_cost = p4tracking.c_en;
+        movieInfo.nodes[i].out_cost = p4tracking.c_ex;
+    }
     unordered_map<size_t, size_t> frame_label2cell_id;
-
+    movieInfo.overall_neighbor_num = 0;
     while(!in.atEnd()) {
         string line = in.readLine().toStdString();
         // start parsing each line
         switch (line[0]) {
         case 'c':                  /* skip lines with comments */
         case '\n':                 /* skip empty lines   */
+        case 'p':
+        case '\0':                 /* skip empty lines at the end of file */
+            break;
         case 'n':{
             int id, frame, labelInMap;
             sscanf(line.c_str(), "%*c %d %d %d", &id, &frame, &labelInMap);
             if(labelInMap != 0){
                 frame_label2cell_id[newkey(frame, labelInMap)] = id;
+                movieInfo.frames[id] = frame;
             }
-        }
-        case '\0':                 /* skip empty lines at the end of file */
             break;
-        case 'p':
+        }
         case 'a':{
             int tail = 0;
             int head = 0;
@@ -173,12 +184,14 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
             tmp.dist_c2n = distance;
             tmp.link_cost = link_cost;
             movieInfo.nodes[tail].neighbors.push_back(tmp);
+            movieInfo.overall_neighbor_num ++;
             break;
         }
         default:
             break;
         }
     }
+    txt_file.close();
     ///----------------------------------read node location information from .bin files--------------//
     for (int i=0; i<fileNames.size(); i++){
         QString fileName = fileNames.at(i);
@@ -198,7 +211,7 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
 
         FOREACH_j(cell_voxIdx){
             vector<int> y, x, z;
-            vec_ind2sub(cell_voxIdx[i], y, x, z, mat_cur_time.size);
+            vec_ind2sub(cell_voxIdx[j], y, x, z, mat_cur_time.size);
             size_t tmp = frame_label2cell_id[newkey(i, (int)j+1)];
             movieInfo.xCoord[tmp] = vec_mean(x);
             movieInfo.yCoord[tmp] = vec_mean(y);
@@ -216,21 +229,28 @@ void cellTrackingMain::extractTraceLocations(vector<int> data_size_yxzt, int wid
     }
     vector<int> yxz_sz = {data_size_yxzt[0], data_size_yxzt[1], data_size_yxzt[2]};
     for(size_t i=0; i<movieInfo.tracks.size(); i++){
-        for(size_t j=1; j<movieInfo.tracks[i].size(); j++){ // start from the second point
-            size_t pre = movieInfo.tracks[i][j-1];
-            size_t curr = movieInfo.tracks[i][j];
-            vector<float> start_yxz = {movieInfo.xCoord[pre], movieInfo.yCoord[pre], movieInfo.zCoord[pre]};
-            vector<float> end_yxz = {movieInfo.xCoord[curr], movieInfo.yCoord[curr], movieInfo.zCoord[curr]};
-            vector<float> diff = vec_Minus(end_yxz, start_yxz);
-            for(int e=0; e<3;e++){
-                diff[e] /= (movieInfo.frames[curr]-movieInfo.frames[pre]);
-            }
-            for(int t = movieInfo.frames[pre]+1; t <= movieInfo.frames[curr]; t++){
+        for(size_t j=0; j<movieInfo.tracks[i].size(); j++){ // start from the second point
+            if(j==0){
+                size_t curr = movieInfo.tracks[i][j];
+                vector<float> end_yxz = {movieInfo.yCoord[curr], movieInfo.xCoord[curr], movieInfo.zCoord[curr]};
+                traceExtract(end_yxz, end_yxz, yxz_sz, width, trace_sets[movieInfo.frames[curr]][i]);
+            }else{
+                size_t pre = movieInfo.tracks[i][j-1];
+                size_t curr = movieInfo.tracks[i][j];
+                vector<float> start_yxz = {movieInfo.yCoord[pre], movieInfo.xCoord[pre], movieInfo.zCoord[pre]};
+                vector<float> end_yxz = {movieInfo.yCoord[curr], movieInfo.xCoord[curr], movieInfo.zCoord[curr]};
+                vector<float> diff = vec_Minus(end_yxz, start_yxz);
                 for(int e=0; e<3;e++){
-                    end_yxz[e] = diff[e]*(t-movieInfo.frames[pre]) + start_yxz[e];
+                    diff[e] /= (movieInfo.frames[curr]-movieInfo.frames[pre]);
                 }
-                traceExtract(start_yxz, end_yxz, yxz_sz, width, trace_sets[t][i]);
+                for(int t = movieInfo.frames[pre]+1; t <= movieInfo.frames[curr]; t++){
+                    for(int e=0; e<3;e++){
+                        end_yxz[e] = diff[e]*(t-movieInfo.frames[pre]) + start_yxz[e];
+                    }
+                    traceExtract(start_yxz, end_yxz, yxz_sz, width, trace_sets[t][i]);
+                }
             }
+
         }
     }
 }
@@ -988,7 +1008,7 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only, bool get_res_f
     float linkCostUpBound = INFINITY;
     for(size_t i=0; i < movieInfo.nodes.size(); i++){
         nodeInfo &node = movieInfo.nodes[i];
-        if(movieInfo.voxIdx[i].size() == 0) continue;
+        if(!get_res_from_txt && movieInfo.voxIdx[i].size() == 0) continue;
 
         node_valid_cnt ++;
         // in arc
@@ -1041,8 +1061,8 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only, bool get_res_f
             all_cost += cost[cost.size()-1];
             vector<size_t> new_track;
             for(size_t j = 0; j < curr_track.size(); j+=2){
-                if(curr_track[j] < 1 ||
-                        movieInfo.voxIdx[size_t((curr_track[j]-1) / 2)].size() == 0){
+                if(curr_track[j] < 1 || (!get_res_from_txt &&
+                        movieInfo.voxIdx[size_t((curr_track[j]-1) / 2)].size() == 0)){
                     qFatal("Node id wrong!");
                 }
                 new_track.push_back(size_t((curr_track[j]-1) / 2));
