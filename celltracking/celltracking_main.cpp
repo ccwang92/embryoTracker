@@ -207,6 +207,33 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
     }
     return true;
 }
+
+void cellTrackingMain::extractTraceLocations(vector<int> data_size_yxzt, int width){
+    //vector<vector<unordered_set<size_t>>> trace_sets; // time x trackes
+    trace_sets.resize(data_size_yxzt[3]);
+    for(int t=0; t<data_size_yxzt[3]; t++){
+        trace_sets[t].resize(movieInfo.tracks.size());
+    }
+    vector<int> yxz_sz = {data_size_yxzt[0], data_size_yxzt[1], data_size_yxzt[2]};
+    for(size_t i=0; i<movieInfo.tracks.size(); i++){
+        for(size_t j=1; j<movieInfo.tracks[i].size(); j++){ // start from the second point
+            size_t pre = movieInfo.tracks[i][j-1];
+            size_t curr = movieInfo.tracks[i][j];
+            vector<float> start_yxz = {movieInfo.xCoord[pre], movieInfo.yCoord[pre], movieInfo.zCoord[pre]};
+            vector<float> end_yxz = {movieInfo.xCoord[curr], movieInfo.yCoord[curr], movieInfo.zCoord[curr]};
+            vector<float> diff = vec_Minus(end_yxz, start_yxz);
+            for(int e=0; e<3;e++){
+                diff[e] /= (movieInfo.frames[curr]-movieInfo.frames[pre]);
+            }
+            for(int t = movieInfo.frames[pre]+1; t <= movieInfo.frames[curr]; t++){
+                for(int e=0; e<3;e++){
+                    end_yxz[e] = diff[e]*(t-movieInfo.frames[pre]) + start_yxz[e];
+                }
+                traceExtract(start_yxz, end_yxz, yxz_sz, width, trace_sets[t][i]);
+            }
+        }
+    }
+}
 /**
  * @brief merge_broken_tracks: for node-neighbor pair with cost of dist_c2n or dist_n2c smaller than obz_cost, link them
  */

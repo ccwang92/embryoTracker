@@ -234,7 +234,8 @@ void MainWindow::connectSignal()
 //    }
     if (timeSlider) {
         connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
-        connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(transferRGBAVolume(int)));
+        //connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(transferRGBAVolume(int)));
+        connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(cellTraceAppend(int)));
         //connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
     }
     if (contrastScrollBar) {
@@ -421,18 +422,35 @@ void MainWindow::sendData4Track()
     }
     if(cellTracker == nullptr){
         chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-        if(!cellSegmenter){ // already finish the tracking
-            //// send data to do segmentation on all frames
-            for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
-                //glWidget_raycast->setVolumeTimePoint(i);
-                glWidget_raycast->curr_timePoint_in_canvas = i;
-                this->sendData4Segment();
-                                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+        QString fileName = data4test->filelist.at(0);
+        QString movieInfo_txt_name = fileName.left(fileName.lastIndexOf('/')) + "/movieInfo.txt";
+        QFileInfo check_file(movieInfo_txt_name);
+        if(check_file.exists() && check_file.isFile()){
+            if(!cellSegmenter){ // already finish the tracking
+                cellSegmenter = new cellSegmentMain((void *)data4test->image4d->getRawData(),
+                                                    data4test->image4d->getDatatype(),
+                                                    glWidget_raycast->bufSize);
             }
+            vector<int> yxzt_sz(4);
+            yxzt_sz.push_back(glWidget_raycast->bufSize[1]);
+            yxzt_sz.push_back(glWidget_raycast->bufSize[0]);
+            yxzt_sz.push_back(glWidget_raycast->bufSize[2]);
+            yxzt_sz.push_back(glWidget_raycast->bufSize[4]);
+            //glWidget_raycast->setVolumeTimePoint(0);
+            cellTracker = new cellTrackingMain(yxzt_sz, data4test->filelist);
+        }else{
+            if(!cellSegmenter){ // already finish the tracking
+                //// send data to do segmentation on all frames
+                for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
+                    //glWidget_raycast->setVolumeTimePoint(i);
+                    glWidget_raycast->curr_timePoint_in_canvas = i;
+                    this->sendData4Segment();
+                    qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+                }
+            }
+            //glWidget_raycast->setVolumeTimePoint(0);
+            cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
         }
-        //glWidget_raycast->setVolumeTimePoint(0);
-        cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
-
         chrono::steady_clock::time_point end = chrono::steady_clock::now();
         qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
 
@@ -441,11 +459,17 @@ void MainWindow::sendData4Track()
     }else{
         tracking_result_exist = !tracking_result_exist;
     }
-    transferRGBAVolume(0);
+    //transferRGBAVolume(0);
+    cellTraceAppend(0);
 }
 void MainWindow::cellTraceAppend(int t){
     glWidget_raycast->show_track_result = tracking_result_exist;
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
+        vector<int> yxzt_sz(4);
+        yxzt_sz.push_back(glWidget_raycast->bufSize[1]);
+        yxzt_sz.push_back(glWidget_raycast->bufSize[0]);
+        yxzt_sz.push_back(glWidget_raycast->bufSize[2]);
+        yxzt_sz.push_back(glWidget_raycast->bufSize[4]);
         glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
         // re-set the rgb_frame
         long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*
@@ -455,39 +479,22 @@ void MainWindow::cellTraceAppend(int t){
         //label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, glWidget_raycast->rgb_frame);
 
         // build a map based on tracking results
-        // 1. build color map
+        // 1. build color map and extract trace locations
         if(colormap4tracking_res.empty()){
-            int max_cell_num = vec_max(cellSegmenter->number_cells);
-            int color_num = MAX((size_t)max_cell_num, cellTracker->movieInfo.tracks.size());
+            //int max_cell_num = vec_max(cellSegmenter->number_cells);
+            int color_num =  cellTracker->movieInfo.tracks.size(); //MAX((size_t)max_cell_num, cellTracker->movieInfo.tracks.size());
             colorMapGen((double)color_num, colormap4tracking_res);
+            cellTracker->extractTraceLocations(yxzt_sz);
         }
 //        label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
         // 2. build label map
-        Mat1i mapedLabelMap = Mat::zeros(cellSegmenter->cell_label_maps[t].dims,
-                                         cellSegmenter->cell_label_maps[t].size, CV_32S);
-        vector<bool> color_used (colormap4tracking_res.size[0] + 1, false);
-        //qDebug("%d-%d", colormap4tracking_res.size[0], colormap4tracking_res.size[1]);
-        FOREACH_i_MAT(cellSegmenter->cell_label_maps[t]){
-            size_t idx = cellSegmenter->cell_label_maps[t].at<int>(i);
-            if(idx == 0) continue;
-            idx --;
-            idx += t == 0 ? 0 : cellTracker->cumulative_cell_nums[t-1];
-            if(cellTracker->movieInfo.nodes[idx].nodeId2trackId >= 0){
-                color_used[cellTracker->movieInfo.nodes[idx].nodeId2trackId] = true;
-            }
-        }
-        size_t next_available = 0;
-        vector<int> mapped_idx (color_used.size(), -1);
-        FOREACH_i_MAT(cellSegmenter->cell_label_maps[t]){
-            size_t org_idx = cellSegmenter->cell_label_maps[t].at<int>(i);
-            if(org_idx == 0) continue;
-            size_t idx = org_idx-1;
-            idx += t == 0 ? 0 : cellTracker->cumulative_cell_nums[t-1];
-            int track_id = cellTracker->movieInfo.nodes[idx].nodeId2trackId;
-            if(track_id >= 0 && cellTracker->movieInfo.tracks[track_id].size() > 1){
-                mapedLabelMap.at<int>(i) = track_id + 1;
-            }else{
-                continue;
+        Mat1i mapedLabelMap = Mat::zeros(3, yxzt_sz.data(), CV_32S);
+
+        for(int i=0; i<=t; i++){
+            for(int j=0; j<cellTracker->trace_sets[i].size(); j++){
+                for(auto idx : cellTracker->trace_sets[i][j]){
+                    mapedLabelMap.at<int>(idx) = j + 1;
+                }
             }
         }
         label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
@@ -559,7 +566,6 @@ void MainWindow::transferRGBAVolume(int t){
 //        glWidget_raycast->setMode("Alpha blending rgba");
 //        glWidget->getRenderer()->transfer_volume((unsigned char *)rgb_mat4display.data, 0, 255, data_rows_cols_slices[1],
 //                data_rows_cols_slices[0], data_rows_cols_slices[2], 4);
-
     }
     glWidget_raycast->setVolumeTimePoint(t);
 }

@@ -95,6 +95,7 @@ public:
     cellTrackingMain *cellTracker = nullptr;
     bool tracking_result_exist = false;
     Mat3b colormap4tracking_res;
+
 public slots:
     void debugAlgorithm();
     void debugBatchFusion();

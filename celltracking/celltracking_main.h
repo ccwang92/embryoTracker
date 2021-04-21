@@ -163,6 +163,8 @@ private:
     void merge_broken_tracks();
     bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
     bool loadTrackResults(vector<int> data_size_yxzt, const QStringList &fileNames);
+public:
+    void extractTraceLocations(vector<int> data_size_yxzt, int width = 1);
 private: // combine all results from batch processing
     bool loadBatchResults(const QString &dataFolderName, const QString &resFolderName);
     bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
@@ -181,6 +183,8 @@ private:
     size_t fuse_batch_processed_cell_cnt = 0;
     vector<pair<int, Mat>> overlapped_frames;
     int frame_processed = -1;
+public:
+    vector<vector<unordered_set<size_t>>> trace_sets;
 public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;

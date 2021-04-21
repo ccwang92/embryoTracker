@@ -2641,6 +2641,62 @@ void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat3b &colormap, Mat4b &dst
         }
     }
 }
+/**
+ * @brief traceExtract: extract the voxel between start and end point
+ * @param start_yxz
+ * @param end_yxz
+ * @param yxz_sz
+ * @param out_idx: return the voxels index along that trace
+ */
+void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yxz_sz, int width, unordered_set<size_t> &out_idx){
+
+    if (start_yxz[0] == end_yxz[0] && start_yxz[1] == end_yxz[1] && start_yxz[2] == end_yxz[2]){
+        out_idx.insert(vol_sub2ind(round(start_yxz[0]), round(start_yxz[1]), round(start_yxz[2]),
+                yxz_sz[1], yxz_sz[1]*yxz_sz[0]));
+    }else{
+        size_t page_sz = yxz_sz[1]*yxz_sz[0];
+        if(start_yxz[0] != end_yxz[0]){
+            int steps = ceil(abs(end_yxz[0] - start_yxz[0]));
+            float g_x = (end_yxz[1] - start_yxz[1])/(end_yxz[0] - start_yxz[0]);
+            float g_z = (end_yxz[2] - start_yxz[2])/(end_yxz[0] - start_yxz[0]);
+            for(int i=0; i<steps; i++){
+                float y = start_yxz[0] + i;
+                float x = start_yxz[1] + g_x*i;
+                float z = start_yxz[2] + g_z*i;
+
+                out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
+            }
+        }else if(start_yxz[1] != end_yxz[1]){
+            int steps = ceil(abs(end_yxz[1] - start_yxz[1]));
+            float g_z = (end_yxz[2] - start_yxz[2])/(end_yxz[1] - start_yxz[1]);
+            for(int i=0; i<steps; i++){
+                float y = start_yxz[0];
+                float x = start_yxz[1] + i;
+                float z = start_yxz[2] + g_z*i;
+
+                out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
+            }
+        }else{
+            int steps = ceil(abs(end_yxz[2] - start_yxz[2]));
+            for(int i=0; i<steps; i++){
+                float y = start_yxz[0];
+                float x = start_yxz[1];
+                float z = start_yxz[2] + i;
+
+                out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
+            }
+        }
+    }
+}
 //hsv rgb2hsv(rgb in)
 //{
 //    hsv         out;

@@ -161,7 +161,7 @@ void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat3b &colormap, Mat4b &dst
 void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat4b &dst);
 void label2rgb2d(Mat1i &src, Mat3b &dst);
 
-
+void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yxz_sz, int width, unordered_set<size_t> &out_idx);
 // Function to find t-test of
 // two set of statistical data.
 
