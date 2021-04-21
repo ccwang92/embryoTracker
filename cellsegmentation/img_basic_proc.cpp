@@ -2636,7 +2636,9 @@ void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat3b &colormap, Mat4b &dst
             dst.at<Vec4b>(i)(2) = cur_cl(2);
             dst.at<Vec4b>(i)(3) = 255;
         }else{
+            //dst.at<Vec4b>(i)(0) = src_intensity.at<unsigned char>(i); //r
             dst.at<Vec4b>(i)(1) = src_intensity.at<unsigned char>(i); //g
+            //dst.at<Vec4b>(i)(2) = src_intensity.at<unsigned char>(i); //b
             dst.at<Vec4b>(i)(3) = src_intensity.at<unsigned char>(i)/2;//the lower the more transparent it is
         }
     }
@@ -2649,13 +2651,15 @@ void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat3b &colormap, Mat4b &dst
  * @param out_idx: return the voxels index along that trace
  */
 void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yxz_sz, int width, unordered_set<size_t> &out_idx){
-
-    if (start_yxz[0] == end_yxz[0] && start_yxz[1] == end_yxz[1] && start_yxz[2] == end_yxz[2]){
+    vector<float> diff = vec_Minus(end_yxz, start_yxz);
+    //qInfo("traceExtract start %f, %f, %f", abs(diff[0]),abs(diff[1]),abs(diff[2]));
+    if ((abs(diff[0])+abs(diff[1])+abs(diff[2])) < 0.1){ // points are quite close
         out_idx.insert(vol_sub2ind(round(start_yxz[0]), round(start_yxz[1]), round(start_yxz[2]),
                 yxz_sz[1], yxz_sz[1]*yxz_sz[0]));
     }else{
+        //qInfo("traceExtract end");
         size_t page_sz = yxz_sz[1]*yxz_sz[0];
-        vector<float> diff = vec_Minus(end_yxz, start_yxz);
+
         if(abs(diff[0]) > MAX(abs(diff[2]), abs(diff[1]))){
             int steps = floor(abs(end_yxz[0] - start_yxz[0]));
             int sign = 1;

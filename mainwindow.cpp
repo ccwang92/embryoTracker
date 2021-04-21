@@ -509,6 +509,7 @@ void MainWindow::cellTraceAppend(int t){
         }
         label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
     }
+    qInfo("3-Done!");
     glWidget_raycast->setVolumeTimePoint(t);
 }
 void MainWindow::transferRGBAVolume(int t){

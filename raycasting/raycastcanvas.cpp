@@ -241,7 +241,8 @@ void RayCastCanvas::setVolume(long frame4display) {
         if(rgb_frame.empty()){
             throw std::runtime_error("rgb results has not been initialized.");
         }
-        this->setMode("Alpha blending rgba");
+        this->setMode("Alpha blending rgba");//
+        //m_gamma = 1;
         m_raycasting_volume->transfer_volume((unsigned char *)rgb_frame.data, 0, 255, rgb_frame.size[1],
                 rgb_frame.size[0], rgb_frame.size[2], 4);
     }else{
