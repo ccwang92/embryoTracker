@@ -65,18 +65,18 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringLi
     tracking_sucess = true;
     size_t total_cells = accumulate(cellSegment.number_cells.begin(), cellSegment.number_cells.end(), 0);
     qInfo("----------------%ld cells after iterative correction-------------------", total_cells);
-    saveTrackResults(cellSegment, fileNames);
+    saveTrackAndFinalSegmentResults(cellSegment, fileNames);
 }
-cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames){
+cellTrackingMain::cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames){
     tracking_sucess =false;
-    if(!loadTrackResults(cellSegment, data_size_yxzt, fileNames)){
+    if(!loadTrackResults(data_size_yxzt, fileNames)){
         qDebug("Fail to load files");
     }
     bool get_res_from_txt = true, get_jumpCost_only = false;
     mccTracker_one2one(get_jumpCost_only, get_res_from_txt);
     tracking_sucess = true;
 }
-bool cellTrackingMain::saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames){
+bool cellTrackingMain::saveTrackAndFinalSegmentResults(cellSegmentMain &cellSegment, const QStringList &fileNames){
     //save segment results
     for (int i=0; i<fileNames.size(); i++){
         QString fileName = fileNames.at(i);
@@ -120,7 +120,7 @@ bool cellTrackingMain::saveTrackResults(cellSegmentMain &cellSegment, const QStr
     movieInfo_txt.close();
     return true;
 }
-bool cellTrackingMain::loadTrackResults(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames){
+bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStringList &fileNames){
     ///-------------------------read movieInfo information from txt file-----------------------//
     QString fileName = fileNames.at(0);
     QString movieInfo_txt_name = fileName.left(fileName.lastIndexOf('/')) + "/movieInfo.txt";

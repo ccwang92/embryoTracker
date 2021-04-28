@@ -5,9 +5,12 @@
 class cellTrackingMain
 {
 public:
+    // constructor if segmentation results is provided
     cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool debugMode = true);
+    // contructor if the segmentation and tracking results are both provided (paths in hard drive)
     cellTrackingMain(const QString &dataFolderName, const QString &resFolderName);
-    cellTrackingMain(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames);
+    // constructor if
+    cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames);
     ~cellTrackingMain(){};
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
@@ -161,8 +164,8 @@ private:    // TODO: missing cell module
 private:
     void movieInfo_update(cellSegmentMain &cellSegment, vector<newFoundCellInfo> &newCells, vector<size_t> &uptCell_idxs);
     void merge_broken_tracks();
-    bool saveTrackResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
-    bool loadTrackResults(cellSegmentMain &cellSegment, vector<int> data_size_yxzt, const QStringList &fileNames);
+    bool saveTrackAndFinalSegmentResults(cellSegmentMain &cellSegment, const QStringList &fileNames);
+    bool loadTrackResults(vector<int> data_size_yxzt, const QStringList &fileNames);
 public:
     void extractTraceLocations(vector<int> data_size_yxzt, int width = 1);
 private: // combine all results from batch processing
