@@ -738,8 +738,16 @@ void DataImporter::data4dp_to_rgba3d(Image4DProxy<Image4DSimple>& img4dp, V3DLON
                             rgba.r = SAMPLE2(SAM0, ix,iy,iz, dx,dy,dz, dxyz);
                             rgba.g = SAMPLE2(SAM1, ix,iy,iz, dx,dy,dz, dxyz);
                             rgba.b = SAMPLE2(SAM2, ix,iy,iz, dx,dy,dz, dxyz);
-                            float t = (0.f + rgba.r + rgba.g + rgba.b)/3.0;
-                            rgba.a = (unsigned char)t;
+//                            float t = (0.f + rgba.r + rgba.g + rgba.b)/3.0;
+//                            rgba.a = (unsigned char)t;
+                            if(rgba.r==rgba.b && rgba.r==rgba.g){
+                                //rgba.r = 0;
+                                //rgba.b = 0;
+                                //float t = (0.f + rgba.r + rgba.g + rgba.b)/3.0;
+                                rgba.a = (unsigned char)(rgba.g/2);
+                            }else{
+                                rgba.a = 255;
+                            }
                             rgbaBuf[oxOffset++] = rgba;
                         }
                     }

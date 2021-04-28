@@ -272,7 +272,7 @@ void RayCastCanvas::setVolume(long frame4display) {
                 bufSize[4] = data_importer->image4d->getTDim();
             }
         } CATCH_handler( "RayCastCanvas:setVolume" );
-        if (!total_rgbaBuf && flag_rgba_display) // if buffer has not been initialized
+        if (!total_rgbaBuf && (bufSize[3] == 3 || flag_rgba_display)) // if buffer has not been initialized
         {
             QElapsedTimer timer;
             // now the correct data size xyzct are saved in bufSize
@@ -306,16 +306,24 @@ void RayCastCanvas::setVolume(long frame4display) {
         }
         long offsets = frame4display*bufSize[0]*bufSize[1]*bufSize[2];
         if (total_rgbaBuf){ // display the data using 4 channels
+
             m_raycasting_volume->transfer_volume(total_rgbaBuf + offsets,
                                                  p_min, p_max, bufSize[0],
                     bufSize[1], bufSize[2], 4/*rgbaBuf contains 4 channels*/);
+            this->setMode("Alpha blending rgba");//
+//            if(frame4display == 1){
+//                resetMode(); // reset the renderering to gray-scale
+//            }else{
+//                this->setMode("Alpha blending rgba");//
+//            }
         }else{
             offsets *= data_importer->image4d->getUnitBytes(); // if 16 bit, one pixel occupies two chars.
             m_raycasting_volume->transfer_volume(data_importer->image4d->getRawData() + offsets,
                                                  p_min, p_max, bufSize[0],
                     bufSize[1], bufSize[2], 1);
+            resetMode(); // reset the renderering to gray-scale
         }
-        resetMode(); // reset the renderering to gray-scale
+
     }
     if(!m_gamma_init){
         //double max_exist_intensity = data_importer->p_vmax[0];
@@ -529,7 +537,7 @@ void RayCastCanvas::setThreshold(int intensity_threshold){
         m_min_valid_intensity = 1;
     }else{
         m_min_valid_intensity = pow(intensity_threshold,3) / 1000000.0;
-        m_min_valid_intensity *= data_importer->p_vmax[0] / max_intensity ;
+        m_min_valid_intensity *= data_importer->p_vmax[bufSize[4]-1] / max_intensity ;
     }
     update();
 

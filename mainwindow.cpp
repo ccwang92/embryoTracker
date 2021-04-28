@@ -342,7 +342,8 @@ void MainWindow::debugBatchFusion(){
 void MainWindow::debugAlgorithm()
 {
     // directly work on 4 folders
-    QString filename = QFileDialog::getOpenFileName(this);
+    QString filename = QString::fromStdString("/home/ccw/storage/debug_batch_merge/TM450_489/backleft/1.tif");
+    //QString filename = QFileDialog::getOpenFileName(this);
     int x = filename.lastIndexOf('/');
     QString folderName = filename.left(x);
     x = folderName.lastIndexOf('/');
@@ -511,7 +512,7 @@ void MainWindow::cellTraceAppend(int t){
         }
         label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
     }
-    qInfo("3-Done!");
+    //qInfo("3-Done!");
     glWidget_raycast->setVolumeTimePoint(t);
 }
 void MainWindow::transferRGBAVolume(int t){

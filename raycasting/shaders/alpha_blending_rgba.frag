@@ -124,30 +124,35 @@ void main()
 
     vec3 position = ray_start;
     vec4 colour = vec4(0.0);
-
+    vec4 bgColor = vec4(0.0);
     // Ray march until reaching the end of the volume, or colour saturation
-    bool trace_exist = false;
-    float max_g = 0;
-    while (ray_length > 0 && colour.a < 1.0) {
+//-------------------------------------way 1---------------------------//
+//    bool trace_exist = false;
+//    float max_g = 0;
+    while (ray_length > 0) {// && colour.a < 1.0
 //        float intensity = texture(volume, position).r;
 //        vec4 c = colour_transfer(intensity);
         vec4 c = texture(volume, position);
         // Alpha-blending
-        colour.rgb = c.a * c.rgb + (1 - c.a) * colour.rgb;//colour.a *
-        colour.a = c.a + (1 - c.a) * colour.a;
-        if (c.a == 1.0){
-            trace_exist = true;
+//        colour.rgb = c.a * c.rgb + (1 - c.a) * colour.rgb;//colour.a *
+//        colour.a = c.a + (1 - c.a) * colour.a;
+        colour.rgb = (1-colour.a) * c.rgb + colour.a * colour.rgb;//colour.a *
+        colour.a = (1 - colour.a) * c.a + colour.a;
+        if (c.a > 0.9){
+            colour = c;
             break;
         }
-        if(colour.g > max_g){
-            max_g = colour.g;
-        }
+//        if(colour.g > max_g){
+//            max_g = colour.g;
+//        }
         ray_length -= step_length;
         position += step_vector;
     }
 //    if(!trace_exist){
-//        colour.rgb = vec3(0.0, max_g, 0.0);
+//        colour.rgb = vec3(max_g, max_g, max_g);
 //    }
+
+
     // Blend background
     if (consider_transparency){
         colour.rgb = colour.a * colour.rgb + (1 - colour.a) * pow(background_colour, vec3(gamma)).rgb;
