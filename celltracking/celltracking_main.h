@@ -8,9 +8,10 @@ public:
     // constructor if segmentation results is provided
     cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool debugMode = true);
     // contructor if the segmentation and tracking results are both provided (paths in hard drive)
-    cellTrackingMain(const QString &dataFolderName, const QString &resFolderName);
-    // constructor if
     cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames);
+    // contructor if we want to fuse all tracking results
+    cellTrackingMain(const vector<int> &data_size_yxzt, const vector<int> &ov_size_yxzt, const QString &dataFolderName, const QString &resFolderName);
+
     ~cellTrackingMain(){};
 private:
     void cellInfoAccumuate(cellSegmentMain &cellSegment);
@@ -170,9 +171,9 @@ public:
     void extractTraceLocations(vector<int> data_size_yxzt, int width = 1);
 private: // combine all results from batch processing
     bool loadBatchResults(const QString &dataFolderName, const QString &resFolderName);
-    bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
+    bool batchResultsFusion(const QString &dataFolderName, const QString &resFolderName, const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz);
 //    bool oneBatchResultsFusion(int batch_id, const QString &batchFolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
-    void oneBatchResultsFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz);
+    void oneBatchResultsFusion(int batch_id, const QString &subfolderName, const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz);
     void spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel);
     void spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int ov_sz, vector<vector<int>> &oldLabel2newLabel);
     void temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int frame,

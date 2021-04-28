@@ -381,6 +381,8 @@ void MainWindow::debugAlgorithm()
             cellSegmenter = nullptr;
             delete cellTracker;
             cellTracker = nullptr;
+        }else{
+
         }
     }
     qFatal("Debug successed! No need to continue");

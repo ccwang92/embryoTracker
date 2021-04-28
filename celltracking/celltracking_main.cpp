@@ -4659,13 +4659,13 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
 /// The key principal of cell fusion is to determine if two cells from overlapped regions are the same or not.
 /// We used a IoU=0.5 as principal, if ov > IoU, they are the same. Otherwise, we keep the one that further to
 /// the spatial or temporal boundary.
-cellTrackingMain::cellTrackingMain(const QString &dataFolderName, const QString &resFolderName){
-    vector<int> fixed_crop_sz = {493, 366, 259};
-    vector<int> overlap_sz = {50, 50, 24, 5}; // y, x, z, t
+cellTrackingMain::cellTrackingMain(const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz, const QString &dataFolderName, const QString &resFolderName){
+    //vector<int> fixed_crop_sz = {493, 366, 259};
+    //vector<int> overlap_sz = {50, 50, 24, 5}; // y, x, z, t
     batchResultsFusion(dataFolderName, resFolderName, fixed_crop_sz, overlap_sz);
 }
 bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName,
-                                          vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
+                                          const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz){
     overlapped_frames.reserve(p4tracking.k);
     // step 1. fuse data in one batch; get the mapping function: batch_id, frame, label ==> newIdx
     QDir root_directory(dataFolderName);
@@ -4759,7 +4759,7 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
  * @brief spaceFusion: fuse data in vertical and horizontal directions
  * @param subfolderName
  */
-void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfolderName, vector<int> &fixed_crop_sz, vector<int> &overlap_sz){
+void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfolderName, const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz){
     vector<QString> crop_names = {"frontleft", "frontright", "backleft", "back_right"};
 //    vector<int> fixed_crop_sz = {493, 366, 259};
 //    vector<int> overlap_sz = {50, 50, 24};
