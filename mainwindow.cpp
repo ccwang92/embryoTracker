@@ -441,7 +441,7 @@ void MainWindow::sendData4Track()
             yxzt_sz.push_back(glWidget_raycast->bufSize[2]);
             yxzt_sz.push_back(glWidget_raycast->bufSize[4]);
             //glWidget_raycast->setVolumeTimePoint(0);
-            cellTracker = new cellTrackingMain(*cellSegmenter, yxzt_sz, data4test->filelist);
+            cellTracker = new cellTrackingMain(yxzt_sz, data4test->filelist);
         }else{
             if(!cellSegmenter){ // already finish the tracking
                 //// send data to do segmentation on all frames

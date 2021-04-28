@@ -9,7 +9,7 @@ public:
     cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool debugMode = true);
     // contructor if the segmentation and tracking results are both provided (paths in hard drive)
     cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames);
-    // contructor if we want to fuse all tracking results
+    // contructor if we want to fuse all batch-wise tracking results
     cellTrackingMain(const vector<int> &data_size_yxzt, const vector<int> &ov_size_yxzt, const QString &dataFolderName, const QString &resFolderName);
 
     ~cellTrackingMain(){};
