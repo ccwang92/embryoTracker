@@ -4884,9 +4884,10 @@ void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMa
     // check the right one
     FOREACH_i(r_cell_voxIdx){
         vector<int> y, x, z;
+        if(r_cell_voxIdx[i].size()==0) continue;
         vec_ind2sub(r_cell_voxIdx[i], y, x, z, right.size);
         if (vec_min(x) >= ov_sz){ // located in non-overlapping area
-            oldLabel2newLabel[0][i+1] = i + 1 + l_max_id;
+            oldLabel2newLabel[1][i+1] = i + 1 + l_max_id;
         }else{
             vector<size_t> to_left_idx;
             to_left_idx.reserve(x.size());
@@ -4903,7 +4904,7 @@ void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMa
             for(auto ele:freqs){
                 if(ele.second>best_ov_sz){
                     best_id = (int) ele.first;
-                    best_ov_sz = ele.first;
+                    best_ov_sz = ele.second;
                 }
             }
             //first test if there is a cell in left with IoU>0.5
@@ -4924,7 +4925,7 @@ void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMa
         }
     }
     int fuse_sz[3] = {left.size[0], left.size[1], left.size[2]};
-    fuse_sz[0] += (right.size[0] - ov_sz);
+    fuse_sz[1] += (right.size[1] - ov_sz);
     fusedMat = Mat::zeros(3, fuse_sz, CV_32S);
     unordered_set<int> used;
     for(int i=0; i<l_cell_voxIdx.size(); i++){
