@@ -342,49 +342,51 @@ void MainWindow::debugBatchFusion(){
 void MainWindow::debugAlgorithm()
 {
     // directly work on 4 folders
-    QString filename = QString::fromStdString("/home/ccw/storage/debug_batch_merge/TM450_489/backleft/1.tif");
     //QString filename = QFileDialog::getOpenFileName(this);
-    int x = filename.lastIndexOf('/');
-    QString folderName = filename.left(x);
-    x = folderName.lastIndexOf('/');
-    folderName = folderName.left(x);
-    QDirIterator it(folderName, QDir::Dirs | QDir::NoDotAndDotDot); //QDirIterator::Subdirectories);//QStringList() << "*.jpg", QDir::Files,
-    while (it.hasNext()){
-        debugDataPath = it.next();
-        qInfo()<<debugDataPath;
-        if(!debugDataPath.isEmpty()){
-            QFileInfo check_file(QDir(debugDataPath).filePath("movieInfo.txt"));
-            if(check_file.exists() && check_file.isFile()){
-                continue;
-            }
-            debugDataPath = QDir(debugDataPath).filePath("1.tif");
-            algorithmDebug = true;
-            this->data4test->debugMode = true;
-            //QString fileName =
-            this->importImageSeries();
-            //// send data to do segmentation on all frames
-            for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
-                glWidget_raycast->curr_timePoint_in_canvas = i;
-                //// segement
-                this->sendData4Segment();
-                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
-            }
-        //    glWidget_raycast->setVolumeTimePoint(0);
-            //// send segmentation results for cell linking
-        //    this->sendData4Track();
-            qInfo("start tracking");
-            chrono::steady_clock::time_point begin = chrono::steady_clock::now();
-            cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
-            chrono::steady_clock::time_point end = chrono::steady_clock::now();
-            qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
-            delete cellSegmenter;
-            cellSegmenter = nullptr;
-            delete cellTracker;
-            cellTracker = nullptr;
-        }else{
+    //    int x = filename.lastIndexOf('/');
+    //    QString folderName = filename.left(x);
+    //    x = folderName.lastIndexOf('/');
+    //    folderName = folderName.left(x);
+    //    QDirIterator it(folderName, QDir::Dirs | QDir::NoDotAndDotDot); //QDirIterator::Subdirectories);//QStringList() << "*.jpg", QDir::Files,
+    //    while (it.hasNext()){
+    //        debugDataPath = it.next();
+    //        qInfo()<<debugDataPath;
+    //        if(debugDataPath.isEmpty()){
+    //            qFatal("Non-exist folder!");
+    //        }
+    //        QFileInfo check_file(QDir(debugDataPath).filePath("movieInfo.txt"));
+    //        if(!check_file.exists() || !check_file.isFile()){
+    //            debugDataPath = QDir(debugDataPath).filePath("1.tif");
+    //            algorithmDebug = true;
+    //            this->data4test->debugMode = true;
+    //            //QString fileName =
+    //            this->importImageSeries();
+    //            //// send data to do segmentation on all frames
+    //            for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
+    //                glWidget_raycast->curr_timePoint_in_canvas = i;
+    //                //// segement
+    //                this->sendData4Segment();
+    //                qInfo("The #%d/%ld frame are finished!", i, glWidget_raycast->bufSize[4]);
+    //            }
+    //            //    glWidget_raycast->setVolumeTimePoint(0);
+    //            //// send segmentation results for cell linking
+    //            //    this->sendData4Track();
+    //            qInfo("start tracking");
+    //            chrono::steady_clock::time_point begin = chrono::steady_clock::now();
+    //            cellTracker = new cellTrackingMain(*cellSegmenter, data4test->filelist);
+    //            chrono::steady_clock::time_point end = chrono::steady_clock::now();
+    //            qInfo("----------------time used: %.3f s", ((float)chrono::duration_cast<chrono::milliseconds>(end - begin).count())/1000);
+    //            delete cellSegmenter;
+    //            cellSegmenter = nullptr;
+    //            delete cellTracker;
+    //            cellTracker = nullptr;
+    //        }
+    //    }
+    QString folderName = QString::fromStdString("/home/ccw/storage/debug_batch_merge");
+    vector<int> fixed_crop_sz = {493, 366, 259};
+    vector<int> overlap_sz = {50, 50, 24, 5}; // y, x, z, t
+    cellTracker = new cellTrackingMain(fixed_crop_sz, overlap_sz, folderName, folderName);
 
-        }
-    }
     qFatal("Debug successed! No need to continue");
 }
 void MainWindow::sendData4Segment()

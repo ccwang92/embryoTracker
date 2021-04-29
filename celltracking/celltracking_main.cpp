@@ -4662,6 +4662,7 @@ bool cellTrackingMain::parentOrKidValidLinkTest(vector<size_t> &new_cell_idx, in
 cellTrackingMain::cellTrackingMain(const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz, const QString &dataFolderName, const QString &resFolderName){
     //vector<int> fixed_crop_sz = {493, 366, 259};
     //vector<int> overlap_sz = {50, 50, 24, 5}; // y, x, z, t
+    init_parameter();
     batchResultsFusion(dataFolderName, resFolderName, fixed_crop_sz, overlap_sz);
 }
 bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName,
@@ -4671,7 +4672,7 @@ bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const Q
     QDir root_directory(dataFolderName);
     QStringList data_batches = root_directory.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name);
     for(int batch_id=0; batch_id<data_batches.count(); batch_id++){
-        oneBatchResultsFusion(batch_id, data_batches[batch_id], fixed_crop_sz, overlap_sz);
+        oneBatchResultsFusion(batch_id, dataFolderName+"/"+data_batches[batch_id], fixed_crop_sz, overlap_sz);
     }
     // step 2. load all the cell information (movieInfo.txt), build movieInfo
     movieInfo.nodes.resize(fuse_batch_processed_cell_cnt);//
@@ -4770,9 +4771,20 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
     /// The principal is get the last p4tracking.k frames
     QRegExp rx("(\\d+)");
     if(rx.indexIn(images[images.count()-1]) == -1) qFatal("Wrong file name");
-    int frame2save = rx.cap(1).toInt() - p4tracking.k + 1;
+    int frame2save = 0;
+    for (int i=0; i<images.count(); i++){
+        rx.indexIn(images[i]);
+        frame2save = MAX(frame2save, rx.cap(1).toInt());
+    }
+    vector<int> data_process_order (images.count());
+    for(int i=0; i<images.count(); i++){
+        rx.indexIn(images[i]);
+        data_process_order[rx.cap(1).toInt()-1+(frame2save-images.count())] = i;
+    }
+    frame2save -= (p4tracking.k - 1);
     int frame_saved_cnt = 0;
-    foreach(QString filename, images) { //QT's version of for_each
+    for(int ii = 0; ii<data_process_order.size(); ii++) { //QT's version of for_each
+        QString filename = images[data_process_order[ii]];
         QRegExp rx("(\\d+)");
         if(rx.indexIn(filename) == -1) qFatal("Wrong file name");
         int frame = rx.cap(1).toInt();
