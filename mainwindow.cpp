@@ -384,7 +384,7 @@ void MainWindow::debugAlgorithm()
     //    }
     QString folderName = QString::fromStdString("/home/ccw/storage/debug_batch_merge");
     vector<int> fixed_crop_sz = {250,250,30};//{493, 366, 259};
-    vector<int> overlap_sz = {50, 50, 24, 5}; // y, x, z, t
+    vector<int> overlap_sz = {50, 50, 5}; // left_right, up_down, t
     cellTracker = new cellTrackingMain(fixed_crop_sz, overlap_sz, folderName, folderName);
 
     qFatal("Debug successed! No need to continue");

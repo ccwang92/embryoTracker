@@ -4809,7 +4809,7 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
         vector<vector<int>> u_label_map_lr, d_label_map_lr, label_map_ud;
         spaceFusion_leftRight(mat_crops[0], mat_crops[1], lr_fuse_mat_u, overlap_sz[1], u_label_map_lr);
         spaceFusion_leftRight(mat_crops[2], mat_crops[3], lr_fuse_mat_d, overlap_sz[1], d_label_map_lr);
-        spaceFusion_upDown(lr_fuse_mat_u, lr_fuse_mat_d, ud_fuse_mat, overlap_sz[2], label_map_ud);
+        spaceFusion_upDown(lr_fuse_mat_u, lr_fuse_mat_d, ud_fuse_mat, overlap_sz[0], label_map_ud);
 
         //// if temperally never processed
         if(frame > overlapped_frames.rbegin()->first){
@@ -4978,9 +4978,10 @@ void cellTrackingMain::spaceFusion_upDown(Mat &up, Mat &down, Mat &fusedMat, int
     // check the right one
     FOREACH_i(d_cell_voxIdx){
         vector<int> y, x, z;
+        if(d_cell_voxIdx[i].size()==0) continue;
         vec_ind2sub(d_cell_voxIdx[i], y, x, z, down.size);
         if (vec_min(y) >= ov_sz){ // located in non-overlapping area
-            oldLabel2newLabel[0][i+1] = i + 1 + u_max_id;
+            oldLabel2newLabel[1][i+1] = i + 1 + u_max_id;
         }else{
             vector<size_t> to_up_idx;
             to_up_idx.reserve(x.size());
