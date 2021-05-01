@@ -249,7 +249,7 @@ public:
         p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex) + 0.00001; // make sure detections are all included
 
 
-        ////update cost of p4seg
+        //// update cost of p4seg
         p4seg.validTrackLength = 0; // the shortest path we want, cells in other tracks will be removed
         p4seg.removeSamllRegion = false; // though we have threshold, we did not
         p4seg.fgBoundaryHandle = LEAVEALONEFIRST;

@@ -4782,13 +4782,14 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
         data_process_order[rx.cap(1).toInt()-1+(frame2save-images.count())] = i;
     }
     frame2save -= (p4tracking.k - 1);
+    //if(overlapped_frames.size() == 0)
     int frame_saved_cnt = 0;
     for(int ii = 0; ii<data_process_order.size(); ii++) { //QT's version of for_each
         QString filename = images[data_process_order[ii]];
         QRegExp rx("(\\d+)");
         if(rx.indexIn(filename) == -1) qFatal("Wrong file name");
         int frame = rx.cap(1).toInt();
-        if(frame < overlapped_frames.begin()->first){
+        if(overlapped_frames.size()>0 && frame < overlapped_frames.begin()->first){
             //// if temperally processed && out of the scope of jump
             continue;
         }
@@ -4808,11 +4809,12 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
         Mat lr_fuse_mat_u, lr_fuse_mat_d, ud_fuse_mat;
         vector<vector<int>> u_label_map_lr, d_label_map_lr, label_map_ud;
         spaceFusion_leftRight(mat_crops[0], mat_crops[1], lr_fuse_mat_u, overlap_sz[1], u_label_map_lr);
+        //ccShowSliceLabelMat(lr_fuse_mat_u);
         spaceFusion_leftRight(mat_crops[2], mat_crops[3], lr_fuse_mat_d, overlap_sz[1], d_label_map_lr);
         spaceFusion_upDown(lr_fuse_mat_u, lr_fuse_mat_d, ud_fuse_mat, overlap_sz[0], label_map_ud);
-
+        //ccShowSliceLabelMat(ud_fuse_mat);
         //// if temperally never processed
-        if(frame > overlapped_frames.rbegin()->first){
+        if(overlapped_frames.size()==0 || frame > overlapped_frames.rbegin()->first){
             int max_label = 0;
             size_t new_idx;
             FOREACH_i(u_label_map_lr){
@@ -4841,10 +4843,18 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
             }
             fuse_batch_processed_cell_cnt += max_label; // count start from 1 and idx starts from 0;
             // save the 16bit unsigned results as label map
-            Mat ud_fuse_mat_u16;
-            ud_fuse_mat.convertTo(ud_fuse_mat_u16, CV_16UC1);
-            QString full_im_name = subfolderName + "/" + filename.left(12)+".tif";
-            imwrite(full_im_name.toStdString(), ud_fuse_mat_u16);
+            //Mat ud_fuse_mat_u16;
+            //ud_fuse_mat.convertTo(ud_fuse_mat_u16, CV_16U);
+            QString full_im_name = subfolderName + "/" + filename.left(12)+"fused.bin";
+            //imwrite(full_im_name.toStdString(), ud_fuse_mat_u16);
+            QFileInfo check_file(full_im_name);
+            if(!(check_file.exists() && check_file.isFile())){
+                ofstream fused_file(full_im_name.toStdString(), ios::binary);
+                if (fused_file.is_open()){
+                    fused_file.write((const char*)(ud_fuse_mat.data), ud_fuse_mat.elemSize() * ud_fuse_mat.total());
+                    fused_file.close();
+                }
+            }
         }else{ //// if temperally processed,
             int ov_label_map_id = frame - overlapped_frames.begin()->first;
             temporalFusion(overlapped_frames[ov_label_map_id].second, ud_fuse_mat, batch_id, frame,
@@ -4852,7 +4862,11 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
         }
         //// start to save the overlapped results for next round
         if(frame == frame2save){
-            overlapped_frames[frame_saved_cnt++] = make_pair(frame, ud_fuse_mat);
+            if(overlapped_frames.size() == p4tracking.k){
+                overlapped_frames[frame_saved_cnt++] = make_pair(frame, ud_fuse_mat);
+            }else{
+                overlapped_frames.emplace_back(make_pair(frame, ud_fuse_mat));
+            }
             frame2save++;
         }
     }
@@ -5062,13 +5076,13 @@ void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int
     double kept_max_id, mov_max_id;
     minMaxIdx(kept, nullptr, &kept_max_id);
     minMaxIdx(mov, nullptr, &mov_max_id);
-    unordered_map<int, vector<int>> mov_label2crop;
+    unordered_map<int, vector<vector<int>>> mov_label2crop;
     FOREACH_i(u_label_map_lr){
         FOREACH_j(u_label_map_lr[i]){
             if(u_label_map_lr[i][j]==0 || label_map_ud[0][u_label_map_lr[i][j]]==0){
                 continue;
             }
-            mov_label2crop[label_map_ud[0][u_label_map_lr[i][j]]] = {mov_batch_id, frame, (int)i, (int)j};
+            mov_label2crop[label_map_ud[0][u_label_map_lr[i][j]]].push_back({mov_batch_id, frame, (int)i, (int)j});
         }
     }
     FOREACH_i(d_label_map_lr){
@@ -5076,7 +5090,9 @@ void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int
             if(d_label_map_lr[i][j]==0 || label_map_ud[1][d_label_map_lr[i][j]]==0){
                 continue;
             }
-            mov_label2crop[label_map_ud[1][d_label_map_lr[i][j]]] = {mov_batch_id, frame, (int)i+2, (int)j};
+            if(mov_label2crop.find(label_map_ud[1][d_label_map_lr[i][j]]) == mov_label2crop.end()){
+                mov_label2crop[label_map_ud[1][d_label_map_lr[i][j]]].push_back({mov_batch_id, frame, (int)i+2, (int)j});
+            }
         }
     }
     vector<vector<size_t>> kept_cell_voxIdx, mov_cell_voxIdx;
@@ -5100,12 +5116,14 @@ void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int
         }
         //first test if there is a cell in left with IoU>0.5
         if(best_id != 0 && best_ov_sz*2>=(mov_cell_voxIdx[i].size() + kept_cell_voxIdx[best_id-1].size())){
-            size_t mov_key = key(mov_label2crop[labelInMap][0], mov_label2crop[labelInMap][1], mov_label2crop[labelInMap][2], mov_label2crop[labelInMap][3]);
             size_t kept_key = newkey(frame, best_id);
             if(newinfo2newIdx.find(kept_key) == newinfo2newIdx.end()){
                 qFatal("refer to a non-exist cell in reference frame");
             }
-            oldinfo2newIdx[mov_key] = newinfo2newIdx[kept_key];
+            for(auto &key_eles : mov_label2crop[labelInMap]){
+                size_t mov_key = key(key_eles[0], key_eles[1], key_eles[2], key_eles[3]);
+                oldinfo2newIdx[mov_key] = newinfo2newIdx[kept_key];
+            }
         }
 
     }
