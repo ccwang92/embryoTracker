@@ -4677,7 +4677,7 @@ bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const Q
     // step 2. load all the cell information (movieInfo.txt), build movieInfo
     movieInfo.nodes.resize(fuse_batch_processed_cell_cnt);//
     for(int batch_id=0; batch_id<data_batches.count(); batch_id++){
-        oneBatchMovieInfoParse(batch_id, data_batches[batch_id]);
+        oneBatchMovieInfoParse(batch_id, dataFolderName+"/"+data_batches[batch_id]);
     }
 }
 
@@ -4779,7 +4779,8 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
     vector<int> data_process_order (images.count());
     for(int i=0; i<images.count(); i++){
         rx.indexIn(images[i]);
-        data_process_order[rx.cap(1).toInt()-1+(frame2save-images.count())] = i;
+        qDebug("%d", rx.cap(1).toInt()-1+(images.count()-frame2save));
+        data_process_order[rx.cap(1).toInt()-1+(images.count()-frame2save)] = i;
     }
     frame2save -= (p4tracking.k - 1);
     //if(overlapped_frames.size() == 0)
