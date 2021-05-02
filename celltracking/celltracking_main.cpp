@@ -4738,6 +4738,8 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
                     auto it = oldinfo2newIdx.find(cell_localId2Key[id]);
                     if(it != oldinfo2newIdx.end()){
                         movieInfo.frames[it->second] = frame;
+                        movieInfo.nodes[it->second].in_cost = en_cost;
+                        movieInfo.nodes[it->second].out_cost = ex_cost;
                     }
                 }
             }
