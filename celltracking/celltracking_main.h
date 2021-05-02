@@ -184,6 +184,7 @@ private:
     unordered_map<size_t, size_t> oldinfo2newIdx; // <time, section(fl, fr, bl, br), labelinMap> ==> new node id
     unordered_map<size_t, size_t> newIdx2newinfo; // new node id ==> <time, new labelinMap>
     unordered_map<size_t, size_t> newinfo2newIdx; // <time, new labelinMap> ==> new node id
+    unordered_map<size_t, vector<float>> fusedFrameLabel2centerYXZ;
     size_t fuse_batch_processed_cell_cnt = 0;
     vector<pair<int, Mat>> overlapped_frames;
     int frame_processed = -1;

@@ -1026,7 +1026,8 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only, bool get_res_f
         // observation arc
         mtail[arc_cnt] = 2 * node.node_id+1;
         mhead[arc_cnt] =  2 * node.node_id + 2;
-        mcost[arc_cnt] = round((double)p4tracking.observationCost * 1e7); // add some randomness to make sure unique optimal solution
+        //mcost[arc_cnt] = round((double)p4tracking.observationCost * 1e7); // add some randomness to make sure unique optimal solution
+        mcost[arc_cnt] = round((-((double)node.in_cost+(double)node.out_cost) + 0.00001)  * 1e7);
         arc_cnt ++;
         // out arc
         mhead[arc_cnt] = src_id;
@@ -4664,6 +4665,10 @@ cellTrackingMain::cellTrackingMain(const vector<int> &fixed_crop_sz, const vecto
     //vector<int> overlap_sz = {50, 50, 24, 5}; // y, x, z, t
     init_parameter();
     batchResultsFusion(dataFolderName, resFolderName, fixed_crop_sz, overlap_sz);
+    tracking_sucess =false;
+    bool get_res_from_txt = true, get_jumpCost_only = false;
+    mccTracker_one2one(get_jumpCost_only, get_res_from_txt);
+    tracking_sucess = true;
 }
 bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName,
                                           const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz){
@@ -4675,7 +4680,20 @@ bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const Q
         oneBatchResultsFusion(batch_id, dataFolderName+"/"+data_batches[batch_id], fixed_crop_sz, overlap_sz);
     }
     // step 2. load all the cell information (movieInfo.txt), build movieInfo
-    movieInfo.nodes.resize(fuse_batch_processed_cell_cnt);//
+    movieInfo.nodes.resize(fuse_batch_processed_cell_cnt);
+    movieInfo.frames.resize(fuse_batch_processed_cell_cnt);
+    movieInfo.xCoord.resize(fuse_batch_processed_cell_cnt);
+    movieInfo.yCoord.resize(fuse_batch_processed_cell_cnt);
+    movieInfo.zCoord.resize(fuse_batch_processed_cell_cnt);
+    FOREACH_i(movieInfo.nodes){
+        movieInfo.nodes[i].node_id = i;
+    }
+    for(auto &nodeId_yxz : fusedFrameLabel2centerYXZ){
+        movieInfo.xCoord[nodeId_yxz.first] = nodeId_yxz.second[1];
+        movieInfo.yCoord[nodeId_yxz.first] = nodeId_yxz.second[0];
+        movieInfo.zCoord[nodeId_yxz.first] = nodeId_yxz.second[2];
+    }
+    movieInfo.overall_neighbor_num = 0;
     for(int batch_id=0; batch_id<data_batches.count(); batch_id++){
         oneBatchMovieInfoParse(batch_id, dataFolderName+"/"+data_batches[batch_id]);
     }
@@ -4693,8 +4711,9 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
             QMessageBox::information(0, "error", txt_file.errorString());
         }
         QTextStream in(&txt_file);
-        long long cell_num;
-        sscanf(in.readLine().toStdString().c_str(), "p %*c %*c %ld", &cell_num);
+        long cell_num;
+        sscanf(in.readLine().toStdString().c_str(), "p cell num: %ld", &cell_num);
+
         for(int i=0; i<2; i++){
             // skip the first 3 lines
             //            p cell num: 65164
@@ -4703,8 +4722,8 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
             in.readLine();
         }
         double en_cost, ex_cost, boz_cost;
-        sscanf(in.readLine().toStdString().c_str(), "p %lf %lf %lf", &en_cost, &ex_cost, &boz_cost);
-        unordered_map<int, pair<int,int>> cell_id2frame_label;
+        sscanf(in.readLine().toStdString().c_str(), "p enexObz: %lf %lf %lf", &en_cost, &ex_cost, &boz_cost);
+        unordered_map<int, size_t> cell_localId2Key;
         while(!in.atEnd()) {
             string line = in.readLine().toStdString();
             // start parsing each line
@@ -4715,7 +4734,11 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
                 int id, frame, labelInMap;
                 sscanf(line.c_str(), "%*c %d %d %d", &id, &frame, &labelInMap);
                 if(labelInMap != 0){
-                    cell_id2frame_label[id] = make_pair(start_frame+frame, labelInMap);
+                    cell_localId2Key[id] = key(batch_id, start_frame+frame, i, labelInMap);
+                    auto it = oldinfo2newIdx.find(cell_localId2Key[id]);
+                    if(it != oldinfo2newIdx.end()){
+                        movieInfo.frames[it->second] = frame;
+                    }
                 }
             }
             case '\0':                 /* skip empty lines at the end of file */
@@ -4726,16 +4749,18 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
                 int head = 0;
                 double distance, link_cost;
                 sscanf(line.c_str(), "%*c %d %d %lf %lf", &tail, &head, &distance, &link_cost);
-                size_t real_tail, real_head;
-                real_tail = key(batch_id, cell_id2frame_label[tail].first, i, cell_id2frame_label[tail].second);
-                real_head = key(batch_id, cell_id2frame_label[head].first, i, cell_id2frame_label[head].second);
-                if(oldinfo2newIdx.find(real_tail)!=oldinfo2newIdx.end() && oldinfo2newIdx.find(real_head)!=oldinfo2newIdx.end()){
-                    real_tail = oldinfo2newIdx[real_tail];
-                    real_head = oldinfo2newIdx[real_head];
+                size_t real_tail, real_tailKey, real_head, real_headKey;
+                real_tailKey = cell_localId2Key[tail];
+                real_headKey = cell_localId2Key[head];
+                auto it_tail = oldinfo2newIdx.find(real_tailKey);
+                auto it_head = oldinfo2newIdx.find(real_headKey);
+                if(it_tail!=oldinfo2newIdx.end() && it_head!=oldinfo2newIdx.end()){
+                    real_tail = it_tail->second;
+                    real_head = it_head->second;
                     bool append_flag = true;
                     for(auto &nn : movieInfo.nodes[real_tail].neighbors){
                         if(nn.node_id == real_head){
-                            append_flag = true;
+                            append_flag = false;
                             break;
                         }
                     }
@@ -4745,6 +4770,7 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
                         tmp.dist_c2n = distance;
                         tmp.link_cost = link_cost;
                         movieInfo.nodes[real_tail].neighbors.push_back(tmp);
+                        movieInfo.overall_neighbor_num ++;
                     }
                 }
                 break;
@@ -4779,7 +4805,7 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
     vector<int> data_process_order (images.count());
     for(int i=0; i<images.count(); i++){
         rx.indexIn(images[i]);
-        qDebug("%d", rx.cap(1).toInt()-1+(images.count()-frame2save));
+        //qDebug("%d", rx.cap(1).toInt()-1+(images.count()-frame2save));
         data_process_order[rx.cap(1).toInt()-1+(images.count()-frame2save)] = i;
     }
     frame2save -= (p4tracking.k - 1);
@@ -4843,7 +4869,18 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
                 }
             }
             fuse_batch_processed_cell_cnt += max_label; // count start from 1 and idx starts from 0;
-            // save the 16bit unsigned results as label map
+
+            //// update the fusedFrameLabel2centerYXZ
+            vector<vector<size_t>> cell_voxIdx;
+            extractVoxIdxList(&ud_fuse_mat, cell_voxIdx, max_label);
+            FOREACH_j(cell_voxIdx){
+                if(cell_voxIdx[j].size() == 0) continue;
+                vector<int> y, x, z;
+                vec_ind2sub(cell_voxIdx[j], y, x, z, ud_fuse_mat.size);
+                fusedFrameLabel2centerYXZ[newinfo2newIdx[newkey(frame, j+1)]] = {vec_mean(y),
+                        vec_mean(x), vec_mean(z)};
+            }
+            //// save the 16bit unsigned results as label map
             //Mat ud_fuse_mat_u16;
             //ud_fuse_mat.convertTo(ud_fuse_mat_u16, CV_16U);
             QString full_im_name = subfolderName + "/" + filename.left(12)+"fused.bin";
@@ -4968,7 +5005,7 @@ void cellTrackingMain::spaceFusion_leftRight(Mat &left, Mat &right, Mat &fusedMa
     }
 }
 /**
- * @brief spaceFusion_upDown
+ * @brief spaceFusion_upDown: the last step of spatial fusion
  * @param up
  * @param down
  * @param fusedMat
