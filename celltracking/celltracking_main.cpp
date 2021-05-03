@@ -4775,9 +4775,9 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
                         }
                     }
                     if(append_flag){
-//                        if(movieInfo.frames[real_tail]==40){
-//                            qDebug("check point, %ld, %.3f", real_tail, link_cost);
-//                        }
+                        if(movieInfo.frames[real_tail]==40){
+                            qDebug("check point, %ld, %.3f", real_tail, link_cost);
+                        }
                         nodeRelation tmp;
                         tmp.node_id = real_head;
                         tmp.dist_c2n = distance;
@@ -5162,18 +5162,22 @@ void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int
         for(auto ele:freqs){
             if(ele.second>best_ov_sz){
                 best_id = (int) ele.first;
-                best_ov_sz = ele.first;
+                best_ov_sz = ele.second;
             }
         }
         //first test if there is a cell in left with IoU>0.5
         if(best_id != 0 && best_ov_sz*2>=(mov_cell_voxIdx[i].size() + kept_cell_voxIdx[best_id-1].size())){
             size_t kept_key = newkey(frame, best_id);
-            if(newinfo2newIdx.find(kept_key) == newinfo2newIdx.end()){
+            auto it = newinfo2newIdx.find(kept_key);
+            if(it == newinfo2newIdx.end()){
                 qFatal("refer to a non-exist cell in reference frame");
+            }
+            if(it->second == 22897){
+                qDebug("check point");
             }
             for(auto &key_eles : mov_label2crop[labelInMap]){
                 size_t mov_key = key(key_eles[0], key_eles[1], key_eles[2], key_eles[3]);
-                oldinfo2newIdx[mov_key] = newinfo2newIdx[kept_key];
+                oldinfo2newIdx[mov_key] = it->second;
             }
         }
 
