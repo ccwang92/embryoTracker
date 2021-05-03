@@ -189,6 +189,8 @@ private:
     vector<pair<int, Mat>> overlapped_frames;
     int frame_processed = -1;
 public:
+    vector<int> fused_im_sz_yxzt;
+public:
     vector<vector<unordered_set<size_t>>> trace_sets;
 public:
     allCellsCensus movieInfo;

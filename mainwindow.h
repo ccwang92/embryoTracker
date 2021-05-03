@@ -90,7 +90,7 @@ public:
 //    QString debugDataPath = QString("/home/ccw/Desktop/embryo_res_folder/"
 //                                    "downsample_crop_embryo_data_470x350x250x50/embryo_TM481.tif");
     //QString debugDataPath = QString("/home/ccw/Desktop/test_ims/cropped_16bit4speed/embryo_TM481.tif");
-    DataImporter *data4test = 0; // functions to import data
+    DataImporter *data4test = nullptr; // functions to import data
     QAction * debugButton;
     cellSegmentMain *cellSegmenter = nullptr;
     cellTrackingMain *cellTracker = nullptr;

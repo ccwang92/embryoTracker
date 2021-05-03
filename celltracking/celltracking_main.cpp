@@ -1092,6 +1092,8 @@ void cellTrackingMain::mccTracker_one2one(bool get_jumpCost_only, bool get_res_f
             // by the way, also update stable segmentations
             stableSegmentFixed();
         }
+    }else{
+        node2trackUpt(true);
     }
     delete[] msz;
     delete[] mtail;
@@ -4669,6 +4671,11 @@ cellTrackingMain::cellTrackingMain(const vector<int> &fixed_crop_sz, const vecto
     bool get_res_from_txt = true, get_jumpCost_only = false;
     mccTracker_one2one(get_jumpCost_only, get_res_from_txt);
     tracking_sucess = true;
+    fused_im_sz_yxzt.resize(4);
+    fused_im_sz_yxzt[0] = fixed_crop_sz[0]*2-overlap_sz[0];
+    fused_im_sz_yxzt[1] = fixed_crop_sz[1]*2-overlap_sz[1];
+    fused_im_sz_yxzt[2] = fixed_crop_sz[2]*2-overlap_sz[2];
+    fused_im_sz_yxzt[3] = 1 + *max_element(movieInfo.frames.begin(), movieInfo.frames.end());
 }
 bool cellTrackingMain::batchResultsFusion(const QString &dataFolderName, const QString &resFolderName,
                                           const vector<int> &fixed_crop_sz, const vector<int> &overlap_sz){
@@ -4733,11 +4740,12 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
             case 'n':{
                 int id, frame, labelInMap;
                 sscanf(line.c_str(), "%*c %d %d %d", &id, &frame, &labelInMap);
+                //qDebug("%d, %d, %d", id, frame, labelInMap);
                 if(labelInMap != 0){
                     cell_localId2Key[id] = key(batch_id, start_frame+frame, i, labelInMap);
                     auto it = oldinfo2newIdx.find(cell_localId2Key[id]);
                     if(it != oldinfo2newIdx.end()){
-                        movieInfo.frames[it->second] = frame;
+                        movieInfo.frames[it->second] = start_frame+frame;
                         movieInfo.nodes[it->second].in_cost = en_cost;
                         movieInfo.nodes[it->second].out_cost = ex_cost;
                     }
@@ -4767,6 +4775,9 @@ void cellTrackingMain::oneBatchMovieInfoParse(int batch_id, const QString &subfo
                         }
                     }
                     if(append_flag){
+//                        if(movieInfo.frames[real_tail]==40){
+//                            qDebug("check point, %ld, %.3f", real_tail, link_cost);
+//                        }
                         nodeRelation tmp;
                         tmp.node_id = real_head;
                         tmp.dist_c2n = distance;
@@ -4905,7 +4916,7 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
             if(overlapped_frames.size() == p4tracking.k){
                 overlapped_frames[frame_saved_cnt++] = make_pair(frame, ud_fuse_mat);
             }else{
-                overlapped_frames.emplace_back(make_pair(frame, ud_fuse_mat));
+                overlapped_frames.push_back(make_pair(frame, ud_fuse_mat));
             }
             frame2save++;
         }

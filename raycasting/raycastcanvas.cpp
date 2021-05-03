@@ -327,17 +327,21 @@ void RayCastCanvas::setVolume(long frame4display) {
     }
     if(!m_gamma_init){
         //double max_exist_intensity = data_importer->p_vmax[0];
-        double max_intensity;
-        if (data_importer->image4d->getDatatype() == V3D_UINT8){
-            max_intensity = 255;
-        }else if(data_importer->image4d->getDatatype() == V3D_UINT16){
-            max_intensity = 65535;
-        }else{
-            max_intensity = 0;
-            qDebug("unsupported image type");
-        }
-        if(data_importer->p_vmax[0] > 10 && data_importer->p_vmax[0] < max_intensity/4){
-            m_gamma = log(data_importer->p_vmax[0]/max_intensity) / log(0.25);
+        if(data_importer){
+            double max_intensity;
+            if (data_importer->image4d->getDatatype() == V3D_UINT8){
+                max_intensity = 255;
+            }else if(data_importer->image4d->getDatatype() == V3D_UINT16){
+                max_intensity = 65535;
+            }else{
+                max_intensity = 0;
+                qDebug("unsupported image type");
+            }
+            if(data_importer->p_vmax[0] > 10 && data_importer->p_vmax[0] < max_intensity/4){
+                m_gamma = log(data_importer->p_vmax[0]/max_intensity) / log(0.25);
+            }else{
+                m_gamma = 1.0;
+            }
         }else{
             m_gamma = 1.0;
         }
@@ -487,7 +491,7 @@ void RayCastCanvas::setVolumeTimePoint(int t)//,
 {
     //qDebug("V3dR_GLWidget::setVolumeTimePoint = %d", t);
     if (t<0) t = 0;
-    if (t>=data_importer->image4d->getTDim()){
+    if (data_importer && t>=data_importer->image4d->getTDim()){
         t = data_importer->image4d->getTDim()-1;
     }
     this->setVolume(t);

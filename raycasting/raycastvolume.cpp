@@ -81,9 +81,9 @@ void RayCastVolume::transfer_volume(void*data, double p_min, double p_max, long 
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);  // The array on the host has 1 byte alignment
-    int texture_format = ((RayCastCanvas*)glWidget)->getDataImporter()->image4d->getDatatype();
     if (sc == 1)
     {
+        int texture_format = ((RayCastCanvas*)glWidget)->getDataImporter()->image4d->getDatatype();
         if(texture_format == V3D_UINT8){
             glTexImage3D(GL_TEXTURE_3D, 0, GL_R8, m_size.x(), m_size.y(), m_size.z(),
                          0, GL_RED, GL_UNSIGNED_BYTE, data);

@@ -15,7 +15,7 @@ MainWindow::MainWindow()
     setCentralWidget(grpBox4display_canvas);
     //layout->addWidget(rightSideControlLayout);
     //setLayout(mainLayout);
-    this->setWindowTitle("BIQAV");
+    this->setWindowTitle("MIVAQ");
     connectSignal();
     cellSegmenter = 0;
 }
@@ -211,7 +211,14 @@ QScrollBar* MainWindow::createThreshodSlider(){
 //}
 void MainWindow::updateControlPanel(){
     timeSlider->setMinimum(0);
-    long st = data4test->image4d->getTDim();
+    long st;
+    if (data4test->image4d){
+        st = data4test->image4d->getTDim();
+    }else if(cellTracker != nullptr){
+        st = cellTracker->fused_im_sz_yxzt[3];
+    }else{
+        st = 0;
+    }
     if (st < 1) st = 1;
     timeSlider->setMaximum(st - 1);// start from 0
 }
@@ -386,8 +393,10 @@ void MainWindow::debugAlgorithm()
     vector<int> fixed_crop_sz = {250,250,30};//{493, 366, 259};
     vector<int> overlap_sz = {50, 50, 5}; // left_right, up_down, t
     cellTracker = new cellTrackingMain(fixed_crop_sz, overlap_sz, folderName, folderName);
-
-    qFatal("Debug successed! No need to continue");
+    qInfo("Debug successed! No need to continue");
+    tracking_result_exist = cellTracker->tracking_sucess;
+    updateControlPanel(); // set time slider
+    cellTraceAppend(0);
 }
 void MainWindow::sendData4Segment()
 {
@@ -470,21 +479,32 @@ void MainWindow::sendData4Track()
     //transferRGBAVolume(0);
     cellTraceAppend(0);
 }
+/**
+ * @brief cellTraceAppend:label the cells' center in the same trace with the same color and linked them by lines
+ * @param t
+ */
 void MainWindow::cellTraceAppend(int t){
     glWidget_raycast->show_track_result = tracking_result_exist;
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
-        vector<int> yxzt_sz;
-        yxzt_sz.reserve(4);
-        yxzt_sz.push_back(glWidget_raycast->bufSize[1]);
-        yxzt_sz.push_back(glWidget_raycast->bufSize[0]);
-        yxzt_sz.push_back(glWidget_raycast->bufSize[2]);
-        yxzt_sz.push_back(glWidget_raycast->bufSize[4]);
+
         glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
         // re-set the rgb_frame
-        long sz_single_frame = cellSegmenter->data_rows_cols_slices[0]*
-                cellSegmenter->data_rows_cols_slices[1]*cellSegmenter->data_rows_cols_slices[2];
-        unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
-        Mat *single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
+        vector<int> yxzt_sz;
+        Mat *single_frame;
+        if(cellSegmenter){ // based on segmentation results
+            yxzt_sz.reserve(4);
+            yxzt_sz.push_back(cellSegmenter->data_rows_cols_slices[0]);
+            yxzt_sz.push_back(cellSegmenter->data_rows_cols_slices[1]);
+            yxzt_sz.push_back(cellSegmenter->data_rows_cols_slices[2]);
+            yxzt_sz.push_back(cellSegmenter->normalized_data4d.size[3]);
+            long sz_single_frame = yxzt_sz[0]*yxzt_sz[1]*yxzt_sz[2];
+            unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
+            single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
+
+        }else{ // based on fused results
+            yxzt_sz = cellTracker->fused_im_sz_yxzt;
+            single_frame = new Mat(3, cellTracker->fused_im_sz_yxzt.data(), CV_8U, Scalar(0));
+        }
         //label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, glWidget_raycast->rgb_frame);
 
         // build a map based on tracking results
@@ -515,10 +535,18 @@ void MainWindow::cellTraceAppend(int t){
             }
         }
         label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
+        if(!cellSegmenter){
+            delete single_frame;
+        }
     }
     //qInfo("3-Done!");
     glWidget_raycast->setVolumeTimePoint(t);
 }
+/**
+ * @brief transferRGBAVolume: label the cells in the same trace with the same color
+ * NOTE: this method is deprecated since the results is too crowded.
+ * @param t: time point
+ */
 void MainWindow::transferRGBAVolume(int t){
     glWidget_raycast->show_track_result = tracking_result_exist;
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
