@@ -39,7 +39,9 @@ public:
     QStringList filelist;
     QString openFileNameLabel = QString("");
     Image4DSimple* image4d = 0;
-
+    TimePackType timepacktype;
+    int overall_file_num; //save the user's input time range
+    int curr_start_file_id, curr_file_num; //if the memory is not large enough, we can only load part of the frames; the time rang is saved here.
     double * p_vmax = NULL, * p_vmin = NULL; //whole volume max/min values. Use pointer to handle multiple channels separately
     void updateMinMax(V3DLONG nFrame);
     bool updateminmaxvalues();

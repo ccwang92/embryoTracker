@@ -213,7 +213,8 @@ void MainWindow::updateControlPanel(){
     timeSlider->setMinimum(0);
     long st;
     if (data4test->image4d){
-        st = data4test->image4d->getTDim();
+        //st = data4test->image4d->getTDim();
+        st = data4test->overall_file_num;
     }else if(cellTracker != nullptr){
         st = cellTracker->fused_im_sz_yxzt[3];
     }else{
@@ -242,7 +243,7 @@ void MainWindow::connectSignal()
     if (timeSlider) {
         connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
         //connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(transferRGBAVolume(int)));
-        connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(cellTraceAppend(int)));
+        connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(setTimeBasedOnCurrentStatus(int)));
         //connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
     }
     if (contrastScrollBar) {
@@ -298,6 +299,8 @@ void MainWindow::importImageSeries()
             if(data4test->importData(filename)) //load data from given paths
             {
                 emit signalDataLoaded();
+            }else{
+                throw;
             }
             // display in glWidget
             if (widget_type == my_simple_test_type){
@@ -396,7 +399,7 @@ void MainWindow::debugAlgorithm()
     qInfo("Debug successed! No need to continue");
     tracking_result_exist = cellTracker->tracking_sucess;
     updateControlPanel(); // set time slider
-    cellTraceAppend(0);
+    setTimeBasedOnCurrentStatus(0);
 }
 void MainWindow::sendData4Segment()
 {
@@ -430,8 +433,8 @@ void MainWindow::sendData4Segment()
 
 void MainWindow::sendData4Track()
 {
-    if(!data4test->image4d || !glWidget_raycast->getDataImporter()){
-        QMessageBox::critical(0, "ASSERT", tr("data has not been imported or displayed"));
+    if(!data4test->image4d || !glWidget_raycast->getDataImporter() || data4test->overall_file_num != data4test->curr_file_num){
+        QMessageBox::critical(0, "ASSERT", tr("data has not been imported or fully imported"));
         return;
     }
     if(cellTracker == nullptr){
@@ -477,16 +480,25 @@ void MainWindow::sendData4Track()
         tracking_result_exist = !tracking_result_exist;
     }
     //transferRGBAVolume(0);
-    cellTraceAppend(0);
+    setTimeBasedOnCurrentStatus(0);
 }
 /**
- * @brief cellTraceAppend:label the cells' center in the same trace with the same color and linked them by lines
+ * @brief setTimeBasedOnCurrentStatus:label the cells' center in the same trace with the same color and linked them by lines
  * @param t
  */
-void MainWindow::cellTraceAppend(int t){
+void MainWindow::setTimeBasedOnCurrentStatus(int t){
     glWidget_raycast->show_track_result = tracking_result_exist;
+    /** ***** STEP 1. Check if the frame has not been loaded in memory *********/
+    int t_at_curr_loaded_data = t - data4test->curr_start_file_id;
+    if (t_at_curr_loaded_data >= data4test->curr_file_num){
+        data4test->curr_start_file_id = t-1; // start from t-1
+        data4test->importGeneralImgSeries(data4test->filelist, data4test->timepacktype);
+    }else if(t_at_curr_loaded_data < 0){
+        data4test->curr_start_file_id = MAX(0, t-data4test->curr_file_num+2); // end to t+1
+        data4test->importGeneralImgSeries(data4test->filelist, data4test->timepacktype);
+    }
+    /** ***** STEP 2. Check if we are visualizing tracking results *********/
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
-
         glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
         // re-set the rgb_frame
         vector<int> yxzt_sz;
@@ -540,7 +552,7 @@ void MainWindow::cellTraceAppend(int t){
         }
     }
     //qInfo("3-Done!");
-    glWidget_raycast->setVolumeTimePoint(t);
+    glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
 }
 /**
  * @brief transferRGBAVolume: label the cells in the same trace with the same color

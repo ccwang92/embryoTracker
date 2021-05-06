@@ -16,9 +16,19 @@ bool DataImporter::importData(QString filename)
     if (!filename.isEmpty())
     {
         openFileNameLabel = filename;
-        TimePackType timepacktype;
         //QStringList mylist = importSeriesFileList_addnumbersort(filename, timepacktype);
         filelist = importSeriesFileList_addnumbersort(filename, timepacktype);
+        //// we use 3 variables to indicate if the data can be fully loaded;
+        /// If we cannot, then curr_file_num!=overall_file_num
+        overall_file_num = filelist.size();
+        if (overall_file_num <1)
+        {
+            v3d_msg("The import list is empty. do nothing.\n");
+            return false;
+        }
+        curr_start_file_id = 0;
+        curr_file_num = overall_file_num;
+
         if (importGeneralImgSeries(filelist, timepacktype))
         {
             //updateMinMax(0); // use the first frame to update the minmax intensity value
@@ -37,16 +47,7 @@ bool DataImporter::importData(QString filename)
 */
 bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackType timepacktype)
 {
-    //foreach (QString qs, myList)  qDebug() << qs;
-    V3DLONG ntime = mylist.size();
-    if (ntime <1)
-    {
-        v3d_msg("The import list is empty. do nothing.\n");
-        return false;
-    }
-
     //if there are files to import, then clean data
-
     if (image4d)
         cleanData();
 
@@ -59,7 +60,9 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
     V3DLONG ncolors=0, nthick=0;
     V3DLONG pack_color=0, pack_z=0;
 
-    for (V3DLONG i = 0; i < ntime; ++i)
+    V3DLONG i = curr_start_file_id;
+    size_t max_mem_usage = 24*1024*long(1024)*1024; // 24GB
+    while (i < MIN(overall_file_num, curr_start_file_id+curr_file_num))
     {
         QString tmpfileInfo = mylist.at(i);
         printf("importing %i file: {%s}\n", i, qPrintable(tmpfileInfo));
@@ -81,7 +84,7 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
         // 090731 RZC: (3D time series --> 4D color image) packed time in Z dim.
         //-----------------------------------------------------------------------
 
-        if (i==0) ncolors = cur_sz[3];
+        if (i==curr_start_file_id) ncolors = cur_sz[3];
         if (cur_sz[3]<=0 || cur_sz[3]!=ncolors)
         {
             printf("The current file has invalid or different colors [=%ld] from first section [=%ld]. Exit importing.\n", cur_sz[3], ncolors);
@@ -90,7 +93,7 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
             if (cur_sz) {delete []cur_sz; cur_sz=0;}
             return false;
         }
-        if (i==0) ndatatype = cur_datatype;
+        if (i==curr_start_file_id) ndatatype = cur_datatype;
         if (cur_datatype != ndatatype)
         {
             printf("The current file has different data type [=%ld] from first section [=%ld]. Exit importing.\n", cur_datatype, ndatatype);
@@ -100,19 +103,19 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
             return false;
         }
 
-
-        if (i==0)
+        if (i==curr_start_file_id)
         {
             nsz0 = cur_sz[0]; nsz1 = cur_sz[1]; nthick = cur_sz[2];
+            curr_file_num = MIN(curr_file_num, max_mem_usage/(nsz0*nsz1*nthick*cur_datatype*ncolors));
             if (timepacktype==TIME_PACK_Z)
             {
-                pack_z     = nthick*ntime;
+                pack_z     = nthick*curr_file_num;
                 pack_color = ncolors;
             }
             else // TIME_PACK_C
             {
                 pack_z     = nthick;
-                pack_color = ncolors*ntime;
+                pack_color = ncolors*curr_file_num;
             }
 
             if (image4d->createImage(nsz0, nsz1, pack_z, pack_color,
@@ -121,7 +124,7 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
                 v3d_msg("Fail to allocate memory for the image stack. Exit importing.\n");
                 return false;
             }
-            image4d->setTDim( ntime );
+            image4d->setTDim( curr_file_num );
             image4d->setTimePackType( timepacktype );
         }
         else
@@ -139,7 +142,7 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
 
         //now copy data of different planes into the 5D stack
         V3DLONG element_bytes = image4d->getUnitBytes();
-        V3DLONG cur_time = i;
+        V3DLONG cur_time = i-curr_start_file_id;
         V3DLONG block_size = (nthick*nsz0*nsz1)*(element_bytes);
         for (V3DLONG cur_ch=0; cur_ch<ncolors; cur_ch++)
         {
@@ -147,7 +150,7 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
             unsigned char * cur_target1d_block;
             if (timepacktype==TIME_PACK_Z)
             {
-                cur_target1d_block = image4d->getRawData() + (cur_ch*ntime + cur_time)*block_size;
+                cur_target1d_block = image4d->getRawData() + (cur_ch*curr_file_num + cur_time)*block_size;
             }
             else
             {
@@ -162,6 +165,7 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
         if (cur_data1d) {delete []cur_data1d; cur_data1d=0;}
         if (cur_sz) {delete []cur_sz; cur_sz=0;}
 
+        i++;
     }
     printf("Finished importing data. Now img data size = [%ld, %ld, %ld, %ld]\n", image4d->getXDim(), image4d->getYDim(), image4d->getZDim(), image4d->getCDim());
     if (image4d->getTDim()>1 && image4d->getTimePackType()==TIME_PACK_Z)

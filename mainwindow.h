@@ -36,7 +36,7 @@ public slots:
     void sendData4Segment();
     void sendData4Track();
     void transferRGBAVolume(int t);
-    void cellTraceAppend(int t);
+    void setTimeBasedOnCurrentStatus(int t);
     void setBackgroundColor();
     //void setAxesCheckBox(bool axesOn);
     // parameters
