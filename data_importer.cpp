@@ -61,7 +61,7 @@ bool DataImporter::importGeneralImgSeries(const QStringList & mylist, TimePackTy
     V3DLONG pack_color=0, pack_z=0;
 
     V3DLONG i = curr_start_file_id;
-    size_t max_mem_usage = 24*1024*long(1024)*1024; // 24GB
+    size_t max_mem_usage = 24*1024*long(1024)*1024; // 24GB //24*1024*long(1024);//24MB for debug
     while (i < MIN(overall_file_num, curr_start_file_id+curr_file_num))
     {
         QString tmpfileInfo = mylist.at(i);

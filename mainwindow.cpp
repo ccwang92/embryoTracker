@@ -241,7 +241,7 @@ void MainWindow::connectSignal()
 //        //connect(bndAxesShow, SIGNAL(triggered()), axesCheckBox, SLOT(toggle()));
 //    }
     if (timeSlider) {
-        connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
+        //connect(glWidget_raycast, SIGNAL(changeVolumeTimePoint(int)), timeSlider, SLOT(setValue(int)));
         //connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(transferRGBAVolume(int)));
         connect(timeSlider, SIGNAL(valueChanged(int)), this, SLOT(setTimeBasedOnCurrentStatus(int)));
         //connect(timeSlider, SIGNAL(valueChanged(int)), glWidget_raycast, SLOT(setVolumeTimePoint(int)));
@@ -490,12 +490,14 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
     glWidget_raycast->show_track_result = tracking_result_exist;
     /** ***** STEP 1. Check if the frame has not been loaded in memory *********/
     int t_at_curr_loaded_data = t - data4test->curr_start_file_id;
-    if (t_at_curr_loaded_data >= data4test->curr_file_num){
-        data4test->curr_start_file_id = t-1; // start from t-1
+    if (t_at_curr_loaded_data < 0 || t_at_curr_loaded_data >= data4test->curr_file_num){
+        if(t_at_curr_loaded_data >= data4test->curr_file_num){
+            data4test->curr_start_file_id = t-1; // start from t-1
+        }else{
+            data4test->curr_start_file_id = MAX(0, t-data4test->curr_file_num+2); // end to t+1
+        }
         data4test->importGeneralImgSeries(data4test->filelist, data4test->timepacktype);
-    }else if(t_at_curr_loaded_data < 0){
-        data4test->curr_start_file_id = MAX(0, t-data4test->curr_file_num+2); // end to t+1
-        data4test->importGeneralImgSeries(data4test->filelist, data4test->timepacktype);
+        t_at_curr_loaded_data = t - data4test->curr_start_file_id;
     }
     /** ***** STEP 2. Check if we are visualizing tracking results *********/
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame

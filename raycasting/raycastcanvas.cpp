@@ -495,7 +495,7 @@ void RayCastCanvas::setVolumeTimePoint(int t)//,
         t = data_importer->image4d->getTDim()-1;
     }
     this->setVolume(t);
-    emit changeVolumeTimePoint(t); //need?
+    //emit changeVolumeTimePoint(t); //need?
 }
 /*!
  * \brief Add a shader.
