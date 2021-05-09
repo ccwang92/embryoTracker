@@ -116,8 +116,8 @@ void RayCastCanvas::drawInstructions(QPainter *painter)
 void RayCastCanvas::drawLine(QPainter *painter, QColor c, QPointF p0, QPointF p1 , int lineWidth)
 {
     painter->setPen(QPen(c, lineWidth));
-    QPointF p_start = view_pos_to_pixel_pos(p0);
-    QPointF p_end = view_pos_to_pixel_pos(p1);
+    QPointF p_start = view_pos_to_canvas_pixel_pos(p0);
+    QPointF p_end = view_pos_to_canvas_pixel_pos(p1);
     painter->drawLine(p_start, p_end);
 
 }
@@ -132,9 +132,8 @@ void RayCastCanvas::drawText(QPainter *painter, QColor c, QPointF p, QString tex
     //QVector3D newStartPt = m_modelViewProjectionMatrix * QVector3D(1.3, 1, 1);
     painter->setPen(c);
     painter->setFont(QFont("Arial", 10)); //font not sure large enough or not
-    QPointF pAtScreen = view_pos_to_pixel_pos(p);
+    QPointF pAtScreen = view_pos_to_canvas_pixel_pos(p);
     painter->drawText(pAtScreen.x(), pAtScreen.y(), text);
-
 }
 /*!
  * \brief Paint a frame on the canvas.
@@ -173,7 +172,11 @@ void RayCastCanvas::paintGL()
         draw_axes();
         glPopMatrix();
     }
-    
+    if(bShowMarkers){
+        glPushMatrix();
+        draw_makers();
+        glPopMatrix();
+    }
 }
 
 
@@ -254,7 +257,6 @@ void RayCastCanvas::setVolume(long frame4display) {
         if (!data_importer->p_vmin){// if max min value not defined
             data_importer->updateminmaxvalues();
         }
-        curr_timePoint_in_canvas = frame4display; // default is 0
         try
         {
             if (data_importer->image4d && data_importer->image4d->getCDim()>0)
@@ -410,12 +412,12 @@ void RayCastCanvas::setVolumeWithMask(long frame4display, unsigned char* mask) {
  * \param p Mouse position.
  * \return Normalised coordinates for the mouse position.
  */
-QPointF RayCastCanvas::pixel_pos_to_view_pos(const QPointF& p)
+QPointF RayCastCanvas::canvas_pixel_pos_to_view_pos(const QPointF& p)
 {
     return QPointF(2.0 * float(p.x()) / width() - 1.0,
                    1.0 - 2.0 * float(p.y()) / height());
 }
-QPointF RayCastCanvas::view_pos_to_pixel_pos(const QPointF& p)
+QPointF RayCastCanvas::view_pos_to_canvas_pixel_pos(const QPointF& p)
 {
     return QPointF(float(p.x() + 1) * width() / 2.0,
                    height() * float(1.0 - p.y()) / 2.0);
@@ -438,10 +440,10 @@ void RayCastCanvas::mouseMoveEvent(QMouseEvent *event)
 {
     //float  test = 0;
     if (event->buttons() & Qt::LeftButton) {
-        m_trackBall.move(pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
+        m_trackBall.move(canvas_pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
         update();
         //} else {
-    //    m_trackBall.release(pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
+    //    m_trackBall.release(canvas_pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
     }
 
 }
@@ -453,7 +455,7 @@ void RayCastCanvas::mouseMoveEvent(QMouseEvent *event)
 void RayCastCanvas::mousePressEvent(QMouseEvent *event)
 {
     if (event->buttons() & Qt::LeftButton) {
-        m_trackBall.push(pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
+        m_trackBall.push(canvas_pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
         update();
         m_trackBall.start();
     }
@@ -466,9 +468,17 @@ void RayCastCanvas::mousePressEvent(QMouseEvent *event)
 void RayCastCanvas::mouseReleaseEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton) {
-        m_trackBall.release(pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
+        m_trackBall.release(canvas_pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
         update();
         m_trackBall.stop();
+    }else if(event->buttons() == Qt::RightButton){
+        MarkerPos pos;
+        pos.norm_canvas_pos = canvas_pixel_pos_to_view_pos(event->pos());
+        pos.time_point = curr_timePoint_in_canvas;
+        pos.ModelViewProjectionMatrix = m_modelViewProjectionMatrix;
+        pos.drawn = false;
+        markers.push_back(pos);
+        update();
     }
 }
 
@@ -488,14 +498,17 @@ void RayCastCanvas::wheelEvent(QWheelEvent * event)
 /*!
  * \brief slot: display frame t.
  */
-void RayCastCanvas::setVolumeTimePoint(int t)//,
+void RayCastCanvas::setVolumeTimePoint(int t_at_curr_loaded_data)//,
 {
     //qDebug("V3dR_GLWidget::setVolumeTimePoint = %d", t);
-    if (t<0) t = 0;
-    if (data_importer && t>=data_importer->image4d->getTDim()){
-        t = data_importer->image4d->getTDim()-1;
+    if (t_at_curr_loaded_data<0) t_at_curr_loaded_data = 0;
+    if (data_importer && t_at_curr_loaded_data>=data_importer->image4d->getTDim()){
+        t_at_curr_loaded_data = data_importer->image4d->getTDim()-1;
     }
-    this->setVolume(t);
+    this->setVolume(t_at_curr_loaded_data);
+
+    /*! t_at_curr_loaded_data may not equals to current time point. We may only load part of the data */
+    curr_timePoint_in_canvas = data_importer->curr_start_file_id + t_at_curr_loaded_data; // default is 0
     //emit changeVolumeTimePoint(t); //need?
 }
 /*!
@@ -831,6 +844,40 @@ inline void RayCastCanvas::transformPoint(GLdouble out[4], const GLdouble m[16],
 #undef M
 }
 
+// in Image space (model space)
+void RayCastCanvas::MarkerPos_to_NearFarPoint(const MarkerPos & pos, QVector3D &loc0, QVector3D &loc1)
+{
+//    Matrix P(4,4);		P << pos.P;   P = P.t();    // OpenGL is row-inner / C is column-inner
+//    Matrix M(4,4);		M << pos.MV;  M = M.t();
+//    Matrix PM = P * M;
+//    //cout << "P M PM \n" << P << endl << M << endl << PM << endl;
+//    double x = (pos.x             - pos.view[0])*2.0/pos.view[2] -1;
+//    double y = (pos.view[3]-pos.y - pos.view[1])*2.0/pos.view[3] -1; // OpenGL is bottom to top
+//    //double z = 0,1;                              // the clip space depth from 0 to 1
+//    ColumnVector pZ0(4); 	pZ0 << x << y << 0 << 1;
+//    ColumnVector pZ1(4); 	pZ1 << x << y << 1 << 1;
+//    if (bOrthoView)
+//    {
+//        pZ0(3) = -1;  //100913
+//    }
+//    ColumnVector Z0 = PM.i() * pZ0;       //cout << "Z0 \n" << Z0 << endl;
+//    ColumnVector Z1 = PM.i() * pZ1;       //cout << "Z1 \n" << Z1 << endl;
+//    Z0 = Z0 / Z0(4);
+//    Z1 = Z1 / Z1(4);
+//    loc0 = XYZ(Z0(1), Z0(2), Z0(3));
+//    loc1 = XYZ(Z1(1), Z1(2), Z1(3));
+}
+void RayCastCanvas::draw_makers(){
+    QPainter painter(this);
+    for(auto &marker : markers){
+        if(marker.time_point == curr_timePoint_in_canvas){
+            QVector3D originPt = m_modelViewProjectionMatrix * QVector3D(marker.norm_canvas_pos);
+            QColor c = QColor(255,0,0);
+            this->drawText(&painter, c, QPointF(originPt.x(), originPt.y()), "o");
+        }
+    }
+    painter.end();
+}
 /** this is the Vaa3d's idea of adding axes. It fails on our framework. Use Qpainter instead.*/
 //void RayCastCanvas::setBoundingBoxSpace(BoundingBox BB)
 //{

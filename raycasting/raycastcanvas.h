@@ -4,7 +4,6 @@
 #include <vector>
 
 #include <QtMath>
-
 #include <QOpenGLWidget>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLShaderProgram>
@@ -14,9 +13,9 @@
 #include "raycastvolume.h"
 #include "trackball.h"
 //#include "vtkvolume.h"
+#include <opencv2/core.hpp>  //mat4b
 #include "../data_importer.h"
-#include <opencv2/core.hpp> //mat4b
-
+#include "../cellsegmentation/types_define.h" // MarkerPos
 // if error then close
 // clean memory before MessageBox, otherwise MessageBox maybe could not be created correctly
 #define ERROR_MessageBox(title, type, what) { \
@@ -145,30 +144,36 @@ public:
     //V3DLONG size1, size2, size3, size4, size5;
     //V3DLONG dim1, dim2, dim3, dim4, dim5;
     V3DLONG bufSize[5]; //(x,y,z,c,t) 090731: add time dim
-    long curr_timePoint_in_canvas;
+    int curr_timePoint_in_canvas = -1;
 
 public:
     // visualize the tracking results
     bool show_track_result = false;
     cv::Mat4b rgb_frame = cv::Mat(); // colorful data with original data overlaid with traces
+public:
     // visualize the markers
-    bool show_markers = false;
-
+    bool bShowMarkers = true;
+    std::vector<MarkerPos> markers;
+    // functions for visualize markers
+    // given a marker, find the starting and ending point of the corresponding ray intersecting the data
+    void MarkerPos_to_NearFarPoint(const MarkerPos & pos, QVector3D &loc0, QVector3D &loc1);
+    void draw_makers();
 private:
     DataImporter *data_importer {0};
     QMatrix4x4 m_viewMatrix;
     QMatrix4x4 m_modelViewProjectionMatrix;
     QMatrix3x3 m_normalMatrix;
+    QVector3D m_leftup_xyz {0, 0, 0};
+    QVector3D m_rightbottom_xyz {1.0, 1.0, 1.0};
+    QVector2D m_viewportSize;
+    QVector3D m_rayOrigin; /*!< Camera position in model space coordinates. */
     // m_fov is the maximum vertical angle of cammera, it defines how large the fov will be
     const GLfloat m_fov = 30.0f;                                          /*!< Vertical field of view. */
     const GLfloat m_focalLength = 1.0 / qTan(M_PI / 180.0 * m_fov / 2.0); /*!< Focal length. */
     GLfloat m_aspectRatio;                                                /*!< width / height */
     GLboolean m_consider_transparency = false;
     GLfloat m_min_valid_intensity = 0;
-    QVector3D m_leftup_xyz {0, 0, 0};
-    QVector3D m_rightbottom_xyz {1.0, 1.0, 1.0};
-    QVector2D m_viewportSize;
-    QVector3D m_rayOrigin; /*!< Camera position in model space coordinates. */
+
 
     QVector3D m_lightPosition {3.0, 0.0, 3.0};    /*!< In camera coordinates. */
     QVector3D m_diffuseMaterial {1.0, 1.0, 1.0};  /*!< Material colour. */
@@ -199,8 +204,8 @@ private:
 
     void raycasting(const QString& shader);
 
-    QPointF pixel_pos_to_view_pos(const QPointF& p);
-    QPointF view_pos_to_pixel_pos(const QPointF& p);
+    QPointF canvas_pixel_pos_to_view_pos(const QPointF& p);
+    QPointF view_pos_to_canvas_pixel_pos(const QPointF& p);
     void create_noise(void);
     void add_shader(const QString& name, const QString& vector, const QString& fragment);
 public:

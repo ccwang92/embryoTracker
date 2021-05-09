@@ -3,7 +3,9 @@
 #include <opencv2/core.hpp> //basic building blocks of opencv
 #include <string>
 #include <vector>
-
+#include <QVector3D>
+#include <QRect>
+#include <QMatrix4x4>
 struct segParameter {
     /** *******  for synQuant ***************/
     float min_intensity;
@@ -50,8 +52,6 @@ struct segParameter {
 
     bool updateCellsAdjMissingCell; //  when add missing cell, do we need to update other regions nearby
     bool sqrtDistance; // euclidian distance or squared euclidian distance
-
-
 };
 
 struct odStatsParameter {
@@ -277,11 +277,11 @@ struct allCellsCensus{
 //    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents
 };
 
-// structure to save a 3D point with x, y, and z coordinates
-struct XYZ {
-    float x, y, z;
-    XYZ(float px, float py, float pz)	{this->x=px; this->y=py; this->z=pz;}
-    XYZ(float a=0)	{x=a; y=a; z=a;}
+// struct to save one marker information (vaa3d used)
+struct MarkerPos {
+    QPointF norm_canvas_pos;		// mouse click point coordinates
+    int time_point;     // time point of the marker
+    QMatrix4x4 ModelViewProjectionMatrix;		// 4x4 model-view matrix * projection matrix
+    bool drawn;			// has this marker already been drawn to the screen?
 };
-
 #endif // TYPES_DEFINE_H
