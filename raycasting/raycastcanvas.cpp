@@ -173,6 +173,7 @@ void RayCastCanvas::paintGL()
         draw_axes();
         glPopMatrix();
     }
+    
 }
 
 

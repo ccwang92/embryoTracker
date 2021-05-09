@@ -151,9 +151,11 @@ public:
     // visualize the tracking results
     bool show_track_result = false;
     cv::Mat4b rgb_frame = cv::Mat(); // colorful data with original data overlaid with traces
+public:
     // visualize the markers
     bool show_markers = false;
-
+    // functions for visualize markers
+    
 private:
     DataImporter *data_importer {0};
     QMatrix4x4 m_viewMatrix;

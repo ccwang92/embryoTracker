@@ -277,4 +277,11 @@ struct allCellsCensus{
 //    std::vector<directFamily> parents, kids; // neighboring relationship, at most two kids or parents
 };
 
+// structure to save a 3D point with x, y, and z coordinates
+struct XYZ {
+    float x, y, z;
+    XYZ(float px, float py, float pz)	{this->x=px; this->y=py; this->z=pz;}
+    XYZ(float a=0)	{x=a; y=a; z=a;}
+};
+
 #endif // TYPES_DEFINE_H

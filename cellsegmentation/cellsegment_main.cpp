@@ -60,7 +60,7 @@ cellSegmentMain::cellSegmentMain(void *data_grayim4d, int _data_type, long bufSi
     normalize(*data4d, normalized_data4d, 255, 0, NORM_MINMAX, CV_8U);
     //ccShowSlice3Dmat(data4d, CV_16U);
     assert(normalized_data4d.type() == CV_8U);
-    // delete data4d;
+    delete data4d;
 }
 // this function contains redundant operation due to copyTo
 bool cellSegmentMain::loadSegResults(const QString &fileName, bool track_needed){
