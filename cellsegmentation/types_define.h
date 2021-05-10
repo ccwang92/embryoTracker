@@ -279,9 +279,10 @@ struct allCellsCensus{
 
 // struct to save one marker information (vaa3d used)
 struct MarkerPos {
-    QPointF norm_canvas_pos;		// mouse click point coordinates
+    QPointF norm_canvas_pos;		// mouse click point coordinates with range [-1,1]
     int time_point;     // time point of the marker
     QMatrix4x4 ModelViewProjectionMatrix;		// 4x4 model-view matrix * projection matrix
+    QMatrix3x3 NormalMatrix;
     bool drawn;			// has this marker already been drawn to the screen?
 };
 #endif // TYPES_DEFINE_H

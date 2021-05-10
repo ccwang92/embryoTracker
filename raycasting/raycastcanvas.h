@@ -161,6 +161,8 @@ public:
 private:
     DataImporter *data_importer {0};
     QMatrix4x4 m_viewMatrix;
+    QMatrix4x4 m_modelMatrix;
+    QMatrix4x4 m_projectionMatrix;
     QMatrix4x4 m_modelViewProjectionMatrix;
     QMatrix3x3 m_normalMatrix;
     QVector3D m_leftup_xyz {0, 0, 0};

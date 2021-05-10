@@ -153,9 +153,11 @@ void RayCastCanvas::paintGL()
         m_viewMatrix.translate(centerShift->x(), centerShift->y(), -4.0f * std::exp(m_distExp / 600.0f));
         m_viewMatrix.rotate(m_trackBall.rotation());
 
-        m_modelViewProjectionMatrix.setToIdentity();
-        m_modelViewProjectionMatrix.perspective(m_fov, (float)scaled_width()/scaled_height(), 0.1f, 100.0f);
-        m_modelViewProjectionMatrix *= m_viewMatrix * m_raycasting_volume->modelMatrix();
+        m_projectionMatrix.setToIdentity();
+        m_projectionMatrix.perspective(m_fov, (float)scaled_width()/scaled_height(), 0.1f, 100.0f);
+        // m_raycasting_volume->modelMatrix() saves the scale and shifting information
+        m_modelMatrix = m_raycasting_volume->modelMatrix();
+        m_modelViewProjectionMatrix = m_projectionMatrix * m_viewMatrix * m_modelMatrix;
 
         m_normalMatrix = (m_viewMatrix * m_raycasting_volume->modelMatrix()).normalMatrix();
         //m_normalMatrix = (m_raycasting_volume->modelMatrix()).normalMatrix();
@@ -438,7 +440,7 @@ void RayCastCanvas::setLightPositionZero(){
  */
 void RayCastCanvas::mouseMoveEvent(QMouseEvent *event)
 {
-    //float  test = 0;
+    /*! NOTE event->buttons() and event->button() are different*/
     if (event->buttons() & Qt::LeftButton) {
         m_trackBall.move(canvas_pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
         update();
@@ -467,15 +469,25 @@ void RayCastCanvas::mousePressEvent(QMouseEvent *event)
  */
 void RayCastCanvas::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton) {
+    //qDebug() << event->button();
+    if (event->button() & Qt::LeftButton) { // event->button() & Qt::LeftButton <> event->button() == Qt::LeftButton
         m_trackBall.release(canvas_pixel_pos_to_view_pos(event->pos()), m_scene_trackBall.rotation().conjugated());
         update();
         m_trackBall.stop();
-    }else if(event->buttons() == Qt::RightButton){
+    }
+    if(event->button() & Qt::RightButton){
         MarkerPos pos;
-        pos.norm_canvas_pos = canvas_pixel_pos_to_view_pos(event->pos());
+        //qDebug() << (m_projectionMatrix * m_viewMatrix).transposed().inverted() * QVector3D(event->pos());
+        qDebug() << QVector3D(event->pos());
+        qDebug() << QVector3D(m_modelMatrix.inverted() * event->pos());
+        qDebug() << QVector3D(m_modelMatrix.inverted() * canvas_pixel_pos_to_view_pos(event->pos()));
+//        qDebug() << m_normalMatrix * event->pos();
+//        qDebug() << m_normalMatrix * event->pos();
+        QVector3D tmp = m_modelViewProjectionMatrix.inverted() * QVector3D(event->pos());
+        pos.norm_canvas_pos = QPointF(tmp.x(), tmp.y());
         pos.time_point = curr_timePoint_in_canvas;
         pos.ModelViewProjectionMatrix = m_modelViewProjectionMatrix;
+        pos.NormalMatrix = m_normalMatrix;
         pos.drawn = false;
         markers.push_back(pos);
         update();
@@ -637,6 +649,7 @@ void RayCastCanvas::setBnfAxesOnOff()
     if(m_raycasting_volume){
         bShowAxes = !bShowAxes;
     }
+    update();
     //emit changeBnfAxesOnOff(bShowAxes);
 }
 
