@@ -61,7 +61,9 @@ public:
         //m_raycasting_volume = new RayCastVolume();
         //m_raycasting_volume->initMesh();
         //m_raycasting_volume->create_noise();
+        markers.clear();
         data_importer = _data_importer;
+
         setVolume();
     }
     void setVolume(long frame4display = 0);
@@ -156,7 +158,7 @@ public:
     std::vector<MarkerPos> markers;
     // functions for visualize markers
     // given a marker, find the starting and ending point of the corresponding ray intersecting the data
-    void MarkerPos_to_NearFarPoint(const MarkerPos & pos, QVector3D &loc0, QVector3D &loc1);
+    void MarkerPos_to_NearFarPoint(const MarkerPos & marker, QVector3D &loc0, QVector3D &loc1);
     void draw_makers();
 private:
     DataImporter *data_importer {0};

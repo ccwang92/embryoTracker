@@ -23,7 +23,7 @@ QVector3D to_vector3d(const QColor& colour) {
 RayCastCanvas::RayCastCanvas(QWidget *parent)
     : QOpenGLWidget {parent},
     m_stepLength(0.003),
-    m_background(QColor(0, 0, 0)),
+    m_background(QColor(58, 90, 100)),
     m_raycasting_volume {nullptr},
     m_active_mode("MIP")
 {
@@ -135,6 +135,41 @@ void RayCastCanvas::drawText(QPainter *painter, QColor c, QPointF p, QString tex
     QPointF pAtScreen = view_pos_to_canvas_pixel_pos(p);
     painter->drawText(pAtScreen.x(), pAtScreen.y(), text);
 }
+
+//QVector3D RayCastCanvas::getWorldCoordinates(float mouseX, float mouseY)
+//{
+//    QMatrix4x4 viewMatrix ;
+//    viewMatrix.lookAt(m_camera.getPosition(), m_camera.getTarget(), m_camera.getUp());
+
+//    QMatrix4x4 projection;
+//    projection.perspective(70.0, width() / height(), 0.1, 120.0);
+
+//    QVector3D Z(0, 0, 0); // instead of 0 for x and y i need worldPosition.x() and worldPosition.y() ....
+//    Z = Z.project(viewMatrix, projection, QRect(0, 0, width(), height()));
+
+//    QVector3D worldPosition = QVector3D(x, height() - y, Z.z()).unproject(viewMatrix, projection, QRect(0, 0, width(), height()));
+//    qDebug() << worldPosition;
+
+
+//    QMatrix4x4 modelViewMatrix  = m_viewMatrix * m_modelMatrix;
+//    QMatrix4x4 modelViewProject = m_projectionMatrix * modelViewMatrix;
+//    QMatrix4x4 inverted         = viewportMatrix * modelViewProject;
+
+//    inverted = inverted.inverted();
+
+//    float posZ;
+//    float posY = viewportSize.y() - mouseY - 1.0f;
+
+//    world->getGLFunctions()->glReadPixels(MathHelper::toInt(mouseX), MathHelper::toInt(posY), 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &posZ);
+
+//    QVector4D clickedPointOnScreen(mouseX, posY, 2.0f * posZ - 1.0f, 1.0f);
+//    QVector4D clickedPointIn3DOrgn = inverted * clickedPointOnScreen;
+
+//    clickedPointIn3DOrgn /= clickedPointIn3DOrgn.w();
+
+//    return clickedPointIn3DOrgn.toVector3DAffine();
+//}
+
 /*!
  * \brief Paint a frame on the canvas.
  */
@@ -416,6 +451,8 @@ void RayCastCanvas::setVolumeWithMask(long frame4display, unsigned char* mask) {
  */
 QPointF RayCastCanvas::canvas_pixel_pos_to_view_pos(const QPointF& p)
 {
+    //qDebug()<<width() << " " << scaled_width();
+    //qDebug()<<height()<< " " << scaled_height();
     return QPointF(2.0 * float(p.x()) / width() - 1.0,
                    1.0 - 2.0 * float(p.y()) / height());
 }
@@ -477,16 +514,14 @@ void RayCastCanvas::mouseReleaseEvent(QMouseEvent *event)
     }
     if(event->button() & Qt::RightButton){
         MarkerPos pos;
-        //qDebug() << (m_projectionMatrix * m_viewMatrix).transposed().inverted() * QVector3D(event->pos());
-        qDebug() << QVector3D(event->pos());
-        qDebug() << QVector3D(m_modelMatrix.inverted() * event->pos());
-        qDebug() << QVector3D(m_modelMatrix.inverted() * canvas_pixel_pos_to_view_pos(event->pos()));
-//        qDebug() << m_normalMatrix * event->pos();
-//        qDebug() << m_normalMatrix * event->pos();
-        QVector3D tmp = m_modelViewProjectionMatrix.inverted() * QVector3D(event->pos());
-        pos.norm_canvas_pos = QPointF(tmp.x(), tmp.y());
+        pos.canvas_pos = event->pos();//QPointF(tmp.x(), tmp.y());
+        pos.canvas_width = width();
+        pos.canvas_height = height();
         pos.time_point = curr_timePoint_in_canvas;
         pos.ModelViewProjectionMatrix = m_modelViewProjectionMatrix;
+        pos.ModelMatrix = m_modelMatrix;
+        pos.ViewMatrix = m_viewMatrix;
+        pos.ProjectionMatrix = m_projectionMatrix;
         pos.NormalMatrix = m_normalMatrix;
         pos.drawn = false;
         markers.push_back(pos);
@@ -858,17 +893,17 @@ inline void RayCastCanvas::transformPoint(GLdouble out[4], const GLdouble m[16],
 }
 
 // in Image space (model space)
-void RayCastCanvas::MarkerPos_to_NearFarPoint(const MarkerPos & pos, QVector3D &loc0, QVector3D &loc1)
+void RayCastCanvas::MarkerPos_to_NearFarPoint(const MarkerPos & marker, QVector3D &loc0, QVector3D &loc1)
 {
-//    Matrix P(4,4);		P << pos.P;   P = P.t();    // OpenGL is row-inner / C is column-inner
-//    Matrix M(4,4);		M << pos.MV;  M = M.t();
-//    Matrix PM = P * M;
-//    //cout << "P M PM \n" << P << endl << M << endl << PM << endl;
-//    double x = (pos.x             - pos.view[0])*2.0/pos.view[2] -1;
-//    double y = (pos.view[3]-pos.y - pos.view[1])*2.0/pos.view[3] -1; // OpenGL is bottom to top
-//    //double z = 0,1;                              // the clip space depth from 0 to 1
-//    ColumnVector pZ0(4); 	pZ0 << x << y << 0 << 1;
-//    ColumnVector pZ1(4); 	pZ1 << x << y << 1 << 1;
+
+//    QVector3D Z(0, 0, 0); // instead of 0 for x and y i need worldPosition.x() and worldPosition.y() ....
+//    Z = Z.project(marker.ViewMatrix*marker.ModelMatrix,
+//                  marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
+
+    QVector3D worldPosition =
+            QVector3D(marker.canvas_pos.x(), marker.canvas_height - marker.canvas_pos.y(),
+                      0).unproject(marker.ViewMatrix*marker.ModelMatrix, marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
+
 //    if (bOrthoView)
 //    {
 //        pZ0(3) = -1;  //100913
@@ -880,13 +915,47 @@ void RayCastCanvas::MarkerPos_to_NearFarPoint(const MarkerPos & pos, QVector3D &
 //    loc0 = XYZ(Z0(1), Z0(2), Z0(3));
 //    loc1 = XYZ(Z1(1), Z1(2), Z1(3));
 }
+
 void RayCastCanvas::draw_makers(){
     QPainter painter(this);
     for(auto &marker : markers){
         if(marker.time_point == curr_timePoint_in_canvas){
-            QVector3D originPt = m_modelViewProjectionMatrix * QVector3D(marker.norm_canvas_pos);
+            QVector3D Z(0, 0, 0); // instead of 0 for x and y i need worldPosition.x() and worldPosition.y() ....
+            Z = Z.project(marker.ViewMatrix*marker.ModelMatrix,
+                          marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
+            QVector3D loc0 =
+                    QVector3D(marker.canvas_pos.x(), marker.canvas_height - marker.canvas_pos.y(),
+                    Z.z()).unproject(marker.ViewMatrix*marker.ModelMatrix, marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
+            qDebug() << loc0;
+
+            Z = QVector3D(0, 0, 1);
+            Z = Z.project(marker.ViewMatrix*marker.ModelMatrix,
+                          marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
+            QVector3D loc1 =
+                    QVector3D(marker.canvas_pos.x(), marker.canvas_height - marker.canvas_pos.y(),
+                    Z.z()).unproject(marker.ViewMatrix*marker.ModelMatrix, marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
+
+            qDebug() << loc1;
+            // way 1: get the exact coordinate of worldPosition, e.g.: (300,200,10)
+            //QVector3D curPt = worldPosition.project(m_viewMatrix*m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
+            // way 2: get the normalized location of worldPosition, e.g.: (0.5, 0.3, 0.1); this is for drawText
+            QVector3D nearEnd(0,0,-1), farEnd(0,0,1);
+            nearEnd.setX(loc1.x() + (-1-loc1.z())*(loc0.x()-loc1.x())/(loc0.z()-loc1.z()));
+            nearEnd.setY(loc1.y() + (-1-loc1.z())*(loc0.y()-loc1.y())/(loc0.z()-loc1.z()));
+            farEnd.setX(loc1.x() + (1-loc1.z())*(loc0.x()-loc1.x())/(loc0.z()-loc1.z()));
+            farEnd.setY(loc1.y() + (1-loc1.z())*(loc0.y()-loc1.y())/(loc0.z()-loc1.z()));
+
             QColor c = QColor(255,0,0);
-            this->drawText(&painter, c, QPointF(originPt.x(), originPt.y()), "o");
+            QVector3D p_start = m_modelViewProjectionMatrix * nearEnd;
+            this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "back");
+
+            c = QColor(255,255,0);
+            QVector3D p_end = m_modelViewProjectionMatrix * farEnd;
+            this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
+
+            painter.setPen(QPen(c, 1));
+            c = QColor(0,255,0);
+            this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
         }
     }
     painter.end();
