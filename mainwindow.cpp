@@ -487,7 +487,7 @@ void MainWindow::sendData4Track()
  * @param t
  */
 void MainWindow::setTimeBasedOnCurrentStatus(int t){
-    glWidget_raycast->show_track_result = tracking_result_exist;
+    glWidget_raycast->bShowTrackResult = tracking_result_exist;
     /** ***** STEP 1. Check if the frame has not been loaded in memory *********/
     int t_at_curr_loaded_data = t - data4test->curr_start_file_id;
     if (t_at_curr_loaded_data < 0 || t_at_curr_loaded_data >= data4test->curr_file_num){
@@ -573,7 +573,6 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
                 }
                 for(int i=0; i<=t; i++){
                     for(auto idx : cellTracker->trace_sets[i][j]){
-                        mapedLabelMap.at<int>(idx) = j + 1;
                     }
                 }
             }
@@ -587,7 +586,7 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
  * @param t: time point
  */
 void MainWindow::transferRGBAVolume(int t){
-    glWidget_raycast->show_track_result = tracking_result_exist;
+    glWidget_raycast->bShowTrackResult = tracking_result_exist;
     if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
         glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
         // re-set the rgb_frame

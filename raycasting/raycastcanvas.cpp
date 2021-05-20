@@ -986,6 +986,7 @@ void RayCastCanvas::draw_traces(){
             QVector3D p_start = m_modelViewProjectionMatrix * start;
             QVector3D p_end = m_modelViewProjectionMatrix * end;
             this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
+        }
     }
     painter.end();
 }
