@@ -500,61 +500,86 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
         t_at_curr_loaded_data = t - data4test->curr_start_file_id;
     }
     /** ***** STEP 2. Check if we are visualizing tracking results *********/
-    if(tracking_result_exist){ // transfer the volume to glWidget_raycast->rgb_frame
-        glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
-        // re-set the rgb_frame
+    if(!tracking_result_exist){ // if no tracking results, directly visualize gray data
+        glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
+    }else{ // transfer the volume to glWidget_raycast->rgb_frame
+        // build a map based on tracking results
+        // 1. build color map and extract trace locations
         vector<int> yxzt_sz;
-        Mat *single_frame;
         if(cellSegmenter){ // based on segmentation results
             yxzt_sz.reserve(4);
             yxzt_sz.push_back(cellSegmenter->data_rows_cols_slices[0]);
             yxzt_sz.push_back(cellSegmenter->data_rows_cols_slices[1]);
             yxzt_sz.push_back(cellSegmenter->data_rows_cols_slices[2]);
             yxzt_sz.push_back(cellSegmenter->normalized_data4d.size[3]);
-            long sz_single_frame = yxzt_sz[0]*yxzt_sz[1]*yxzt_sz[2];
-            unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
-            single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
-
         }else{ // based on fused results
             yxzt_sz = cellTracker->fused_im_sz_yxzt;
-            single_frame = new Mat(3, cellTracker->fused_im_sz_yxzt.data(), CV_8U, Scalar(0));
         }
-        //label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, glWidget_raycast->rgb_frame);
-
-        // build a map based on tracking results
-        // 1. build color map and extract trace locations
         if(colormap4tracking_res.empty()){
             //int max_cell_num = vec_max(cellSegmenter->number_cells);
             int color_num =  cellTracker->movieInfo.tracks.size(); //MAX((size_t)max_cell_num, cellTracker->movieInfo.tracks.size());
             colorMapGen((double)color_num, colormap4tracking_res);
             cellTracker->extractTraceLocations(yxzt_sz);
         }
-//        label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
-        // 2. build label map
-        Mat1i mapedLabelMap = Mat::zeros(3, yxzt_sz.data(), CV_32S);
+        //label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
+        //// TWO ways to visualize the tracking results
+        if(false){/// way 1: use multiple channel to visualize the tracking results
+            glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
+            // re-set the rgb_frame
+            Mat *single_frame;
+            if(cellSegmenter){ // based on segmentation results
+                long sz_single_frame = yxzt_sz[0]*yxzt_sz[1]*yxzt_sz[2];
+                unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
+                single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
 
-        for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
-            if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
-                continue;
+            }else{ // based on fused results
+                single_frame = new Mat(3, cellTracker->fused_im_sz_yxzt.data(), CV_8U, Scalar(0));
             }
-            int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
-            int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
-            if(end_time < t || start_time > t){ // if the trace has stopped before time t
-                continue;
+            //label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, glWidget_raycast->rgb_frame);
+
+            // 2. build label map
+            Mat1i mapedLabelMap = Mat::zeros(3, yxzt_sz.data(), CV_32S);
+
+            for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
+                if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
+                    continue;
+                }
+                int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
+                int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
+                if(end_time < t || start_time > t){ // if the trace has stopped before time t
+                    continue;
+                }
+                for(int i=0; i<=t; i++){
+                    for(auto idx : cellTracker->trace_sets[i][j]){
+                        mapedLabelMap.at<int>(idx) = j + 1;
+                    }
+                }
             }
-            for(int i=0; i<=t; i++){
-                for(auto idx : cellTracker->trace_sets[i][j]){
-                    mapedLabelMap.at<int>(idx) = j + 1;
+            label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
+            if(!cellSegmenter){
+                delete single_frame;
+            }
+            glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
+        }else{/// way 2: re-draw traces on the visualized data
+            glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
+            for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
+                if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
+                    continue;
+                }
+                int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
+                int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
+                if(end_time < t || start_time > t){ // if the trace has stopped before time t
+                    continue;
+                }
+                for(int i=0; i<=t; i++){
+                    for(auto idx : cellTracker->trace_sets[i][j]){
+                        mapedLabelMap.at<int>(idx) = j + 1;
+                    }
                 }
             }
         }
-        label2rgb3d(mapedLabelMap, *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
-        if(!cellSegmenter){
-            delete single_frame;
-        }
     }
-    //qInfo("3-Done!");
-    glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
+
 }
 /**
  * @brief transferRGBAVolume: label the cells in the same trace with the same color

@@ -150,8 +150,11 @@ public:
 
 public:
     // visualize the tracking results
-    bool show_track_result = false;
+    bool bShowTrackResult = false;
     cv::Mat4b rgb_frame = cv::Mat(); // colorful data with original data overlaid with traces
+    std::vector<std::vector<QVector3D>> traces;
+    cv::Mat3b *colormap4tracking_res {0};
+    void draw_traces();
 public:
     // visualize the markers
     bool bShowMarkers = true;

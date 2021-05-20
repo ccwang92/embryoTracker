@@ -4,7 +4,6 @@
 #include <vector>
 #include <QCoreApplication>
 #include <QtWidgets>
-
 #include "raycastcanvas.h"
 
 /*!
@@ -48,6 +47,13 @@ RayCastCanvas::~RayCastCanvas()
         delete val;
     }
     delete m_raycasting_volume;
+
+    if (total_rgbaBuf){
+        delete total_rgbaBuf;
+    }
+    if(rgbaBuf){
+        delete rgbaBuf;
+    }
 }
 
 
@@ -214,6 +220,14 @@ void RayCastCanvas::paintGL()
         draw_makers();
         glPopMatrix();
     }
+    if(bShowTrackResult){
+        // we first check if rgb_frame is empty, if so, traces are already overlaid
+        if(rgb_frame.empty() && !traces.empty()){
+            glPushMatrix();
+            draw_traces();
+            glPopMatrix();
+        }
+    }
 }
 
 
@@ -277,11 +291,7 @@ void RayCastCanvas::raycasting(const QString& shader)
  * \brief import the data and set it as color RGBA data if needed
  */
 void RayCastCanvas::setVolume(long frame4display) {
-
-    if(show_track_result){ // display RGBA tracking results
-        if(rgb_frame.empty()){
-            throw std::runtime_error("rgb results has not been initialized.");
-        }
+    if(bShowTrackResult && !rgb_frame.empty()){ // display RGBA tracking results
         this->setMode("Alpha blending rgba");//
         //m_gamma = 1;
         m_raycasting_volume->transfer_volume((unsigned char *)rgb_frame.data, 0, 255, rgb_frame.size[1],
@@ -957,6 +967,25 @@ void RayCastCanvas::draw_makers(){
             c = QColor(0,255,0);
             this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
         }
+    }
+    painter.end();
+}
+
+/**
+ * @brief draw_traces: draw cell traces
+ */
+void RayCastCanvas::draw_traces(){
+    QPainter painter(this);
+    for(int tr = 0; tr<traces.size(); tr++){
+        auto &trace = traces[tr];
+        cv::Vec3b cur_cl = colormap4tracking_res->at<cv::Vec3b>(tr);
+        QColor c(cur_cl(0), cur_cl(1), cur_cl(2));
+        painter.setPen(QPen(c, 1));
+        for(int i=1; i<trace.size(); i++){
+            QVector3D start = trace[i-1], end = trace[i];
+            QVector3D p_start = m_modelViewProjectionMatrix * start;
+            QVector3D p_end = m_modelViewProjectionMatrix * end;
+            this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
     }
     painter.end();
 }
