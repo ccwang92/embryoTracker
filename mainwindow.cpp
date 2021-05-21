@@ -519,11 +519,10 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
             //int max_cell_num = vec_max(cellSegmenter->number_cells);
             int color_num =  cellTracker->movieInfo.tracks.size(); //MAX((size_t)max_cell_num, cellTracker->movieInfo.tracks.size());
             colorMapGen((double)color_num, colormap4tracking_res);
-            cellTracker->extractTraceLocations(yxzt_sz);
         }
         //label2rgb3d(cellSegmenter->cell_label_maps[t], *single_frame, colormap4tracking_res, glWidget_raycast->rgb_frame);
         //// TWO ways to visualize the tracking results
-        if(false){/// way 1: use multiple channel to visualize the tracking results
+        if(track_res_vis_method == OVERLAY_IN_OTHER_CHANNEL){/// way 1 (OVERLAY_IN_OTHER_CHANNEL): use multiple channel to visualize the tracking results
             glWidget_raycast->rgb_frame = Mat(); // clear the content by assign an empty mat
             // re-set the rgb_frame
             Mat *single_frame;
@@ -531,7 +530,6 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
                 long sz_single_frame = yxzt_sz[0]*yxzt_sz[1]*yxzt_sz[2];
                 unsigned char *ind = (unsigned char*)cellSegmenter->normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
                 single_frame = new Mat(3, cellSegmenter->normalized_data4d.size, CV_8U, ind);
-
             }else{ // based on fused results
                 single_frame = new Mat(3, cellTracker->fused_im_sz_yxzt.data(), CV_8U, Scalar(0));
             }
@@ -539,7 +537,9 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
 
             // 2. build label map
             Mat1i mapedLabelMap = Mat::zeros(3, yxzt_sz.data(), CV_32S);
-
+            if(cellTracker->trace_sets.empty()){
+                cellTracker->extractTraceLocations(yxzt_sz);
+            }
             for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
                 if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
                     continue;
@@ -560,22 +560,14 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
                 delete single_frame;
             }
             glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
-        }else{/// way 2: re-draw traces on the visualized data
-            glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
-            for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
-                if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
-                    continue;
-                }
-                int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
-                int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
-                if(end_time < t || start_time > t){ // if the trace has stopped before time t
-                    continue;
-                }
-                for(int i=0; i<=t; i++){
-                    for(auto idx : cellTracker->trace_sets[i][j]){
-                    }
-                }
+        }else{/// way 2 (OVERLAY_IN_CANVAS): re-draw traces on the visualized data
+            if (!glWidget_raycast->bShowAxes){
+                // Once we toggle checkbox, then traces can be smoothly visualized. Otherwise, we need call drawtext before drawline;
+                axesCheckBox->toggle();
             }
+            glWidget_raycast->colormap4tracking_res = &colormap4tracking_res;
+            glWidget_raycast->import_traces(cellTracker->movieInfo, t);
+            glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
         }
     }
 

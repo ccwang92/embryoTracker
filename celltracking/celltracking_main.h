@@ -191,7 +191,7 @@ private:
 public:
     vector<int> fused_im_sz_yxzt;
 public:
-    vector<vector<unordered_set<size_t>>> trace_sets;
+    vector<vector<unordered_set<size_t>>> trace_sets;// #frames x #trackes, each trace node may be represented by >1 voxels
 public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;

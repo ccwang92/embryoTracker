@@ -155,6 +155,7 @@ public:
     std::vector<std::vector<QVector3D>> traces;
     cv::Mat3b *colormap4tracking_res {0};
     void draw_traces();
+    void import_traces(const allCellsCensus &movieInfo, int t); // get traces
 public:
     // visualize the markers
     bool bShowMarkers = true;
@@ -211,6 +212,8 @@ private:
 
     void raycasting(const QString& shader);
 
+    QVector3D view_pos_to_volume_pixel_pos(const QVector3D& p);
+    QVector3D volume_pixel_pos_to_view_pos(const QVector3D& p);
     QPointF canvas_pixel_pos_to_view_pos(const QPointF& p);
     QPointF view_pos_to_canvas_pixel_pos(const QPointF& p);
     void create_noise(void);

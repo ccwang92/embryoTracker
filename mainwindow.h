@@ -95,6 +95,7 @@ public:
     cellSegmentMain *cellSegmenter = nullptr;
     cellTrackingMain *cellTracker = nullptr;
     bool tracking_result_exist = false;
+    int track_res_vis_method = OVERLAY_IN_CANVAS;
     Mat3b colormap4tracking_res;
 
 public slots:

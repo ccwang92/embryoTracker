@@ -220,6 +220,10 @@ void RayCastCanvas::paintGL()
         draw_makers();
         glPopMatrix();
     }
+
+//    QPainter p(this);
+//    p.setPen(Qt::red);
+//    p.drawLine(rect().topLeft(), rect().bottomRight());
     if(bShowTrackResult){
         // we first check if rgb_frame is empty, if so, traces are already overlaid
         if(rgb_frame.empty() && !traces.empty()){
@@ -453,7 +457,7 @@ void RayCastCanvas::setVolumeWithMask(long frame4display, unsigned char* mask) {
     update();
 }
 /*!
- * \brief Convert a mouse position into normalised canvas coordinates.
+ * \brief Convert a mouse position into normalised canvas coordinates (view pos).
  * Normalized coordinates: Center of the canvas is the origin piont.
  * left-up corner is (-1,1) and right-bottom is (1,-1)
  * \param p Mouse position.
@@ -470,6 +474,23 @@ QPointF RayCastCanvas::view_pos_to_canvas_pixel_pos(const QPointF& p)
 {
     return QPointF(float(p.x() + 1) * width() / 2.0,
                    height() * float(1.0 - p.y()) / 2.0);
+}
+/**
+ * \brief Convert a voxel position in volume into normalised canvas coordinates.
+ * Normalized coordinates: Center of the canvas is the origin piont.
+ * left-up corner is (-1, 1, 1) and right-bottom is (1, -1, -1)
+ * \param p Mouse position.
+ * \return Normalised coordinates for the mouse position.
+ */
+QVector3D RayCastCanvas::volume_pixel_pos_to_view_pos(const QVector3D& p){
+    return QVector3D(2.0 * float(p.x()) / bufSize[0] - 1.0,
+                     2.0 * float(p.y()) / bufSize[1] - 1.0, //1.0 - 2.0 * float(p.y()) /  bufSize[1],
+                     2.0 * float(p.z()) / bufSize[2] - 1.0);
+}
+QVector3D RayCastCanvas::view_pos_to_volume_pixel_pos(const QVector3D& p){
+    return QVector3D(float(p.x() + 1) * bufSize[0] / 2.0,
+                     float(p.y() + 1) * bufSize[1] / 2.0,//bufSize[1] * float(1.0 - p.y()) / 2.0,
+                     float(p.z() + 1) * bufSize[2] / 2.0);
 }
 /**
  * @brief RayCastCanvas::setLightPositionZero
@@ -759,21 +780,21 @@ void RayCastCanvas::draw_axes() {
         float exceed_extent = 1.2;
         //qDebug ("drawInstructions has been called \n"); //this->paintText();
         QPainter painter(this);
-        QVector3D originPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, 1);
+        QVector3D originPt = m_modelViewProjectionMatrix * QVector3D(-1, 1, -1);
         // x-axis
-        QVector3D newEndPt = m_modelViewProjectionMatrix * QVector3D(exceed_extent, -1, 1);
+        QVector3D newEndPt = m_modelViewProjectionMatrix * QVector3D(exceed_extent, 1, -1);
         QColor c = QColor(255,0,0);
         this->drawLine(&painter, c, QPointF(originPt.x(), originPt.y()),
                        QPointF(newEndPt.x(), newEndPt.y()), 2);
         this->drawText(&painter, c, QPointF(newEndPt.x(), newEndPt.y()), "X");
         // y-axis
-        newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, exceed_extent, 1);
+        newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, -exceed_extent, -1);
         c = QColor(0,255,0);
         this->drawLine(&painter, c, QPointF(originPt.x(), originPt.y()),
                        QPointF(newEndPt.x(), newEndPt.y()), 2);
         this->drawText(&painter, c, QPointF(newEndPt.x(), newEndPt.y()), "Y");
         // z-axis
-        newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, -1, -exceed_extent);
+        newEndPt = m_modelViewProjectionMatrix * QVector3D(-1, 1, exceed_extent);
         c = QColor(0,0,255);
         this->drawLine(&painter, c, QPointF(originPt.x(), originPt.y()),
                        QPointF(newEndPt.x(), newEndPt.y()), 2);
@@ -957,36 +978,81 @@ void RayCastCanvas::draw_makers(){
 
             QColor c = QColor(255,0,0);
             QVector3D p_start = m_modelViewProjectionMatrix * nearEnd;
-            this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "back");
+            //this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "back");
 
             c = QColor(255,255,0);
             QVector3D p_end = m_modelViewProjectionMatrix * farEnd;
-            this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
+            //this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
 
             painter.setPen(QPen(c, 1));
             c = QColor(0,255,0);
-            this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
+            //this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
+            painter.setPen(QPen(Qt::white, 3));
+            this->drawLine(&painter, Qt::white, QPointF(0, 0), QPointF(1, 1));
+
+            this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
         }
     }
     painter.end();
 }
 
 /**
+ * @brief import_traces
+ * @param movieInfo: celltracking results
+ * @param t: neglect the traces that are un-related with frame t; Note this t here is not influenced by
+ * the loaded data. Even we only load part of the data, as long as the trace infor in intact, t is for
+ * the whole data.
+ */
+void RayCastCanvas::import_traces(const allCellsCensus &movieInfo, int t){
+    traces.clear();
+    traces.resize(movieInfo.tracks.size());
+    //int trace_cnt = 0;
+    for(int j=0; j<movieInfo.tracks.size(); j++){
+        if(movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
+            continue;
+        }
+        int end_time = movieInfo.frames[*movieInfo.tracks[j].rbegin()];
+        int start_time = movieInfo.frames[*movieInfo.tracks[j].begin()];
+        if(end_time < t || start_time > t){ // if the trace has stopped before time t
+            continue;
+        }
+
+        for(auto idx : movieInfo.tracks[j]){
+            if(movieInfo.frames[idx] > t) break;
+            traces[j].emplace_back(QVector3D(movieInfo.xCoord[idx], movieInfo.yCoord[idx], movieInfo.zCoord[idx]));
+        }
+    }
+    //traces.resize(trace_cnt);
+}
+/**
  * @brief draw_traces: draw cell traces
  */
 void RayCastCanvas::draw_traces(){
     QPainter painter(this);
+    //bool flag = false;
     for(int tr = 0; tr<traces.size(); tr++){
         auto &trace = traces[tr];
+        if(trace.empty()) continue;
         cv::Vec3b cur_cl = colormap4tracking_res->at<cv::Vec3b>(tr);
         QColor c(cur_cl(0), cur_cl(1), cur_cl(2));
+        //QColor c = QColor(255,0,0);
         painter.setPen(QPen(c, 1));
+        //        qDebug() << c;
         for(int i=1; i<trace.size(); i++){
-            QVector3D start = trace[i-1], end = trace[i];
-            QVector3D p_start = m_modelViewProjectionMatrix * start;
-            QVector3D p_end = m_modelViewProjectionMatrix * end;
+            QVector3D start_p = volume_pixel_pos_to_view_pos(trace[i-1]);
+            QVector3D end_p = volume_pixel_pos_to_view_pos(trace[i]);
+            //qDebug() << trace[i-1] << trace[i];
+            //qDebug() << start_p << end_p;
+            QVector3D p_start = m_modelViewProjectionMatrix * start_p;
+            QVector3D p_end = m_modelViewProjectionMatrix * end_p;
+            //qDebug() << p_start << p_end;
+            //this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "x");
+            //this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "o");
             this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
+            //flag = true;
+            //break;
         }
+        //if(flag) break;
     }
     painter.end();
 }

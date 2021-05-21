@@ -53,6 +53,8 @@ enum parentsKidsConsistentFlag {CONSISTENCY_NOT_SURE = 0, PARENTS_KIDS_CONSISTEN
 enum merge_split_decisions {MERGE_SPLIT_NOT_SURE = 0, MERGE_PARENTS, MERGE_KIDS, SPLIT_BY_PARENTS, SPLIT_BY_KIDS, MERGE_BOTH_PARENTS_KIDS};
 
 enum missingCellLocations {MISS_AT_TRACK_START=0, MISS_AT_TRACK_END, MISS_AS_JUMP};
+
+enum track_result_visualize_method {OVERLAY_IN_OTHER_CHANNEL, OVERLAY_IN_CANVAS};
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)
