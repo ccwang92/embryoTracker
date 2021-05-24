@@ -14,6 +14,7 @@
 #include "trackball.h"
 //#include "vtkvolume.h"
 #include <opencv2/core.hpp>  //mat4b
+//#include "../mainwindow.h"
 #include "../data_importer.h"
 #include "../cellsegmentation/types_define.h" // MarkerPos
 // if error then close
@@ -150,12 +151,14 @@ public:
 
 public:
     // visualize the tracking results
+    //MainWindow *mainwindow {nullptr};
     bool bShowTrackResult = false;
     cv::Mat4b rgb_frame = cv::Mat(); // colorful data with original data overlaid with traces
     std::vector<std::vector<QVector3D>> traces;
     cv::Mat3b *colormap4tracking_res {0};
     void draw_traces();
     void import_traces(const allCellsCensus &movieInfo, int t); // get traces
+    int process_right_button_hit(); //MainWindow *_mainwindow
 public:
     // visualize the markers
     bool bShowMarkers = true;

@@ -31,8 +31,8 @@ RayCastCanvas::RayCastCanvas(QWidget *parent)
     m_modes["Alpha blending"] = [&]() { RayCastCanvas::raycasting("Alpha blending"); };
     m_modes["Alpha blending rgba"] = [&]() { RayCastCanvas::raycasting("Alpha blending rgba"); };
     m_modes["MIP"] = [&]() { RayCastCanvas::raycasting("MIP"); };
-
     m_init_mode = m_active_mode;
+
     // set focus policy to accept key press events
     this->setFocusPolicy(Qt::StrongFocus);
 }
@@ -544,23 +544,52 @@ void RayCastCanvas::mouseReleaseEvent(QMouseEvent *event)
         m_trackBall.stop();
     }
     if(event->button() & Qt::RightButton){
-        MarkerPos pos;
-        pos.canvas_pos = event->pos();//QPointF(tmp.x(), tmp.y());
-        pos.canvas_width = width();
-        pos.canvas_height = height();
-        pos.time_point = curr_timePoint_in_canvas;
-        pos.ModelViewProjectionMatrix = m_modelViewProjectionMatrix;
-        pos.ModelMatrix = m_modelMatrix;
-        pos.ViewMatrix = m_viewMatrix;
-        pos.ProjectionMatrix = m_projectionMatrix;
-        pos.NormalMatrix = m_normalMatrix;
-        pos.drawn = false;
-        markers.push_back(pos);
-        update();
+//        MarkerPos pos;
+//        pos.canvas_pos = event->pos();//QPointF(tmp.x(), tmp.y());
+//        pos.canvas_width = width();
+//        pos.canvas_height = height();
+//        pos.time_point = curr_timePoint_in_canvas;
+//        pos.ModelViewProjectionMatrix = m_modelViewProjectionMatrix;
+//        pos.ModelMatrix = m_modelMatrix;
+//        pos.ViewMatrix = m_viewMatrix;
+//        pos.ProjectionMatrix = m_projectionMatrix;
+//        pos.NormalMatrix = m_normalMatrix;
+//        pos.drawn = false;
+//        markers.push_back(pos);
+//        update();
+        process_right_button_hit();
     }
 }
+/**
+ * @brief process_right_button_hit: pop-up menu to process cell traces， MainWindow *_mainwindow
+ */
+int RayCastCanvas::process_right_button_hit(){
+    if (bShowTrackResult) return 0;
+    //mainwindow = _mainwindow;
+    QList<QAction*> listAct;
+    QAction *act=0, *actShowSingleCellTrace=0, *actContinueOneTrace;
 
+    listAct.append(act = new QAction("", this->parent())); act->setSeparator(true);
+    listAct.append(actShowSingleCellTrace = new QAction("Right-click to select a cell to track", this->parent()));
+    listAct.append(actContinueOneTrace = new QAction("Right-click to continue the cell trace", this->parent()));
 
+    QMenu menu;
+    foreach (QAction* a, listAct) {  menu.addAction(a); }
+    //menu.setWindowOpacity(POPMENU_OPACITY); // no effect on MAC? on Windows cause blink
+    act = menu.exec(QCursor::pos());
+    if (act==0) 	return 0;
+    else if (act == actShowSingleCellTrace)
+    {
+        qDebug() << "actShowSingleCellTrace";
+    }
+    else if (act == actContinueOneTrace)
+    {
+        qDebug() << "actContinueOneTrace";
+    }else{
+        qDebug() << "No valid selection";
+        return 0;
+    }
+}
 /*!
  * \brief Callback for mouse wheel.
  */
@@ -978,19 +1007,19 @@ void RayCastCanvas::draw_makers(){
 
             QColor c = QColor(255,0,0);
             QVector3D p_start = m_modelViewProjectionMatrix * nearEnd;
-            //this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "back");
+            this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "back");
 
             c = QColor(255,255,0);
             QVector3D p_end = m_modelViewProjectionMatrix * farEnd;
-            //this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
+            this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
 
             painter.setPen(QPen(c, 1));
             c = QColor(0,255,0);
-            //this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
+            this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
             painter.setPen(QPen(Qt::white, 3));
-            this->drawLine(&painter, Qt::white, QPointF(0, 0), QPointF(1, 1));
+            //this->drawLine(&painter, Qt::white, QPointF(0, 0), QPointF(1, 1));
 
-            this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
+            //this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
         }
     }
     painter.end();

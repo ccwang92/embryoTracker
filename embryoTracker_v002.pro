@@ -19,7 +19,6 @@ SOURCES += data_importer.cpp \
     celltracking/celltracking_main.cpp \
     main.cpp \
     mainwindow.cpp \
-    my4dimage.cpp \
     myglwidget.cpp \
 #    emt_glwidget.cpp \
 #    renderer_emt.cpp \
@@ -55,7 +54,6 @@ HEADERS += data_importer.h \
     celltracking/dt3d.hpp \
     dialog_import_im_sequence.h \
     mainwindow.h \
-    my4dimage.h \
     myglwidget.h \
 #    emt_glwidget.h \
 #    renderer_emt.h \

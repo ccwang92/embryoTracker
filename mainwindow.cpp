@@ -442,8 +442,8 @@ void MainWindow::sendData4Track()
         QString fileName = data4test->filelist.at(0);
         QString movieInfo_txt_name = fileName.left(fileName.lastIndexOf('/')) + "/movieInfo.txt";
         QFileInfo check_file(movieInfo_txt_name);
-        if(check_file.exists() && check_file.isFile()){
-            if(!cellSegmenter){ // already finish the tracking
+        if(check_file.exists() && check_file.isFile()){// already finish the tracking
+            if(!cellSegmenter){
                 cellSegmenter = new cellSegmentMain((void *)data4test->image4d->getRawData(),
                                                     data4test->image4d->getDatatype(),
                                                     glWidget_raycast->bufSize);
@@ -456,8 +456,8 @@ void MainWindow::sendData4Track()
             yxzt_sz.push_back(glWidget_raycast->bufSize[4]);
             //glWidget_raycast->setVolumeTimePoint(0);
             cellTracker = new cellTrackingMain(yxzt_sz, data4test->filelist);
-        }else{
-            if(!cellSegmenter){ // already finish the tracking
+        }else{// tracking has not been finished
+            if(!cellSegmenter){
                 //// send data to do segmentation on all frames
                 seg4track = true;
                 for(int i = 0; i < glWidget_raycast->bufSize[4]; i++){
