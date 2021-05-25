@@ -226,9 +226,9 @@ bool cellSegmentMain::saveSegResults(const QString &fileName){
     stbVartrend_file.close();
     return true;
 }
-void cellSegmentMain::processSingleFrameAndReturn(RayCastCanvas *glWidget, const QString &fileName, bool track_needed){
+void cellSegmentMain::processSingleFrameAndReturn(int curr_timePoint_in_canvas, const QString &fileName, bool track_needed){
     long sz_single_frame = data_rows_cols_slices[0]*data_rows_cols_slices[1]*data_rows_cols_slices[2];
-    curr_time_point = glWidget->curr_timePoint_in_canvas;
+    curr_time_point = curr_timePoint_in_canvas;
     ///
     /// \brief We fist test if there is saved binary file for use
     ///

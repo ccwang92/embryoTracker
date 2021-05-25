@@ -1,5 +1,8 @@
 ﻿#ifndef CELLTRACKINGMAIN_H
 #define CELLTRACKINGMAIN_H
+#include <QFile>
+#include <QDir>
+#include <QMessageBox>
 #include "../cellsegmentation/cellsegment_main.h"
 
 class cellTrackingMain
@@ -183,7 +186,7 @@ private: // combine all results from batch processing
 private:
     unordered_map<size_t, size_t> oldinfo2newIdx; // <time, section(fl, fr, bl, br), labelinMap> ==> new node id
     unordered_map<size_t, size_t> newIdx2newinfo; // new node id ==> <time, new labelinMap>
-    unordered_map<size_t, size_t> newinfo2newIdx; // <time, new labelinMap> ==> new node id
+    //unordered_map<size_t, size_t> newinfo2newIdx; // <time, new labelinMap> ==> new node id, duplicate as frame_label2cell_id
     unordered_map<size_t, vector<float>> fusedFrameLabel2centerYXZ;
     size_t fuse_batch_processed_cell_cnt = 0;
     vector<pair<int, Mat>> overlapped_frames;
@@ -196,6 +199,7 @@ public:
     allCellsCensus movieInfo;
     trackParameter p4tracking;
     vector<size_t> cumulative_cell_nums;
+    unordered_map<size_t, size_t> frame_label2cell_id;
     vector<Mat1b> validGapMaps;
     bool debugMode;
     bool tracking_sucess;

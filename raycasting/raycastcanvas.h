@@ -12,11 +12,11 @@
 #include "mesh.h"
 #include "raycastvolume.h"
 #include "trackball.h"
-//#include "vtkvolume.h"
 #include <opencv2/core.hpp>  //mat4b
-//#include "../mainwindow.h"
 #include "../data_importer.h"
 #include "../cellsegmentation/types_define.h" // MarkerPos
+#include "../cellsegmentation/cellsegment_main.h"
+#include "../celltracking/celltracking_main.h"
 // if error then close
 // clean memory before MessageBox, otherwise MessageBox maybe could not be created correctly
 #define ERROR_MessageBox(title, type, what) { \
@@ -153,11 +153,14 @@ public:
     // visualize the tracking results
     //MainWindow *mainwindow {nullptr};
     bool bShowTrackResult = false;
+    bool bShowSingleTrace = false;
     cv::Mat4b rgb_frame = cv::Mat(); // colorful data with original data overlaid with traces
     std::vector<std::vector<QVector3D>> traces;
     cv::Mat3b *colormap4tracking_res {0};
+    cellSegmentMain *cellSegmenter = nullptr;
+    cellTrackingMain *cellTracker = nullptr;
     void draw_traces();
-    void import_traces(const allCellsCensus &movieInfo, int t); // get traces
+    void import_traces(int t); // get traces
     int process_right_button_hit(); //MainWindow *_mainwindow
 public:
     // visualize the markers

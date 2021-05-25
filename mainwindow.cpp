@@ -284,6 +284,9 @@ void MainWindow::connectSignal()
     if (debugButton){
         connect(debugButton, SIGNAL(triggered()), this, SLOT(debugAlgorithm()));
     }
+
+    /** annotation from glWidget_raycast to update the */
+
 }
 void MainWindow::importImageSeries()
 {
@@ -415,7 +418,7 @@ void MainWindow::sendData4Segment()
     /// way 1: directly detect cells on the original data
     //cellSegmenter->processSingleFrameAndReturn(glWidget_raycast);
     /// way 2: try to load saved data. Detect cells if failed.
-    cellSegmenter->processSingleFrameAndReturn(glWidget_raycast,
+    cellSegmenter->processSingleFrameAndReturn(glWidget_raycast->curr_timePoint_in_canvas,
                    data4test->filelist.at(glWidget_raycast->curr_timePoint_in_canvas), seg4track);
     //// display results in canvas
     int i = glWidget_raycast->curr_timePoint_in_canvas;
@@ -566,7 +569,13 @@ void MainWindow::setTimeBasedOnCurrentStatus(int t){
                 axesCheckBox->toggle();
             }
             glWidget_raycast->colormap4tracking_res = &colormap4tracking_res;
-            glWidget_raycast->import_traces(cellTracker->movieInfo, t);
+            if (glWidget_raycast->cellSegmenter == nullptr) {
+                glWidget_raycast->cellSegmenter = cellSegmenter;
+            }
+            if (glWidget_raycast->cellTracker == nullptr) {
+                glWidget_raycast->cellTracker = cellTracker;
+            }
+            glWidget_raycast->import_traces(t);
             glWidget_raycast->setVolumeTimePoint(t_at_curr_loaded_data);
         }
     }

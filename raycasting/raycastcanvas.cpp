@@ -109,7 +109,6 @@ void RayCastCanvas::drawInstructions(QPainter *painter)
     painter->drawText((width() - rect.width())/2, border,
                       rect.width(), rect.height(),
                       Qt::AlignCenter | Qt::TextWordWrap, text);
-
 }
 /**
  * @brief RayCastCanvas::drawLine at a specific location related to the rendered volume
@@ -564,7 +563,7 @@ void RayCastCanvas::mouseReleaseEvent(QMouseEvent *event)
  * @brief process_right_button_hit: pop-up menu to process cell traces， MainWindow *_mainwindow
  */
 int RayCastCanvas::process_right_button_hit(){
-    if (bShowTrackResult) return 0;
+    if (!bShowTrackResult) return 0;
     //mainwindow = _mainwindow;
     QList<QAction*> listAct;
     QAction *act=0, *actShowSingleCellTrace=0, *actContinueOneTrace;
@@ -580,6 +579,7 @@ int RayCastCanvas::process_right_button_hit(){
     if (act==0) 	return 0;
     else if (act == actShowSingleCellTrace)
     {
+
         qDebug() << "actShowSingleCellTrace";
     }
     else if (act == actContinueOneTrace)
@@ -1032,23 +1032,24 @@ void RayCastCanvas::draw_makers(){
  * the loaded data. Even we only load part of the data, as long as the trace infor in intact, t is for
  * the whole data.
  */
-void RayCastCanvas::import_traces(const allCellsCensus &movieInfo, int t){
+void RayCastCanvas::import_traces(int t){
     traces.clear();
-    traces.resize(movieInfo.tracks.size());
+    traces.resize(cellTracker->movieInfo.tracks.size());
     //int trace_cnt = 0;
-    for(int j=0; j<movieInfo.tracks.size(); j++){
-        if(movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
+    for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
+        if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
             continue;
         }
-        int end_time = movieInfo.frames[*movieInfo.tracks[j].rbegin()];
-        int start_time = movieInfo.frames[*movieInfo.tracks[j].begin()];
+        int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
+        int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
         if(end_time < t || start_time > t){ // if the trace has stopped before time t
             continue;
         }
 
-        for(auto idx : movieInfo.tracks[j]){
-            if(movieInfo.frames[idx] > t) break;
-            traces[j].emplace_back(QVector3D(movieInfo.xCoord[idx], movieInfo.yCoord[idx], movieInfo.zCoord[idx]));
+        for(auto idx : cellTracker->movieInfo.tracks[j]){
+            if(cellTracker->movieInfo.frames[idx] > t) break;
+            traces[j].emplace_back(QVector3D(cellTracker->movieInfo.xCoord[idx], cellTracker->movieInfo.yCoord[idx],
+                                             cellTracker->movieInfo.zCoord[idx]));
         }
     }
     //traces.resize(trace_cnt);

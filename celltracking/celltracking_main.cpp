@@ -27,7 +27,13 @@ inline void denewkey(size_t k, int &time, int &label) {
     time = k & 0xFFFF;
 }
 
-
+///--------------------------------------Conduct cell tracking from scratch--------------------------//
+/**
+ * @brief cellTrackingMain: the 1st construction function (totally 3 kinds)
+ * @param cellSegment
+ * @param fileNames
+ * @param _debugMode
+ */
 cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringList &fileNames, bool _debugMode)
 {
     debugMode = _debugMode;
@@ -65,8 +71,19 @@ cellTrackingMain::cellTrackingMain(cellSegmentMain &cellSegment, const QStringLi
     tracking_sucess = true;
     size_t total_cells = accumulate(cellSegment.number_cells.begin(), cellSegment.number_cells.end(), 0);
     qInfo("----------------%ld cells after iterative correction-------------------", total_cells);
+    // build frame_label2cell_id for trace annotation and update
+    FOREACH_i(movieInfo.frames){
+        frame_label2cell_id[newkey(movieInfo.frames[i], movieInfo.labelInMap[i])] = i;
+    }
     saveTrackAndFinalSegmentResults(cellSegment, fileNames);
 }
+
+///--------------------------------Load existing cell tracking results--------------------------//
+/**
+ * @brief cellTrackingMain: the 2nd construction function (totally 3 kinds)
+ * @param data_size_yxzt
+ * @param fileNames
+ */
 cellTrackingMain::cellTrackingMain(vector<int> data_size_yxzt, const QStringList &fileNames){
     tracking_sucess =false;
     if(!loadTrackResults(data_size_yxzt, fileNames)){
@@ -153,7 +170,7 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
         movieInfo.nodes[i].in_cost = p4tracking.c_en;
         movieInfo.nodes[i].out_cost = p4tracking.c_ex;
     }
-    unordered_map<size_t, size_t> frame_label2cell_id;
+    //unordered_map<size_t, size_t> frame_label2cell_id;
     movieInfo.overall_neighbor_num = 0;
     while(!in.atEnd()) {
         string line = in.readLine().toStdString();
@@ -4865,7 +4882,7 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
                     new_idx = fuse_batch_processed_cell_cnt + label_map_ud[0][u_label_map_lr[i][j]] - 1;
                     oldinfo2newIdx[key(batch_id, frame, i, j)] = new_idx;
                     newIdx2newinfo[new_idx] = newkey(frame, label_map_ud[0][u_label_map_lr[i][j]]);
-                    newinfo2newIdx[newkey(frame, label_map_ud[0][u_label_map_lr[i][j]])] = new_idx;
+                    frame_label2cell_id[newkey(frame, label_map_ud[0][u_label_map_lr[i][j]])] = new_idx;
                     max_label = MAX(max_label, label_map_ud[0][u_label_map_lr[i][j]]);
                 }
             }
@@ -4877,7 +4894,7 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
                     new_idx = fuse_batch_processed_cell_cnt + label_map_ud[1][d_label_map_lr[i][j]] - 1;
                     oldinfo2newIdx[key(batch_id, frame, i+2, j)] = new_idx;
                     newIdx2newinfo[new_idx] = newkey(frame, label_map_ud[1][d_label_map_lr[i][j]]);
-                    newinfo2newIdx[newkey(frame, label_map_ud[1][d_label_map_lr[i][j]])] = new_idx;
+                    frame_label2cell_id[newkey(frame, label_map_ud[1][d_label_map_lr[i][j]])] = new_idx;
                     max_label = MAX(max_label, label_map_ud[1][d_label_map_lr[i][j]]);
                 }
             }
@@ -4890,7 +4907,7 @@ void cellTrackingMain::oneBatchResultsFusion(int batch_id, const QString &subfol
                 if(cell_voxIdx[j].size() == 0) continue;
                 vector<int> y, x, z;
                 vec_ind2sub(cell_voxIdx[j], y, x, z, ud_fuse_mat.size);
-                fusedFrameLabel2centerYXZ[newinfo2newIdx[newkey(frame, j+1)]] = {vec_mean(y),
+                fusedFrameLabel2centerYXZ[frame_label2cell_id[newkey(frame, j+1)]] = {vec_mean(y),
                         vec_mean(x), vec_mean(z)};
             }
             //// save the 16bit unsigned results as label map
@@ -5168,8 +5185,8 @@ void cellTrackingMain::temporalFusion(Mat &kept, Mat &mov, int mov_batch_id, int
         //first test if there is a cell in left with IoU>0.5
         if(best_id != 0 && best_ov_sz*2>=(mov_cell_voxIdx[i].size() + kept_cell_voxIdx[best_id-1].size())){
             size_t kept_key = newkey(frame, best_id);
-            auto it = newinfo2newIdx.find(kept_key);
-            if(it == newinfo2newIdx.end()){
+            auto it = frame_label2cell_id.find(kept_key);
+            if(it == frame_label2cell_id.end()){
                 qFatal("refer to a non-exist cell in reference frame");
             }
             if(it->second == 22897){

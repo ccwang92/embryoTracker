@@ -4,7 +4,7 @@
 #include <opencv2/imgcodecs.hpp> // image io
 #include <opencv2/highgui.hpp> //image display
 #include "synquant_simple.h"
-#include "../raycasting/raycastcanvas.h"
+//#include "../raycasting/raycastcanvas.h"
 //#include "../celltracking/celltracking_main.h"
 //#include "vol_basic_proc.hpp"
 //#define VOLUME_WH_MAX 100000
@@ -17,7 +17,7 @@ public:
         //if(data_rows_cols_slices) delete data_rows_cols_slices;
         //if(time_points_processed) delete time_points_processed;
     };
-    void processSingleFrameAndReturn(RayCastCanvas *glWidget, const QString &fileName = "", bool track_needed=true);
+    void processSingleFrameAndReturn(int curr_timePoint_in_canvas, const QString &fileName = "", bool track_needed=true);
     //void processAllFramesAndReturn(RayCastCanvas *glWidget);
     void cellSegmentSingleFrame(cv::Mat *data_grayim3d, std::size_t curr_frame);
     void regionWiseAnalysis4d(cv::Mat *data_grayim3d, cv::Mat *dataVolFloat, cv::Mat * volStblizedFloat,
