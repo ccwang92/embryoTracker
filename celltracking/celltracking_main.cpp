@@ -242,7 +242,19 @@ bool cellTrackingMain::loadTrackResults(vector<int> data_size_yxzt, const QStrin
     }
     return true;
 }
+/**
+ * @brief loc2traceId
+ * @param xyz
+ * @return
+ */
+int cellTrackingMain::loc2traceId(QVector3D xyz){
 
+}
+/**
+ * @brief cellTrackingMain::extractTraceLocations
+ * @param data_size_yxzt
+ * @param width
+ */
 void cellTrackingMain::extractTraceLocations(vector<int> data_size_yxzt, int width){
     //vector<vector<unordered_set<size_t>>> trace_sets; // time x trackes
     trace_sets.resize(data_size_yxzt[3]);

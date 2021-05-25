@@ -191,6 +191,7 @@ private:
     size_t fuse_batch_processed_cell_cnt = 0;
     vector<pair<int, Mat>> overlapped_frames;
     int frame_processed = -1;
+
 public:
     vector<int> fused_im_sz_yxzt;
 public:
@@ -204,6 +205,9 @@ public:
     bool debugMode;
     bool tracking_sucess;
     //friend class cellSegmentMain;
+
+public:
+    int loc2traceId(QVector3D xyz); // functions for data annotation
 public:
     void init_parameter(){
         p4tracking.cycle_track = true; // true: circulation framework to solve tracking problem

@@ -556,38 +556,52 @@ void RayCastCanvas::mouseReleaseEvent(QMouseEvent *event)
 //        pos.drawn = false;
 //        markers.push_back(pos);
 //        update();
-        process_right_button_hit();
+        process_right_button_hit(event);
     }
+}
+/**
+ * @brief userClick2CellTrace: convert user's right click to cell trace id
+ * @param event
+ * @return
+ */
+QVector3D RayCastCanvas::userClick2volumeLoc(QMouseEvent *event){
+
 }
 /**
  * @brief process_right_button_hit: pop-up menu to process cell traces， MainWindow *_mainwindow
  */
-int RayCastCanvas::process_right_button_hit(){
+int RayCastCanvas::process_right_button_hit(QMouseEvent *event){
     if (!bShowTrackResult) return 0;
-    //mainwindow = _mainwindow;
-    QList<QAction*> listAct;
-    QAction *act=0, *actShowSingleCellTrace=0, *actContinueOneTrace;
-
-    listAct.append(act = new QAction("", this->parent())); act->setSeparator(true);
-    listAct.append(actShowSingleCellTrace = new QAction("Right-click to select a cell to track", this->parent()));
-    listAct.append(actContinueOneTrace = new QAction("Right-click to continue the cell trace", this->parent()));
-
-    QMenu menu;
-    foreach (QAction* a, listAct) {  menu.addAction(a); }
-    //menu.setWindowOpacity(POPMENU_OPACITY); // no effect on MAC? on Windows cause blink
-    act = menu.exec(QCursor::pos());
-    if (act==0) 	return 0;
-    else if (act == actShowSingleCellTrace)
-    {
-
-        qDebug() << "actShowSingleCellTrace";
-    }
-    else if (act == actContinueOneTrace)
-    {
-        qDebug() << "actContinueOneTrace";
+    if (bWait4RightClickOnCell){ // waiting for user's annotation
+        //QVector3D tmp = userClick2volumeLoc(event);
+        curr_trace_id_from_click = cellTracker->loc2traceId(userClick2volumeLoc(event));
+        bWait4RightClickOnCell = false; // annotation obtained
     }else{
-        qDebug() << "No valid selection";
-        return 0;
+        QList<QAction*> listAct;
+        QAction *act=0, *actShowSingleCellTrace=0, *actContinueOneTrace;
+
+        listAct.append(act = new QAction("", this->parent())); act->setSeparator(true);
+        listAct.append(actShowSingleCellTrace = new QAction("Right-click to select a cell to track", this->parent()));
+        listAct.append(actContinueOneTrace = new QAction("Right-click to continue the cell trace", this->parent()));
+
+        QMenu menu;
+        foreach (QAction* a, listAct) {  menu.addAction(a); }
+        //menu.setWindowOpacity(POPMENU_OPACITY); // no effect on MAC? on Windows cause blink
+        act = menu.exec(QCursor::pos());
+        if (act==0) 	return 0;
+        else if (act == actShowSingleCellTrace)
+        {
+            bShowSingleTrace = true;
+            bWait4RightClickOnCell = true;
+            qDebug() << "actShowSingleCellTrace";
+        }
+        else if (act == actContinueOneTrace)
+        {
+            qDebug() << "actContinueOneTrace";
+        }else{
+            qDebug() << "No valid selection";
+            return 0;
+        }
     }
 }
 /*!
@@ -1035,21 +1049,30 @@ void RayCastCanvas::draw_makers(){
 void RayCastCanvas::import_traces(int t){
     traces.clear();
     traces.resize(cellTracker->movieInfo.tracks.size());
-    //int trace_cnt = 0;
-    for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
-        if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
-            continue;
-        }
-        int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
-        int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
-        if(end_time < t || start_time > t){ // if the trace has stopped before time t
-            continue;
-        }
+    curr_timePoint_in_canvas = t;
+    if(curr_trace_id_from_click < 0){ // display all valid traces in the FOV
+        for(int j=0; j<cellTracker->movieInfo.tracks.size(); j++){
+            if(cellTracker->movieInfo.tracks[j].size()<=5){ // if the trace has stopped before time t
+                continue;
+            }
+            int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].rbegin()];
+            int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[j].begin()];
+            if(end_time < t || start_time > t){ // if the trace has stopped before time t
+                continue;
+            }
 
-        for(auto idx : cellTracker->movieInfo.tracks[j]){
+            for(auto idx : cellTracker->movieInfo.tracks[j]){
+                if(cellTracker->movieInfo.frames[idx] > t) break;
+                traces[j].emplace_back(QVector3D(cellTracker->movieInfo.xCoord[idx], cellTracker->movieInfo.yCoord[idx],
+                                                 cellTracker->movieInfo.zCoord[idx]));
+            }
+        }
+    }else{ // display one trace only
+        for(auto idx : cellTracker->movieInfo.tracks[curr_trace_id_from_click]){
             if(cellTracker->movieInfo.frames[idx] > t) break;
-            traces[j].emplace_back(QVector3D(cellTracker->movieInfo.xCoord[idx], cellTracker->movieInfo.yCoord[idx],
-                                             cellTracker->movieInfo.zCoord[idx]));
+            traces[curr_trace_id_from_click].emplace_back(QVector3D(cellTracker->movieInfo.xCoord[idx],
+                                                           cellTracker->movieInfo.yCoord[idx],
+                                                           cellTracker->movieInfo.zCoord[idx]));
         }
     }
     //traces.resize(trace_cnt);
