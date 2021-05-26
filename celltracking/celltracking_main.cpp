@@ -428,7 +428,14 @@ void cellTrackingMain::extendTraceWithOneAnnotation(int trace_id, size_t idx,
     }else{ // only consider the condition that with valid cell segment
         return;
     }
-    /** * step 2. extend the trace **/
+    /** * step 2. update this node's center **/
+    int y, x, z;
+    vol_ind2sub(idx, y, x, z, cellSegment.data_rows_cols_slices.data());
+    movieInfo.xCoord[idx] = x;
+    movieInfo.yCoord[idx] = y;
+    movieInfo.zCoord[idx] = z;
+
+    /** * step 3. extend the trace **/
     if(org_trace_id >= 0){
         int extend_cnt = 0;
         for(int i=org_loc_in_trace; i<movieInfo.tracks[org_trace_id].size(); i++){
