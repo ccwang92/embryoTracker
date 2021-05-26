@@ -133,6 +133,7 @@ bool cellSegmentMain::loadSegResults(const QString &fileName, bool track_needed)
     if (!vartrend_file.open(QIODevice::ReadOnly))  return false;
     //QByteArray arr = vartrend_file.read(4);
     QByteArray tmp_in = vartrend_file.read(4);
+    //vartrend_file.read((char*)(&variances[curr_time_point]), sizeof(int));
 //        QDataStream stream(tmp_in.data()); // #0 element
 //        stream.setFloatingPointPrecision(QDataStream::SinglePrecision); // for float, default is double
 //        stream >> variances[curr_time_point];

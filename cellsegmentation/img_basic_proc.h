@@ -1,7 +1,6 @@
 /** the basic template function used in volume image processing */
 
 #include "img_basic_proc_declare.h"
-
 // all the template functions
 
 //double normalCDF(double value) //standard

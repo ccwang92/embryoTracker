@@ -601,7 +601,7 @@ int RayCastCanvas::process_right_button_hit(QMouseEvent *event){
         size_t user_click = cellTracker->endpoint2loc(nearend, farend, *cellSegmenter,
                                                          curr_timePoint_in_canvas);
         if(canvasRightClickOperation == RRIGHT_CLICK_OPR_EXTEND_EXIST_TRACE && curr_trace_id_from_click>=0){
-
+            
         }else if(canvasRightClickOperation == RRIGHT_CLICK_OPR_SELECT_ONE_TRACE){
             curr_trace_id_from_click = cellTracker->loc2traceId(user_click, *cellSegmenter, curr_timePoint_in_canvas,
                                                             data_importer->filelist.at(curr_timePoint_in_canvas));

@@ -55,6 +55,8 @@ enum merge_split_decisions {MERGE_SPLIT_NOT_SURE = 0, MERGE_PARENTS, MERGE_KIDS,
 enum missingCellLocations {MISS_AT_TRACK_START=0, MISS_AT_TRACK_END, MISS_AS_JUMP};
 
 enum track_result_visualize_method {OVERLAY_IN_OTHER_CHANNEL, OVERLAY_IN_CANVAS};
+
+enum canvas_right_click_operation_set {RRIGHT_CLICK_OPR_NONE, RRIGHT_CLICK_OPR_SELECT_ONE_TRACE, RRIGHT_CLICK_OPR_EXTEND_EXIST_TRACE};
 #define REARRANGE_IDS true
 #define NOT_REARRANGE_IDS false
 #define FOREACH_i(x) for(size_t i = 0; i<x.size(); i++)

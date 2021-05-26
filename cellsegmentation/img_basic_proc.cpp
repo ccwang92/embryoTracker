@@ -2643,6 +2643,7 @@ void label2rgb3d(Mat &src_label, Mat &src_intensity, Mat3b &colormap, Mat4b &dst
         }
     }
 }
+
 /**
  * @brief traceExtract: extract the voxel between start and end point
  * @param start_yxz
@@ -2659,7 +2660,6 @@ void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yx
     }else{
         //qInfo("traceExtract end");
         size_t page_sz = yxz_sz[1]*yxz_sz[0];
-
         if(abs(diff[0]) > MAX(abs(diff[2]), abs(diff[1]))){
             int steps = floor(abs(end_yxz[0] - start_yxz[0]));
             int sign = 1;
@@ -2671,10 +2671,28 @@ void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yx
                 float x = start_yxz[1] + g_x*i*sign;
                 float z = start_yxz[2] + g_z*i*sign;
 
-                out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
+                //                    out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                //                    out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                //                    out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                //                    out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
+                if(round(z) >= 0 && round(z) < yxz_sz[2]){
+                    if(ceil(y) >= 0 && ceil(y) < yxz_sz[0]){
+                        if(ceil(x) >= 0 && ceil(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                        }
+                        if(floor(x) >= 0 && floor(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                        }
+                    }
+                    if(floor(y) >= 0 && floor(y) < yxz_sz[0]){
+                        if(ceil(x) >= 0 && ceil(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                        }
+                        if(floor(x) >= 0 && floor(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                        }
+                    }
+                }
             }
         }else if(abs(diff[1]) > abs(diff[2])){
             int steps = floor(abs(end_yxz[1] - start_yxz[1]));
@@ -2687,10 +2705,24 @@ void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yx
                 float x = start_yxz[1] + i*sign;
                 float z = start_yxz[2] + g_z*i*sign;
 
-                out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
+                if(round(z) >= 0 && round(z) < yxz_sz[2]){
+                    if(ceil(y) >= 0 && ceil(y) < yxz_sz[0]){
+                        if(ceil(x) >= 0 && ceil(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                        }
+                        if(floor(x) >= 0 && floor(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                        }
+                    }
+                    if(floor(y) >= 0 && floor(y) < yxz_sz[0]){
+                        if(ceil(x) >= 0 && ceil(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                        }
+                        if(floor(x) >= 0 && floor(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                        }
+                    }
+                }
             }
         }else{
             int steps = floor(abs(end_yxz[2] - start_yxz[2]));
@@ -2703,10 +2735,24 @@ void traceExtract(vector<float> start_yxz, vector<float> end_yxz, vector<int> yx
                 float x = start_yxz[1] + g_x*i*sign;
                 float z = start_yxz[2] + i*sign;
 
-                out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(floor(y), ceil(x), round(z), yxz_sz[1], page_sz));
-                out_idx.insert(vol_sub2ind(floor(y), floor(x), round(z), yxz_sz[1], page_sz));
+                if(round(z) >= 0 && round(z) < yxz_sz[2]){
+                    if(ceil(y) >= 0 && ceil(y) < yxz_sz[0]){
+                        if(ceil(x) >= 0 && ceil(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                        }
+                        if(floor(x) >= 0 && floor(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                        }
+                    }
+                    if(floor(y) >= 0 && floor(y) < yxz_sz[0]){
+                        if(ceil(x) >= 0 && ceil(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), ceil(x), round(z), yxz_sz[1], page_sz));
+                        }
+                        if(floor(x) >= 0 && floor(x) < yxz_sz[1]){
+                            out_idx.insert(vol_sub2ind(ceil(y), floor(x), round(z), yxz_sz[1], page_sz));
+                        }
+                    }
+                }
             }
         }
     }

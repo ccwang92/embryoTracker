@@ -207,7 +207,11 @@ public:
     //friend class cellSegmentMain;
 
 public:
-    int loc2traceId(QVector3D xyz); // functions for data annotation
+    size_t endpoint2loc(QVector3D nearEnd, QVector3D farEnd, const cellSegmentMain &cellSegment, int t);
+    size_t loc2nodeId(size_t idx, const cellSegmentMain &cellSegment, int t, const QString &label_file_name);
+    int loc2traceId(size_t idx, const cellSegmentMain &cellSegment, int t, const QString &label_file_name); // functions for data annotation
+    void updateTraceWithOneAnnotation(int trace_id, size_t idx, cellSegmentMain &cellSegment, int t, const QString &label_file_name);
+    void extendTraceWithOneAnnotation(int trace_id, size_t idx, cellSegmentMain &cellSegment, int t, const QString &label_file_name);
 public:
     void init_parameter(){
         p4tracking.cycle_track = true; // true: circulation framework to solve tracking problem
@@ -257,7 +261,7 @@ public:
         p4tracking.realEnter = chi2inv(1-0.01/cell_num, 1)/2; // 12.3546 is from chi2inv(1-0.01/particleNum) / 2
         p4tracking.c_en = p4tracking.realEnter;// cost of appearance and disappearance in the scene
         p4tracking.c_ex = p4tracking.c_en;
-        p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex) + 0.00001; // make sure detections are all included
+        p4tracking.observationCost = -(p4tracking.c_en+p4tracking.c_ex);// this value is used and duplicated in several places (e.g. nodeInfo), we may simplify them.
 
 
         //// update cost of p4seg

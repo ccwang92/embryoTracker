@@ -153,7 +153,9 @@ public:
     // visualize the tracking results
     //MainWindow *mainwindow {nullptr};
     bool bShowTrackResult = false;
-    bool bShowSingleTrace = false, bWait4RightClickOnCell = false;
+    bool bWait4RightClickOnCell = false;
+    int canvasRightClickOperation = RRIGHT_CLICK_OPR_NONE;
+    bool bExtendExistingTrace = false;
     int curr_trace_id_from_click = -1;
     cv::Mat4b rgb_frame = cv::Mat(); // colorful data with original data overlaid with traces
     std::vector<std::vector<QVector3D>> traces;
@@ -162,7 +164,7 @@ public:
     cellTrackingMain *cellTracker = nullptr;
     void draw_traces();
     void import_traces(int t); // get traces
-    QVector3D userClick2volumeLoc(QMouseEvent *event);
+    void userClick2volumeLoc(QMouseEvent *event, QVector3D &nearEnd, QVector3D &farEnd);
     int process_right_button_hit(QMouseEvent *event); //MainWindow *_mainwindow
 public:
     // visualize the markers
