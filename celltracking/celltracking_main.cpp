@@ -258,7 +258,7 @@ size_t cellTrackingMain::endpoint2loc(QVector3D nearEnd, QVector3D farEnd, const
 
     unsigned char *ind = (unsigned char*)cellSegment.normalized_data4d.data + sz_single_frame*t; // sub-matrix pointer
     Mat *single_frame = new Mat(3, cellSegment.normalized_data4d.size, CV_8U, ind);
-
+    //ccShowSlice3Dmat(single_frame, CV_8U);
     unordered_set<size_t> voxel_idx_in_line_segment;
     int line_width = 1;
     traceExtract({nearEnd.y(), nearEnd.x(), nearEnd.z()}, {farEnd.y(), farEnd.x(), farEnd.z()},
@@ -271,7 +271,11 @@ size_t cellTrackingMain::endpoint2loc(QVector3D nearEnd, QVector3D farEnd, const
             max_intensity_voxel_idx = v;
         }
     }
+    delete single_frame;
     if(max_intensity > 0){
+        int y, x, z;
+        vol_ind2sub(max_intensity_voxel_idx, y, x, z, cellSegment.data_rows_cols_slices.data());
+        qDebug() << y << x << z;
         return max_intensity_voxel_idx;
     }else{
         return sz_single_frame + 1; // invalid size index
@@ -284,8 +288,8 @@ size_t cellTrackingMain::endpoint2loc(QVector3D nearEnd, QVector3D farEnd, const
  * @return
  */
 int cellTrackingMain::loc2traceId(size_t idx, const cellSegmentMain &cellSegment,
-                                  int t, const QString &label_file_name){
-    size_t node_id = loc2nodeId(idx, cellSegment, t, label_file_name);
+                                  int t, const QString &fileName){
+    size_t node_id = loc2nodeId(idx, cellSegment, t, fileName);
     if(node_id < movieInfo.nodes.size()){
         return movieInfo.nodes[node_id].nodeId2trackId;
     }else{
@@ -299,7 +303,7 @@ int cellTrackingMain::loc2traceId(size_t idx, const cellSegmentMain &cellSegment
  * @return
  */
 size_t cellTrackingMain::loc2nodeId(size_t idx, const cellSegmentMain &cellSegment,
-                                    int t, const QString &label_file_name){
+                                    int t, const QString &fileName){
     int cell_label_of_idx;
     long sz_single_frame = cellSegment.data_rows_cols_slices[0] *
                             cellSegment.data_rows_cols_slices[1] *
@@ -310,17 +314,23 @@ size_t cellTrackingMain::loc2nodeId(size_t idx, const cellSegmentMain &cellSegme
     if(!cellSegment.cell_label_maps[t].empty()){
         cell_label_of_idx = cellSegment.cell_label_maps[t].at<int>(idx);
     }else{ //load from data
+        QString fileNameNoExt = fileName.left(fileName.lastIndexOf('.'));
+        QString label_file_name = fileNameNoExt + "_label_map_int32_final.bin";
         QFile label_file(label_file_name);
         if (!label_file.open(QIODevice::ReadOnly)){
             qFatal("lost files!");
         }
+        Mat label_mat;
+        Mat(3, cellSegment.data_rows_cols_slices.data(), CV_32S, label_file.readAll().data()).copyTo(label_mat);
+        //ccShowSliceLabelMat(label_mat);
+        qDebug() << label_mat.at<int>(idx);
         label_file.seek(idx*sizeof(int));
         label_file.read((char*)(&cell_label_of_idx), sizeof(int));
         label_file.close();
         //memcpy(&cell_label_of_idx, tmp_in.data(), tmp_in.size());
     }
-    size_t trace_key = newkey(t, cell_label_of_idx);
-    auto it = frame_label2cell_id.find(trace_key);
+    size_t frame_label_key = newkey(t, cell_label_of_idx);
+    auto it = frame_label2cell_id.find(frame_label_key);
     if(it == frame_label2cell_id.end()){
         return movieInfo.nodes.size() + 1;
     }
@@ -333,13 +343,13 @@ size_t cellTrackingMain::loc2nodeId(size_t idx, const cellSegmentMain &cellSegme
  * @param idx
  * @param cellSegment
  * @param t
- * @param label_file_name
+ * @param fileName
  */
 void cellTrackingMain::updateTraceWithOneAnnotation(int trace_id, size_t idx,
                                                     cellSegmentMain &cellSegment,
-                                                    int t, const QString &label_file_name){
+                                                    int t, const QString &fileName){
     /** * step 1. identify the annotation's orignal trace id **/
-    size_t org_node_id = loc2nodeId(idx, cellSegment, t, label_file_name);
+    size_t org_node_id = loc2nodeId(idx, cellSegment, t, fileName);
     if(org_node_id > movieInfo.nodes.size()){
         return;
     }
@@ -414,13 +424,13 @@ void cellTrackingMain::updateTraceWithOneAnnotation(int trace_id, size_t idx,
  * @param idx
  * @param cellSegment
  * @param t
- * @param label_file_name
+ * @param fileName
  */
 void cellTrackingMain::extendTraceWithOneAnnotation(int trace_id, size_t idx,
                                                     cellSegmentMain &cellSegment,
-                                                    int t, const QString &label_file_name){
+                                                    int t, const QString &fileName){
     /** * step 1. identify the annotation's orignal node and trace id **/
-    size_t org_node_id = loc2nodeId(idx, cellSegment, t, label_file_name);
+    size_t org_node_id = loc2nodeId(idx, cellSegment, t, fileName);
     int org_trace_id = -1, org_loc_in_trace = -1;
     if (org_node_id < movieInfo.nodes.size()){
         org_trace_id = movieInfo.nodes[org_node_id].nodeId2trackId;

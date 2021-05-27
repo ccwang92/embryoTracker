@@ -192,6 +192,7 @@ template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize si
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, int *size);
 template <typename T> T vol_sub2ind(int y, int x, int z, int col_num, T page_sz);
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size);
+template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, const int *size);
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size);
 template <typename T> void vec_ind2sub(vector<T> idx, vector<int> &y, vector<int> &x, vector<int> &z, MatSize size);
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, int size[3]);

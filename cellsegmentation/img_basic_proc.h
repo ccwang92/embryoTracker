@@ -778,13 +778,7 @@ template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, MatSize size
     // assert(
     idx = z*size[0]*size[1] + x + y*size[1];
 }
-template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize size){
-    z = idx / (size[0]*size[1]);
-    T rmder = idx % (size[0]*size[1]);
-    y = rmder/size[1];
-    x = rmder-y*size[1];
 
-}
 
 template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, int *size){
     idx = z*size[0]*size[1] + x + y*size[1];
@@ -793,13 +787,24 @@ template <typename T> void vol_sub2ind(T &idx, int y, int x, int z, int *size){
 template <typename T> T vol_sub2ind(int y, int x, int z, int col_num, T page_sz){
     return z*page_sz + x + y*col_num;
 }
+template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, MatSize size){
+    z = idx / (size[0]*size[1]);
+    T rmder = idx % (size[0]*size[1]);
+    y = rmder/size[1];
+    x = rmder-y*size[1];
+}
 template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, int *size){
     z = idx / (size[0]*size[1]);
     T rmder = idx - z*(size[0]*size[1]);
     y = rmder/size[1];
     x = rmder-y*size[1];
 }
-
+template <typename T> void vol_ind2sub(T idx, int &y, int &x, int &z, const int *size){
+    z = idx / (size[0]*size[1]);
+    T rmder = idx - z*(size[0]*size[1]);
+    y = rmder/size[1];
+    x = rmder-y*size[1];
+}
 template <typename T> void vec_sub2ind(vector<T> &idx, vector<int> y, vector<int> x, vector<int> z, MatSize size){
     int size_new[3] = {size[0], size[1], size[2]};
     vec_sub2ind(idx, y, x, z, size_new);

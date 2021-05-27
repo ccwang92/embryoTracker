@@ -208,10 +208,10 @@ public:
 
 public:
     size_t endpoint2loc(QVector3D nearEnd, QVector3D farEnd, const cellSegmentMain &cellSegment, int t);
-    size_t loc2nodeId(size_t idx, const cellSegmentMain &cellSegment, int t, const QString &label_file_name);
-    int loc2traceId(size_t idx, const cellSegmentMain &cellSegment, int t, const QString &label_file_name); // functions for data annotation
-    void updateTraceWithOneAnnotation(int trace_id, size_t idx, cellSegmentMain &cellSegment, int t, const QString &label_file_name);
-    void extendTraceWithOneAnnotation(int trace_id, size_t idx, cellSegmentMain &cellSegment, int t, const QString &label_file_name);
+    size_t loc2nodeId(size_t idx, const cellSegmentMain &cellSegment, int t, const QString &fileName);
+    int loc2traceId(size_t idx, const cellSegmentMain &cellSegment, int t, const QString &fileName); // functions for data annotation
+    void updateTraceWithOneAnnotation(int trace_id, size_t idx, cellSegmentMain &cellSegment, int t, const QString &fileName);
+    void extendTraceWithOneAnnotation(int trace_id, size_t idx, cellSegmentMain &cellSegment, int t, const QString &fileName);
 public:
     void init_parameter(){
         p4tracking.cycle_track = true; // true: circulation framework to solve tracking problem

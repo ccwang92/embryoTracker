@@ -232,6 +232,7 @@ public:
     // Rendering axes in the figure
     bool bShowAxes = false;
     void drawInstructions(QPainter *painter);
+    void drawPoint(QPainter *painter, QColor c, QPointF p0, int ptWidth);
     void drawLine(QPainter *painter, QColor c=QColor(50,50,50), QPointF p0 = QPointF(0, 0),
                    QPointF p1 = QPointF(1, 1), int lineWidth = 1);
     void drawText(QPainter *painter, QColor c=QColor(50,50,50), QPointF p = QPointF(0, 0),

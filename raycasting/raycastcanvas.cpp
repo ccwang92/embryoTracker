@@ -32,7 +32,7 @@ RayCastCanvas::RayCastCanvas(QWidget *parent)
     m_modes["Alpha blending rgba"] = [&]() { RayCastCanvas::raycasting("Alpha blending rgba"); };
     m_modes["MIP"] = [&]() { RayCastCanvas::raycasting("MIP"); };
     m_init_mode = m_active_mode;
-
+    curr_timePoint_in_canvas = 0;
     // set focus policy to accept key press events
     this->setFocusPolicy(Qt::StrongFocus);
 }
@@ -110,6 +110,20 @@ void RayCastCanvas::drawInstructions(QPainter *painter)
                       rect.width(), rect.height(),
                       Qt::AlignCenter | Qt::TextWordWrap, text);
 }
+
+/**
+ * @brief RayCastCanvas::draw a point at a specific location related to the rendered volume
+ * @param painter
+ * @param c
+ * @param p0: location in camera view, which x,y,z in [-1, 1]
+ * @param ptWidth
+ */
+void RayCastCanvas::drawPoint(QPainter *painter, QColor c, QPointF p0, int ptWidth)
+{
+    painter->setPen(QPen(c, ptWidth));
+    QPointF p_loc = view_pos_to_canvas_pixel_pos(p0);
+    painter->drawPoint(p_loc);
+}
 /**
  * @brief RayCastCanvas::drawLine at a specific location related to the rendered volume
  * @param painter
@@ -124,7 +138,6 @@ void RayCastCanvas::drawLine(QPainter *painter, QColor c, QPointF p0, QPointF p1
     QPointF p_start = view_pos_to_canvas_pixel_pos(p0);
     QPointF p_end = view_pos_to_canvas_pixel_pos(p1);
     painter->drawLine(p_start, p_end);
-
 }
 /**
  * @brief RayCastCanvas::drawText at a specific location related to the rendered volume
@@ -223,9 +236,9 @@ void RayCastCanvas::paintGL()
 //    QPainter p(this);
 //    p.setPen(Qt::red);
 //    p.drawLine(rect().topLeft(), rect().bottomRight());
-    if(bShowTrackResult){
+    if(bShowTrackResult && !bWait4RightClickOnCell){
         // we first check if rgb_frame is empty, if so, traces are already overlaid
-        if(rgb_frame.empty() && !traces.empty()){
+        if ( rgb_frame.empty() && !traces.empty()){
             glPushMatrix();
             draw_traces();
             glPopMatrix();
@@ -584,11 +597,13 @@ void RayCastCanvas::userClick2volumeLoc(QMouseEvent *event, QVector3D &nearEnd, 
     //QVector3D nearEnd(0,0,-1), farEnd(0,0,1);
     nearEnd.setX(loc1.x() + (-1-loc1.z())*(loc0.x()-loc1.x())/(loc0.z()-loc1.z()));
     nearEnd.setY(loc1.y() + (-1-loc1.z())*(loc0.y()-loc1.y())/(loc0.z()-loc1.z()));
+    nearEnd.setZ(-1);
     farEnd.setX(loc1.x() + (1-loc1.z())*(loc0.x()-loc1.x())/(loc0.z()-loc1.z()));
     farEnd.setY(loc1.y() + (1-loc1.z())*(loc0.y()-loc1.y())/(loc0.z()-loc1.z()));
+    farEnd.setZ(1);
 
     nearEnd = view_pos_to_volume_pixel_pos(nearEnd);
-    farEnd = view_pos_to_volume_pixel_pos(nearEnd);
+    farEnd = view_pos_to_volume_pixel_pos(farEnd);
 }
 /**
  * @brief process_right_button_hit: pop-up menu to process cell traces， MainWindow *_mainwindow
@@ -598,17 +613,21 @@ int RayCastCanvas::process_right_button_hit(QMouseEvent *event){
     if (bWait4RightClickOnCell){ // waiting for user's annotation
         QVector3D farend, nearend;
         userClick2volumeLoc(event, nearend, farend);
-        size_t user_click = cellTracker->endpoint2loc(nearend, farend, *cellSegmenter,
+        size_t user_click_cell_center_idx = cellTracker->endpoint2loc(nearend, farend, *cellSegmenter,
                                                          curr_timePoint_in_canvas);
         if(canvasRightClickOperation == RRIGHT_CLICK_OPR_EXTEND_EXIST_TRACE && curr_trace_id_from_click>=0){
-
+            cellTracker->extendTraceWithOneAnnotation(curr_trace_id_from_click, user_click_cell_center_idx,
+                                                      *cellSegmenter, curr_timePoint_in_canvas,
+                                                      data_importer->filelist.at(curr_timePoint_in_canvas));
         }else if(canvasRightClickOperation == RRIGHT_CLICK_OPR_SELECT_ONE_TRACE){
-            curr_trace_id_from_click = cellTracker->loc2traceId(user_click, *cellSegmenter, curr_timePoint_in_canvas,
+            curr_trace_id_from_click = cellTracker->loc2traceId(user_click_cell_center_idx, *cellSegmenter, curr_timePoint_in_canvas,
                                                             data_importer->filelist.at(curr_timePoint_in_canvas));
+            this->import_traces(curr_timePoint_in_canvas);
         }else{
             qDebug() << "Non-defined operation.";
         }
         bWait4RightClickOnCell = false; // annotation obtained
+        update();
     }else{
         QList<QAction*> listAct;
         QAction *act=0, *actShowSingleCellTrace=0, *actContinueOneTrace;
@@ -626,7 +645,6 @@ int RayCastCanvas::process_right_button_hit(QMouseEvent *event){
         {
             bWait4RightClickOnCell = true;
             canvasRightClickOperation = RRIGHT_CLICK_OPR_SELECT_ONE_TRACE;
-            //bExtendExistingTrace = false;
             qDebug() << "actShowSingleCellTrace";
         }
         else if (act == actContinueOneTrace)
@@ -1003,29 +1021,6 @@ inline void RayCastCanvas::transformPoint(GLdouble out[4], const GLdouble m[16],
 #undef M
 }
 
-// in Image space (model space)
-void RayCastCanvas::MarkerPos_to_NearFarPoint(const MarkerPos & marker, QVector3D &loc0, QVector3D &loc1)
-{
-
-//    QVector3D Z(0, 0, 0); // instead of 0 for x and y i need worldPosition.x() and worldPosition.y() ....
-//    Z = Z.project(marker.ViewMatrix*marker.ModelMatrix,
-//                  marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
-
-    QVector3D worldPosition =
-            QVector3D(marker.canvas_pos.x(), marker.canvas_height - marker.canvas_pos.y(),
-                      0).unproject(marker.ViewMatrix*marker.ModelMatrix, marker.ProjectionMatrix, QRect(0, 0, marker.canvas_width, marker.canvas_height));
-
-//    if (bOrthoView)
-//    {
-//        pZ0(3) = -1;  //100913
-//    }
-//    ColumnVector Z0 = PM.i() * pZ0;       //cout << "Z0 \n" << Z0 << endl;
-//    ColumnVector Z1 = PM.i() * pZ1;       //cout << "Z1 \n" << Z1 << endl;
-//    Z0 = Z0 / Z0(4);
-//    Z1 = Z1 / Z1(4);
-//    loc0 = XYZ(Z0(1), Z0(2), Z0(3));
-//    loc1 = XYZ(Z1(1), Z1(2), Z1(3));
-}
 
 void RayCastCanvas::draw_makers(){
     QPainter painter(this);
@@ -1067,7 +1062,7 @@ void RayCastCanvas::draw_makers(){
             painter.setPen(QPen(c, 1));
             c = QColor(0,255,0);
             this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
-            painter.setPen(QPen(Qt::white, 3));
+            //painter.setPen(QPen(Qt::white, 3));
             //this->drawLine(&painter, Qt::white, QPointF(0, 0), QPointF(1, 1));
 
             //this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "front");
@@ -1119,15 +1114,20 @@ void RayCastCanvas::import_traces(int t){
  */
 void RayCastCanvas::draw_traces(){
     QPainter painter(this);
-    //bool flag = false;
+    int line_width = 3;
     for(int tr = 0; tr<traces.size(); tr++){
         auto &trace = traces[tr];
         if(trace.empty()) continue;
         cv::Vec3b cur_cl = colormap4tracking_res->at<cv::Vec3b>(tr);
         QColor c(cur_cl(0), cur_cl(1), cur_cl(2));
         //QColor c = QColor(255,0,0);
-        painter.setPen(QPen(c, 1));
+        //painter.setPen(QPen(c, 3));
         //        qDebug() << c;
+        if(trace.size() > 1){
+            QVector3D trace_head = volume_pixel_pos_to_view_pos(trace[0]);
+            trace_head = m_modelViewProjectionMatrix * trace_head;
+            this->drawPoint(&painter, c, QPointF(trace_head.x(), trace_head.y()), line_width+1);
+        }
         for(int i=1; i<trace.size(); i++){
             QVector3D start_p = volume_pixel_pos_to_view_pos(trace[i-1]);
             QVector3D end_p = volume_pixel_pos_to_view_pos(trace[i]);
@@ -1135,159 +1135,16 @@ void RayCastCanvas::draw_traces(){
             //qDebug() << start_p << end_p;
             QVector3D p_start = m_modelViewProjectionMatrix * start_p;
             QVector3D p_end = m_modelViewProjectionMatrix * end_p;
+
             //qDebug() << p_start << p_end;
             //this->drawText(&painter, c, QPointF(p_start.x(), p_start.y()), "x");
             //this->drawText(&painter, c, QPointF(p_end.x(), p_end.y()), "o");
-            this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));
-            //flag = true;
+            this->drawLine(&painter, c, QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()), line_width);
+            //painter.drawLine(QPointF(p_start.x(), p_start.y()), QPointF(p_end.x(), p_end.y()));            //flag = true;
             //break;
+            this->drawPoint(&painter, c, QPointF(p_end.x(), p_end.y()), line_width+1);
         }
         //if(flag) break;
     }
     painter.end();
 }
-/** this is the Vaa3d's idea of adding axes. It fails on our framework. Use Qpainter instead.*/
-//void RayCastCanvas::setBoundingBoxSpace(BoundingBox BB)
-//{
-//    float DX = BB.Dx();
-//    float DY = BB.Dy();
-//    float DZ = BB.Dz();
-//    float maxD = BB.Dmax();
-
-//    double s[3];
-//    s[0] = 1/maxD *2;
-//    s[1] = 1/maxD *2;
-//    s[2] = 1/maxD *2;
-//    double t[3];
-//    t[0] = -BB.x0 -DX /2;
-//    t[1] = -BB.y0 -DY /2;
-//    t[2] = -BB.z0 -DZ /2;
-
-//    // from boundingBox space ==> fit in [-1, +1]^3
-//    glScaled(s[0], s[1], s[2]);
-//    glTranslated(t[0], t[1], t[2]);
-//}
-
-//inline void box_quads(const BoundingBox & BB)
-//{
-//#define BB_VERTEX(xi,yi,zi)  glVertex3d(BB.x##xi, BB.y##yi, BB.z##zi)
-
-//    BB_VERTEX(0, 0, 0);	BB_VERTEX(0, 1, 0);	BB_VERTEX(1, 1, 0); BB_VERTEX(1, 0, 0); //z=0
-//    BB_VERTEX(0, 0, 1);	BB_VERTEX(0, 1, 1);	BB_VERTEX(1, 1, 1); BB_VERTEX(1, 0, 1); //z=1
-
-//    BB_VERTEX(0, 0, 0);	BB_VERTEX(1, 0, 0);	BB_VERTEX(1, 0, 1); BB_VERTEX(0, 0, 1); //y=0
-//    BB_VERTEX(0, 1, 0);	BB_VERTEX(1, 1, 0);	BB_VERTEX(1, 1, 1); BB_VERTEX(0, 1, 1); //y=1
-
-//    BB_VERTEX(0, 0, 0);	BB_VERTEX(0, 0, 1);	BB_VERTEX(0, 1, 1); BB_VERTEX(0, 1, 0); //x=0
-//    BB_VERTEX(1, 0, 0);	BB_VERTEX(1, 0, 1);	BB_VERTEX(1, 1, 1); BB_VERTEX(1, 1, 0); //x=1
-
-//}
-
-
-
-//void RayCastCanvas::drawBoundingBoxAndAxes(BoundingBox BB, float BlineWidth, float AlineWidth)
-//{
-//    glPushAttrib(GL_LINE_BIT | GL_POLYGON_BIT);
-//            //| GL_DEPTH_BUFFER_BIT);
-//    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-//    glEnable(GL_POLYGON_OFFSET_LINE);
-
-////	glPolygonOffset(0, -1); // deal z-fighting, 081120
-////	glDepthFunc(GL_LEQUAL);
-//    if (posXTranslateBB != 0) delete posXTranslateBB;
-//    if (negXTranslateBB != 0) delete negXTranslateBB;
-//    if (posYTranslateBB != 0) delete posYTranslateBB;
-//    if (negYTranslateBB != 0) delete negYTranslateBB;
-//    posXTranslateBB=0, negXTranslateBB=0,
-//            posYTranslateBB=0, negYTranslateBB=0;
-//    // an indicator of coordinate direction
-//    if (bShowAxes && AlineWidth>0)
-//    {
-//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-//        float D = (BB.Dmax());
-//        float ld = D*0.0001; //1e-4 is best
-//        float td = D*0.015;
-//        XYZ A0 = BB.Vabsmin();
-//        XYZ A1 = BB.V1() + D*0.05;
-
-//        glPolygonOffset(-0.002, -2); //(-0.002, -2) for good z-fighting with bounding box, 081120,100823
-
-//        glLineWidth(AlineWidth); // work only before glBegin(), by RZC 080827
-//        //glBegin(GL_QUADS);
-//        glBegin(GL_LINES); // glPolygonOffset do NOT  influence GL_LINES
-//        {
-////            glColor3f(1, 0, 0);		box_quads( BoundingBox(A0, XYZ(A1.x, A0.y+ld, A0.z+ld)) );
-////            glColor3f(0, 1, 0);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A1.y, A0.z+ld)) );
-////            glColor3f(0, 0, 1);		box_quads( BoundingBox(A0, XYZ(A0.x+ld, A0.y+ld, A1.z)) );
-//            //glColor3f(1, 0, 0);
-//            glVertex3f(0, 0, 0); glVertex3f(10, 0, 0);
-//            //glColor3f(0, 1, 0); glVertex3f(0, 0, 0); glVertex3f(0, 10, 0);
-//            //glColor3f(0, 0, 1); glVertex3f(0, 0, 0); glVertex3f(0, 0, 10);
-//        }
-//        glEnd();
-
-////        glColor3f(1, 0, 0);		drawString(A1.x+td, A0.y, A0.z, "X", 1, 0);
-////        glColor3f(0, 1, 0);		drawString(A0.x, A1.y+td, A0.z, "Y", 1, 0);
-////        glColor3f(0, 0, 1);		drawString(A0.x, A0.y, A1.z+td, "Z", 1, 0);
-//    }
-
-//    if (bShowBoundingBox && BlineWidth>0)
-//    {
-//        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-//        glPolygonOffset(0, -1); // deal z-fighting with volume, 081120
-
-//        glLineWidth(BlineWidth); // work only before glBegin(), by RZC 080827
-//        glBegin(GL_QUADS);
-//        //glBegin(GL_LINES);
-//        {
-//            glColor3fv(color_line.c);	box_quads(BB);
-//        }
-//        glEnd();
-//    }
-
-//    glPopAttrib();
-//}
-//void RayCastCanvas::drawString(float x, float y, float z, const char* text, int shadow, int fontsize)
-//{
-//    //if (! this)  return;
-
-//    if (shadow)
-//    {
-//        glPushAttrib(GL_DEPTH_BUFFER_BIT);
-//        glPushAttrib(GL_CURRENT_BIT);
-//            //glColor3ub(50,50,50);
-//            //glColor3ub(200,200,200);
-
-//            // CMB MSVC debugger with Qt 4.7 triggers assert if font weight > 99
-//            // QFont f;  f.setPointSize(f.pointSize()+1); f.setWeight(f.weight()+200);
-//            QFont f;  f.setPointSize(f.pointSize()+1); f.setWeight(99);
-////#if defined(USE_Qt5)
-////#else
-////            ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text), f);
-////#endif
-//            QPainter painter(this);
-//            painter.setPen(QColor(50,50,50));
-//            painter.setFont(QFont("Arial", 16));
-//            painter.drawText(QPoint(int(200),int(200)), QString(text));
-//            painter.end();
-//        glPopAttrib();
-//        glDepthFunc(GL_LEQUAL);
-//    }
-
-//    QFont f1;  f1.setPointSize((fontsize>0)?fontsize:30); f1.setWeight(99);
-////    if (fontsize>0)
-////#if defined(USE_Qt5)
-////#else
-////        ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text), f1);
-////    else
-////        ((QOpenGLWidget_proxy*)widget)->renderText(x,y,z, QString(text));
-////#endif
-
-
-//    if (shadow)
-//    {
-//        glPopAttrib();
-//    }
-//}
