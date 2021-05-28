@@ -619,6 +619,7 @@ int RayCastCanvas::process_right_button_hit(QMouseEvent *event){
             cellTracker->extendTraceWithOneAnnotation(curr_trace_id_from_click, user_click_cell_center_idx,
                                                       *cellSegmenter, curr_timePoint_in_canvas,
                                                       data_importer->filelist.at(curr_timePoint_in_canvas));
+            this->import_traces(curr_timePoint_in_canvas);
         }else if(canvasRightClickOperation == RRIGHT_CLICK_OPR_SELECT_ONE_TRACE){
             curr_trace_id_from_click = cellTracker->loc2traceId(user_click_cell_center_idx, *cellSegmenter, curr_timePoint_in_canvas,
                                                             data_importer->filelist.at(curr_timePoint_in_canvas));
@@ -630,9 +631,10 @@ int RayCastCanvas::process_right_button_hit(QMouseEvent *event){
         update();
     }else{
         QList<QAction*> listAct;
-        QAction *act=0, *actShowSingleCellTrace=0, *actContinueOneTrace;
+        QAction *act=0, *actShowSingleCellTrace=0, *actContinueOneTrace, *actReset2ShowAllTraces;
 
         listAct.append(act = new QAction("", this->parent())); act->setSeparator(true);
+        listAct.append(actReset2ShowAllTraces= new QAction("Show all traces", this->parent()));act->setSeparator(true);
         listAct.append(actShowSingleCellTrace = new QAction("Right-click to select a cell to track", this->parent()));
         listAct.append(actContinueOneTrace = new QAction("Right-click to continue the cell trace", this->parent()));
 
@@ -641,6 +643,13 @@ int RayCastCanvas::process_right_button_hit(QMouseEvent *event){
         //menu.setWindowOpacity(POPMENU_OPACITY); // no effect on MAC? on Windows cause blink
         act = menu.exec(QCursor::pos());
         if (act==0) 	return 0;
+        else if (act == actReset2ShowAllTraces){
+            bWait4RightClickOnCell = false;
+            canvasRightClickOperation = RRIGHT_CLICK_OPR_NONE;
+            curr_trace_id_from_click = -1;
+            this->import_traces(curr_timePoint_in_canvas);
+            qDebug() << "actShowAllCellTraces";
+        }
         else if (act == actShowSingleCellTrace)
         {
             bWait4RightClickOnCell = true;
@@ -1100,11 +1109,15 @@ void RayCastCanvas::import_traces(int t){
             }
         }
     }else{ // display one trace only
-        for(auto idx : cellTracker->movieInfo.tracks[curr_trace_id_from_click]){
-            if(cellTracker->movieInfo.frames[idx] > t) break;
-            traces[curr_trace_id_from_click].emplace_back(QVector3D(cellTracker->movieInfo.xCoord[idx],
-                                                           cellTracker->movieInfo.yCoord[idx],
-                                                           cellTracker->movieInfo.zCoord[idx]));
+        int end_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[curr_trace_id_from_click].rbegin()];
+        int start_time = cellTracker->movieInfo.frames[*cellTracker->movieInfo.tracks[curr_trace_id_from_click].begin()];
+        if(!(end_time < t || start_time > t)){ // if the trace has stopped before time t
+            for(auto idx : cellTracker->movieInfo.tracks[curr_trace_id_from_click]){
+                if(cellTracker->movieInfo.frames[idx] > t) break;
+                traces[curr_trace_id_from_click].emplace_back(QVector3D(cellTracker->movieInfo.xCoord[idx],
+                                                               cellTracker->movieInfo.yCoord[idx],
+                                                               cellTracker->movieInfo.zCoord[idx]));
+            }
         }
     }
     //traces.resize(trace_cnt);
@@ -1114,7 +1127,7 @@ void RayCastCanvas::import_traces(int t){
  */
 void RayCastCanvas::draw_traces(){
     QPainter painter(this);
-    int line_width = 3;
+    int line_width = 2;
     for(int tr = 0; tr<traces.size(); tr++){
         auto &trace = traces[tr];
         if(trace.empty()) continue;
@@ -1123,7 +1136,7 @@ void RayCastCanvas::draw_traces(){
         //QColor c = QColor(255,0,0);
         //painter.setPen(QPen(c, 3));
         //        qDebug() << c;
-        if(trace.size() > 1){
+        if(trace.size() > 1 || (trace.size()==1 && curr_timePoint_in_canvas==0)){
             QVector3D trace_head = volume_pixel_pos_to_view_pos(trace[0]);
             trace_head = m_modelViewProjectionMatrix * trace_head;
             this->drawPoint(&painter, c, QPointF(trace_head.x(), trace_head.y()), line_width+1);

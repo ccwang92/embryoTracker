@@ -447,18 +447,40 @@ void cellTrackingMain::extendTraceWithOneAnnotation(int trace_id, size_t idx,
 
     /** * step 3. extend the trace **/
     if(org_trace_id >= 0){
-        int extend_cnt = 0;
-        for(int i=org_loc_in_trace; i<movieInfo.tracks[org_trace_id].size(); i++){
-            movieInfo.nodes[movieInfo.tracks[org_trace_id][i]].nodeId2trackId = trace_id;
-            movieInfo.nodes[movieInfo.tracks[org_trace_id][i]].nodeLocInTrack = movieInfo.tracks[trace_id].size()+extend_cnt;
-            extend_cnt++;
+        if(t > movieInfo.frames[*movieInfo.tracks[trace_id].rbegin()]){ // append to end
+            int extend_cnt = 0;
+            for(int i=org_loc_in_trace; i<movieInfo.tracks[org_trace_id].size(); i++){
+                movieInfo.nodes[movieInfo.tracks[org_trace_id][i]].nodeId2trackId = trace_id;
+                movieInfo.nodes[movieInfo.tracks[org_trace_id][i]].nodeLocInTrack = movieInfo.tracks[trace_id].size()+extend_cnt;
+                extend_cnt++;
+            }
+            movieInfo.tracks[trace_id].insert(movieInfo.tracks[trace_id].end(),
+                                              movieInfo.tracks[org_trace_id].begin()+org_loc_in_trace,
+                                              movieInfo.tracks[org_trace_id].end());
+            movieInfo.tracks[org_trace_id].resize(org_loc_in_trace);
+        }else if(t < movieInfo.frames[*movieInfo.tracks[trace_id].begin()]){
+            int extend_cnt = 0;
+            for(int i=0; i<=org_loc_in_trace; i++){
+                movieInfo.nodes[movieInfo.tracks[org_trace_id][i]].nodeId2trackId = trace_id;
+                movieInfo.nodes[movieInfo.tracks[org_trace_id][i]].nodeLocInTrack = movieInfo.tracks[trace_id].size()+extend_cnt;
+                extend_cnt++;
+            }
+            movieInfo.tracks[trace_id].insert(movieInfo.tracks[trace_id].begin(),
+                                              movieInfo.tracks[org_trace_id].begin(),
+                                              movieInfo.tracks[org_trace_id].begin()+org_loc_in_trace+1);
+            movieInfo.tracks[org_trace_id].erase(movieInfo.tracks[org_trace_id].begin(),
+                                                 movieInfo.tracks[org_trace_id].begin()+org_loc_in_trace+1);
+        }else{
+            qDebug()<< "Function for cell change in between a trace has not implemented !";
         }
-        movieInfo.tracks[trace_id].insert(movieInfo.tracks[trace_id].end(),
-                                          movieInfo.tracks[org_trace_id].begin(),
-                                          movieInfo.tracks[org_trace_id].end());
-        movieInfo.tracks[org_trace_id].resize(org_loc_in_trace);
     }else{
-        movieInfo.tracks[trace_id].push_back(org_node_id);
+        if(t > movieInfo.frames[*movieInfo.tracks[trace_id].rbegin()]){
+            movieInfo.tracks[trace_id].push_back(org_node_id);
+        }else if(t < movieInfo.frames[*movieInfo.tracks[trace_id].begin()]){
+            movieInfo.tracks[trace_id].insert(movieInfo.tracks[trace_id].begin(), org_node_id);
+        }else{
+            qDebug()<< "Function for cell change in between a trace has not implemented !";
+        }
         movieInfo.nodes[org_node_id].nodeId2trackId = trace_id;
         movieInfo.nodes[org_node_id].nodeLocInTrack = movieInfo.tracks[trace_id].size()-1;
     }
