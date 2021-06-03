@@ -37,7 +37,7 @@ SOURCES += data_importer.cpp \
     src_3rd/basic_c_fun/mg_utilities.cpp \
     src_3rd/basic_c_fun/stackutil.cpp \
     src_3rd/basic_c_fun/v3d_message.cpp \
-    src_3rd/cellseg/FL_morphology.cpp \
+#    src_3rd/cellseg/FL_morphology.cpp \
     src_3rd/io/io_bioformats.cpp
 
 HEADERS += data_importer.h \
@@ -76,33 +76,33 @@ HEADERS += data_importer.h \
     src_3rd/basic_c_fun/v3d_message.h \
     src_3rd/basic_c_fun/volimg_proc.h \
     src_3rd/basic_c_fun/volimg_proc_declare.h \
-    src_3rd/cellseg/FL_accessory.h \
-    src_3rd/cellseg/FL_adaptiveThreshold3D.h \
-    src_3rd/cellseg/FL_bwdist.h \
-    src_3rd/cellseg/FL_bwlabel2D3D.h \
-    src_3rd/cellseg/FL_cellSegmentation3D.h \
-    src_3rd/cellseg/FL_coordDefinition.h \
-    src_3rd/cellseg/FL_defType.h \
-    src_3rd/cellseg/FL_distanceTransform3D.h \
-    src_3rd/cellseg/FL_downSample3D.h \
-    src_3rd/cellseg/FL_filter3D.h \
-    src_3rd/cellseg/FL_gvfCellSeg.h \
-    src_3rd/cellseg/FL_interpolateCoordCubic3D.h \
-    src_3rd/cellseg/FL_interpolateCoordLinear3D.h \
-    src_3rd/cellseg/FL_main_brainseg.h \
-    src_3rd/cellseg/FL_morphology.h \
-    src_3rd/cellseg/FL_neighborhood.h \
-    src_3rd/cellseg/FL_neighborhoodWalker.h \
-    src_3rd/cellseg/FL_queue.h \
-    src_3rd/cellseg/FL_regionProps.h \
-    src_3rd/cellseg/FL_sort.h \
-    src_3rd/cellseg/FL_sort2.h \
-    src_3rd/cellseg/FL_threshold.h \
-    src_3rd/cellseg/FL_unionFind.h \
-    src_3rd/cellseg/FL_upSample3D.h \
-    src_3rd/cellseg/FL_volimgProcLib.h \
-    src_3rd/cellseg/FL_watershed_vs.h \
-    src_3rd/cellseg/nrutil.h \
+#    src_3rd/cellseg/FL_accessory.h \
+#    src_3rd/cellseg/FL_adaptiveThreshold3D.h \
+#    src_3rd/cellseg/FL_bwdist.h \
+#    src_3rd/cellseg/FL_bwlabel2D3D.h \
+#    src_3rd/cellseg/FL_cellSegmentation3D.h \
+#    src_3rd/cellseg/FL_coordDefinition.h \
+#    src_3rd/cellseg/FL_defType.h \
+#    src_3rd/cellseg/FL_distanceTransform3D.h \
+#    src_3rd/cellseg/FL_downSample3D.h \
+#    src_3rd/cellseg/FL_filter3D.h \
+#    src_3rd/cellseg/FL_gvfCellSeg.h \
+#    src_3rd/cellseg/FL_interpolateCoordCubic3D.h \
+#    src_3rd/cellseg/FL_interpolateCoordLinear3D.h \
+#    src_3rd/cellseg/FL_main_brainseg.h \
+#    src_3rd/cellseg/FL_morphology.h \
+#    src_3rd/cellseg/FL_neighborhood.h \
+#    src_3rd/cellseg/FL_neighborhoodWalker.h \
+#    src_3rd/cellseg/FL_queue.h \
+#    src_3rd/cellseg/FL_regionProps.h \
+#    src_3rd/cellseg/FL_sort.h \
+#    src_3rd/cellseg/FL_sort2.h \
+#    src_3rd/cellseg/FL_threshold.h \
+#    src_3rd/cellseg/FL_unionFind.h \
+#    src_3rd/cellseg/FL_upSample3D.h \
+#    src_3rd/cellseg/FL_volimgProcLib.h \
+#    src_3rd/cellseg/FL_watershed_vs.h \
+#    src_3rd/cellseg/nrutil.h \
     src_3rd/io/io_bioformats.h \
 #    src_3rd/v3d/import_images_tool_dialog.h
 
