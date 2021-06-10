@@ -525,6 +525,7 @@ void cellTrackingMain::extractTraceLocations(vector<int> data_size_yxzt, int wid
         }
     }
 }
+
 /**
  * @brief merge_broken_tracks: for node-neighbor pair with cost of dist_c2n or dist_n2c smaller than obz_cost, link them
  */
@@ -537,6 +538,7 @@ void cellTrackingMain::merge_broken_tracks(){
             if (movieInfo.nodes[nr.node_id].parent_num == 0 &&
                     isBestNeighbor(nf.node_id, nr.node_id, best_cost)){
                 int f_diff = movieInfo.frames[nr.node_id] - movieInfo.frames[nf.node_id];
+
                 best_cost = distance2cost(MIN(nr.dist_n2c, nr.dist_c2n), p4tracking.jumpCost[f_diff-1]);
                 if(best_cost < abs(p4tracking.observationCost)){
                     nf.kids[nf.kid_num] = nr.node_id;

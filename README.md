@@ -11,6 +11,18 @@ This is an on-going project aiming to build a platform that supports 3D+time (co
   <img height="500" src="imgs/seg_res.png">
 </p>
 
+
+# Run the software
+The software is still under development. The code was tested with Ubuntu 18.04.5 LTS and Ubuntu 16.04 LTS. The IDE and compiler are Qt 5.15.2 and GCC 5.3.1. Newer Linux, Qt, or GCC versions should also work.
+1. Clone the project to your local hard drive.
+
+2. Download the 3rd-party vaa3d codes [here](https://drive.google.com/drive/folders/18ZK8gdnF8-MK2oPed-6jtIGr6tMEXAia?usp=sharing) for tiff data loading and put it (the folder 'src_3rd') at the root folder of the project.
+
+3. Install OpenCV and Boost libraries to your system.
+
+4. Use Qt to compile the code by opening the .pro file.
+
+
 # Other resources
 [synQuant](https://github.com/yu-lab-vt/SynQuant), [muSSP](https://github.com/yu-lab-vt/muSSP), [CINDA](https://github.com/yu-lab-vt/CINDA), [Vaa3d project.](https://github.com/Vaa3D), [RayCasting volume rendering](https://martinopilia.com/posts/2018/09/17/volume-raycasting.html) and [QDarkStyleSheet.](https://github.com/ColinDuquesnoy/QDarkStyleSheet)
 
