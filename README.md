@@ -14,6 +14,8 @@ This is an on-going project aiming to build a platform that supports 3D+time (co
 
 # Run the software
 The software is still under development. The code was tested with Ubuntu 18.04.5 LTS and Ubuntu 16.04 LTS. The IDE and compiler are Qt creator with Qt v5.15.2 and GCC 5.3.1. Newer Linux, Qt, or GCC versions should also work.
+
+To test the visualiztion, tracking and annotation functions:
 1. Clone the project to your local hard drive.
 
 2. Download the 3rd-party vaa3d codes [here](https://drive.google.com/file/d/1OZO8f1_ia27ccgzRlfL-i-3oZzX5O8QP/view?usp=sharing) for tiff data loading.
