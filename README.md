@@ -16,11 +16,17 @@ This is an on-going project aiming to build a platform that supports 3D+time (co
 The software is still under development. The code was tested with Ubuntu 18.04.5 LTS and Ubuntu 16.04 LTS. The IDE and compiler are Qt creator with Qt v5.15.2 and GCC 5.3.1. Newer Linux, Qt, or GCC versions should also work.
 1. Clone the project to your local hard drive.
 
-2. Download the 3rd-party vaa3d codes [here](https://drive.google.com/drive/folders/18ZK8gdnF8-MK2oPed-6jtIGr6tMEXAia?usp=sharing) for tiff data loading and put it (the folder 'src_3rd') at the root folder of the project.
+2. Download the 3rd-party vaa3d codes [here](https://drive.google.com/file/d/1OZO8f1_ia27ccgzRlfL-i-3oZzX5O8QP/view?usp=sharing) for tiff data loading.
+
+3. Unzip the codes and put it (the folder 'src_3rd') at the root folder of the project.
 
 3. Install OpenCV and Boost libraries to your system.
 
 4. Use Qt to compile the code by opening the .pro file.
+
+5. A sample data and analysis results can be found [here](https://drive.google.com/file/d/1h4X6FDUYXzntEM5IVhjifqZODHooDw6E/view?usp=sharing). Run the software, click File->Import image stack.... From the prompt window, select any tif file in the sample data and then enjoy.
+
+<!-- Here are the specs of the PC currently for software development for reference: CPU i5-6600 CPU @ 3.30GHz; Mem 48GB; GPU GeForce GTX 1050 Ti; Hard drive 2T SSD. -->
 
 
 # Other resources
