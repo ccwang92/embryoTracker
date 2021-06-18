@@ -2,8 +2,10 @@
 MIVAQ (Microscopic Image Visualization, Annotation and Quantification) is an on-going project aiming to build a platform that supports 3D+time (colorful or gray) imaging data visualization, cell segmentation, cell tracking and results curation. It is built using Qt with C/C++ and OpenGL.
 
 ## Current interface and visualization quality
+<p>
 <img align="left" height="300" src="imgs/org_im3d.png">
 <img align="right" height="300" src="imgs/seg_res.png">
+</p>
 
 # Run the software
 The software is still under development. The code was tested with Ubuntu 18.04.5 LTS and Ubuntu 16.04 LTS. The IDE and compiler are Qt creator with Qt v5.15.2 and GCC 5.3.1. Newer Linux, Qt, or GCC versions should also work.
