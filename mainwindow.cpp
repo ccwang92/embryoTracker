@@ -155,8 +155,8 @@ void MainWindow::createControlWidgets()
     saveTrackCheckBox = new QCheckBox("Save Tracking Results", saveResultGroup);
     changeSaveFolderButton = new QPushButton("Change Folder", saveResultGroup);
     saveFolder = new QLineEdit;
-    saveFolderName = "";
-    saveFolder->setText(saveFolderName);
+    saveFolderPath = "";
+    saveFolder->setText(saveFolderPath);
     saveResultsOptGroup->addWidget(saveSegCheckBox, 1, 0, 1, 21);
     saveResultsOptGroup->addWidget(saveTrackCheckBox, 2, 0, 1, 21);
     saveResultsOptGroup->addWidget(new QLabel("Save Folder"), 3, 0, 1, 8);
@@ -285,6 +285,10 @@ void MainWindow::connectSignal()
         connect(debugButton, SIGNAL(triggered()), this, SLOT(debugAlgorithm()));
     }
 
+    /** results saving panel */
+    if(changeSaveFolderButton){
+        connect(changeSaveFolderButton, SIGNAL(clicked()), this, SLOT(setSavePath()));//setBackgroundColor/
+    }
     /** annotation from glWidget_raycast to update the */
 
 }
@@ -301,6 +305,13 @@ void MainWindow::importImageSeries()
         {
             if(data4test->importData(filename)) //load data from given paths
             {
+                // update results saving panel
+                saveSegCheckBox->setChecked(true);
+                saveTrackCheckBox->setChecked(true);
+                //changeSaveFolderButton = new QPushButton("Change Folder", saveResultGroup);
+                int x = filename.lastIndexOf('/');
+                saveFolderPath = filename.left(x);
+                saveFolder->setText(saveFolderPath);
                 emit signalDataLoaded();
             }else{
                 throw;
@@ -323,23 +334,7 @@ void MainWindow::importImageSeries()
         }
     }
 }
-//void MainWindow::zeroViewPiont(){
-//    if (widget_type == my_simple_test_type){
-////        glWidget_simple->xRotationChanged(0);
-////        glWidget_simple->yRotationChanged(0);
-////        glWidget_simple->zRotationChanged(0);
-//    }
-//    else if (widget_type == raycast_type){
-//        glWidget_raycast->set
-//        //glWidget_raycast->xRotationChanged(0);
-//        //glWidget_raycast->yRotationChanged(0);
-//        //glWidget_raycast->zRotationChanged(0);
-//    }
-//    else //vaa3d_type
-//    {
-//        //
-//    }
-//}
+
 MainWindow::~MainWindow()
 {
 }
@@ -666,3 +661,13 @@ void MainWindow::setBackgroundColor(){
 //void MainWindow::setAxesCheckBox(bool axesOn){
 //    axesCheckBox->setChecked(axesOn);
 //}
+
+void MainWindow::setSavePath(){
+    if(saveSegCheckBox->isChecked() || saveTrackCheckBox->isChecked()){
+        QString tmp = QFileDialog::getExistingDirectory(this, "Select a folder to save results");
+        if (!tmp.isEmpty()){
+            saveFolderPath = tmp;
+            saveFolder->setText(saveFolderPath);
+        }
+    }
+}

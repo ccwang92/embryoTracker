@@ -38,6 +38,7 @@ public slots:
     void transferRGBAVolume(int t);
     void setTimeBasedOnCurrentStatus(int t);
     void setBackgroundColor();
+    void setSavePath();
     //void setAxesCheckBox(bool axesOn);
     // parameters
 public:
@@ -65,7 +66,7 @@ public:
     QCheckBox *saveSegCheckBox, *saveTrackCheckBox;
     QPushButton *changeSaveFolderButton;
     QLineEdit *saveFolder;
-    QString saveFolderName;
+    QString saveFolderPath;
     // major widget
     QScrollArea *glWidgetArea = 0;
     int widget_type = raycast_type;
