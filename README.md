@@ -9,7 +9,7 @@ MIVAQ (Microscopic Image Visualization, Annotation and Quantification) is an on-
 
 
 # Run the software
-The software is still under development. The code was tested with Ubuntu 18.04.5 LTS and Ubuntu 16.04 LTS. The IDE and compiler are Qt creator with Qt v5.15.2 and GCC 5.3.1. Newer Linux, Qt, or GCC versions should also work.
+The software is still under development. The code was tested with Ubuntu 18.04 LTS and Ubuntu 16.04 LTS. The IDE and compiler are Qt creator with Qt v5.15.2 and GCC 5.3.1. Newer Linux, Qt, or GCC versions should also work.
 
 To test the visualiztion, tracking and annotation functions:
 1. Clone the project to your local hard drive.
