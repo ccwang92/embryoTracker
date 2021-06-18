@@ -1,4 +1,4 @@
-# MIVAQ: A unified cell tracking, visualization and annotation platform
+# MIVAQ: a unified cell tracking, visualization and annotation platform
 MIVAQ (Microscopic Image Visualization, Annotation and Quantification) is an on-going project aiming to build a platform that supports 3D+time (colorful or gray) imaging data visualization, cell segmentation, cell tracking and results curation. It is built using Qt with C/C++ and OpenGL.
 
 ## Current interface and visualization quality
