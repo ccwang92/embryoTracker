@@ -18,9 +18,8 @@ The software is still under development. The code was tested with Ubuntu 18.04.5
 To test the visualiztion, tracking and annotation functions:
 1. Clone the project to your local hard drive.
 
-2. Download the 3rd-party vaa3d codes [here](https://drive.google.com/file/d/1OZO8f1_ia27ccgzRlfL-i-3oZzX5O8QP/view?usp=sharing) for tiff data loading.
-
-3. Unzip the codes and put it (the folder 'src_3rd') at the root folder of the project.
+<!-- 2. Download the 3rd-party vaa3d codes [here](https://drive.google.com/file/d/1OZO8f1_ia27ccgzRlfL-i-3oZzX5O8QP/view?usp=sharing) for tiff data loading. -->
+2. Download the CINDA package for data association [here](https://github.com/yu-lab-vt/CINDA) and put it in the folder of celltracking.
 
 3. Install OpenCV and Boost libraries to your system.
 
