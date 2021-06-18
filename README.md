@@ -25,7 +25,7 @@ To test the visualiztion, tracking and annotation functions:
 
 4. Use Qt to compile the code by opening the .pro file.
 
-5. A sample data and analysis results can be found [here](https://drive.google.com/file/d/1h4X6FDUYXzntEM5IVhjifqZODHooDw6E/view?usp=sharing). Run the software, click File->Import image stack.... From the prompt window, select any tif file in the sample data and then enjoy.
+5. A sample data and analysis results can be found [here](https://drive.google.com/file/d/1h4X6FDUYXzntEM5IVhjifqZODHooDw6E/view?usp=sharing). Run the software, click File->Import image stack... . From the prompt window, select any tif file in the sample data and then enjoy.
 
 <!-- Here are the specs of the PC currently for software development for reference: CPU i5-6600 CPU @ 3.30GHz; Mem 48GB; GPU GeForce GTX 1050 Ti; Hard drive 2T SSD. -->
 
